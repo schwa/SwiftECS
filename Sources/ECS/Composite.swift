@@ -35,3 +35,15 @@ extension Composite: Hashable where repeat each T: Hashable {
 /// Sendable conformance when all elements are Sendable.
 extension Composite: Sendable where repeat each T: Sendable {
 }
+
+extension Composite: Comparable where repeat each T: Comparable {
+    public static func < (lhs: Self, rhs: Self) -> Bool {
+        for (left, right) in repeat (each lhs.values, each rhs.values) {
+            guard left < right else {
+                return false
+            }
+        }
+        return true
+    }
+}
+
