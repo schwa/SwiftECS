@@ -19,6 +19,12 @@ public struct EntityID: Hashable, Equatable, Sendable {
     }
 }
 
+extension EntityID: Comparable {
+    public static func < (lhs: EntityID, rhs: EntityID) -> Bool {
+        lhs.value < rhs.value
+    }
+}
+
 extension EntityID: Codable {
     public init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
