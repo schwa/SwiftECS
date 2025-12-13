@@ -90,7 +90,7 @@ struct Physics: Component {
     var entities: [Entity] = []
 
     for i in 0..<10_000 {
-        entities.append(world.createEntity( Position(x: Double(i), y: 0)))
+        entities.append(world.createEntity(Position(x: Double(i), y: 0)))
     }
 
     let time = measureTime {
@@ -105,7 +105,7 @@ struct Physics: Component {
 
 // MARK: - Iteration Tests
 
-@Test func stressTestForEach_100K() {
+@Test func stressTestQueryIteration_100K() {
     let world = World()
 
     for i in 0..<100_000 {
@@ -117,13 +117,40 @@ struct Physics: Component {
 
     var sum = 0.0
     let time = measureTime {
-        world.forEach(Position.self, Velocity.self) { _, pos, vel in
+        for entity in world.query(with: Position.self, Velocity.self) {
+            let (pos, vel) = entity.get(Position.self, Velocity.self)!.values
             sum += pos.x + vel.dx
         }
     }
 
     #expect(sum > 0)
-    print("⏱ forEach iteration (100K entities): \(String(format: "%.2f", time))ms")
+    print("⏱ Query iteration (100K entities): \(String(format: "%.2f", time))ms")
+}
+
+@Test func stressTestRegisteredQueryIteration_100K() {
+    let world = World()
+
+    for i in 0..<100_000 {
+        world.createEntity(
+            Position(x: Double(i), y: 0),
+            Velocity(dx: 1, dy: 1)
+        )
+    }
+
+    let query = Query(with: Position.self, Velocity.self)
+    world.register(query)
+    
+    var sum = 0.0
+    let time = measureTime {
+        for entity in world.entities(query) {
+            let pos = entity[Position.self]!
+            let vel = entity[Velocity.self]!
+            sum += pos.x + vel.dx
+        }
+    }
+
+    #expect(sum > 0)
+    print("⏱ Registered query iteration (100K entities): \(String(format: "%.2f", time))ms")
 }
 
 @Test func stressTestPhysicsUpdate_100K() {
@@ -140,15 +167,73 @@ struct Physics: Component {
 
     let time = measureTime {
         for _ in 0..<60 {
-            world.forEachMutable(Transform.self, Physics.self) { _, transform, physics in
+            for entity in world.query(with: Transform.self, Physics.self) {
+                var (transform, physics) = entity.get(Transform.self, Physics.self)!.values
                 transform.x += physics.velocityX * deltaTime
                 transform.y += physics.velocityY * deltaTime
                 transform.z += physics.velocityZ * deltaTime
+                entity.set(transform, physics)
             }
         }
     }
 
     print("⏱ 60 physics updates on 100000 entities in \(String(format: "%.2f", time))ms")
+    print("   Average per frame: \(String(format: "%.2f", time / 60.0))ms")
+}
+
+@Test func stressTestRegisteredPhysicsUpdate_100K() {
+    let world = World()
+
+    for i in 0..<100_000 {
+        world.createEntity(
+            Transform(x: Double(i), y: 0, z: 0),
+            Physics(velocityX: 1, velocityY: 2, velocityZ: 0)
+        )
+    }
+
+    let query = Query(with: Transform.self, Physics.self)
+    world.register(query)
+    let deltaTime = 1.0 / 60.0
+
+    let time = measureTime {
+        for _ in 0..<60 {
+            for entity in world.entities(query) {
+                entity[Transform.self]!.x += entity[Physics.self]!.velocityX * deltaTime
+                entity[Transform.self]!.y += entity[Physics.self]!.velocityY * deltaTime
+                entity[Transform.self]!.z += entity[Physics.self]!.velocityZ * deltaTime
+            }
+        }
+    }
+
+    print("⏱ 60 registered physics updates on 100000 entities in \(String(format: "%.2f", time))ms")
+    print("   Average per frame: \(String(format: "%.2f", time / 60.0))ms")
+}
+
+@Test func stressTestFastPhysicsUpdate_100K() {
+    let world = World()
+
+    for i in 0..<100_000 {
+        world.createEntity(
+            Transform(x: Double(i), y: 0, z: 0),
+            Physics(velocityX: 1, velocityY: 2, velocityZ: 0)
+        )
+    }
+
+    let query = Query(with: Transform.self, Physics.self)
+    world.register(query)
+    let deltaTime = 1.0 / 60.0
+
+    let time = measureTime {
+        for _ in 0..<60 {
+            for ref in world.entities(query, Transform.self, Physics.self) {
+                ref[Transform.self].x += ref[Physics.self].velocityX * deltaTime
+                ref[Transform.self].y += ref[Physics.self].velocityY * deltaTime
+                ref[Transform.self].z += ref[Physics.self].velocityZ * deltaTime
+            }
+        }
+    }
+
+    print("⏱ 60 FAST physics updates on 100000 entities in \(String(format: "%.2f", time))ms")
     print("   Average per frame: \(String(format: "%.2f", time / 60.0))ms")
 }
 
@@ -166,7 +251,7 @@ struct Physics: Component {
 
     let time = measureTime {
         for _ in 0..<60 {
-            world.update(deltaTime: 1.0 / 60.0)
+            try! world.update(deltaTime: 1.0 / 60.0)
         }
     }
 
@@ -181,7 +266,7 @@ struct Physics: Component {
 
     for i in 0..<100_000 {
         if i % 2 == 0 {
-            world.createEntity( Position(x: Double(i), y: 0))
+            world.createEntity(Position(x: Double(i), y: 0))
         } else {
             world.createEntity(
                 Position(x: Double(i), y: 0),
@@ -193,14 +278,14 @@ struct Physics: Component {
     var total = 0
     let time = measureTime {
         for _ in 0..<100 {
-            total += world.entities(with: Position.self).count
-            total += world.entities(with: Velocity.self).count
-            total += world.entities(with: Position.self, Velocity.self).count
+            total += world.query(with: Position.self).count
+            total += world.query(with: Velocity.self).count
+            total += world.query(with: Position.self, Velocity.self).count
         }
     }
 
     #expect(total > 0)
-    print("⏱ 300 entities queries on 100000 entities in \(String(format: "%.2f", time))ms")
+    print("⏱ 300 queries on 100000 entities in \(String(format: "%.2f", time))ms")
 }
 
 // MARK: - Mixed Operations Test
@@ -223,9 +308,11 @@ struct Physics: Component {
     // Update (30 frames)
     let updateTime = measureTime {
         for _ in 0..<30 {
-            world.forEachMutable(Position.self, Velocity.self) { _, pos, vel in
+            for entity in world.query(with: Position.self, Velocity.self) {
+                var (pos, vel) = entity.get(Position.self, Velocity.self)!.values
                 pos.x += vel.dx
                 pos.y += vel.dy
+                entity.set(pos, vel)
             }
         }
     }

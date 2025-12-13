@@ -19,10 +19,16 @@ struct Health: Component {
 // MARK: - Test Systems
 
 struct MovementSystem: System {
+    static let query = Query(with: Position.self, Velocity.self)
+    
+    func initialize(world: World) {
+        world.register(Self.query)
+    }
+    
     func update(world: World, deltaTime: Double) {
-        world.forEachMutable(Position.self, Velocity.self) { _, pos, vel in
-            pos.x += vel.dx * deltaTime
-            pos.y += vel.dy * deltaTime
+        for entity in world.entities(Self.query) {
+            entity[Position.self]!.x += entity[Velocity.self]!.dx * deltaTime
+            entity[Position.self]!.y += entity[Velocity.self]!.dy * deltaTime
         }
     }
 }

@@ -11,11 +11,15 @@ let package = Package(
             targets: ["ECS"])
     ],
     dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0")
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.0")
     ],
     targets: [
         .target(
-            name: "ECS"),
+            name: "ECS",
+            dependencies: [
+                .product(name: "Collections", package: "swift-collections")
+            ]),
         .testTarget(
             name: "ECSTests",
             dependencies: ["ECS"])

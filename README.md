@@ -6,6 +6,14 @@ A high-performance Entity Component System for Swift using archetype-based stora
 
 ECS is an architectural pattern that separates data (Components) from behavior (Systems). Entities are unique IDs that group components together. This implementation uses archetype storage for cache-friendly iteration.
 
+## Features
+
+- **Archetype-based storage** for cache-friendly iteration
+- **@Observable World** with curated observable properties for SwiftUI integration
+- **Simulation time tracking** via `world.simulationTime`
+- **Query predicates** for flexible entity filtering
+- **System dependencies** with automatic topological ordering
+
 ## Requirements
 
 - Swift 6.2+
@@ -60,9 +68,12 @@ struct MovementSystem: System {
     }
 }
 
-// Run
+// Run simulation
 world.addSystem(MovementSystem())
-world.update(deltaTime: 1.0 / 60.0)
+try world.update(deltaTime: 1.0 / 60.0)
+
+// Check simulation time
+print(world.simulationTime)  // Accumulated time from all updates
 ```
 
 ## Architecture
@@ -93,21 +104,22 @@ Archetype {Position}
 
 ## API Reference
 
-### Entity Management
+### World
 
 ```swift
-// Create entities
-let e1 = world.createEntity()                              // Empty entity
-let e2 = world.createEntity(Position(x: 0, y: 0))          // With components
-let e3 = world.createEntity(pos, vel, health)              // Variadic
+let world = World()
 
-// Access by ID
+// World is @Observable - simulationTime triggers SwiftUI updates
+world.simulationTime        // Double - accumulated time from updates
+
+// Entity management
+world.createEntity()                              // Empty entity
+world.createEntity(Position(x: 0, y: 0))          // With components
+world.createEntity(pos, vel, health)              // Variadic
 world[entityID]             // Entity?
-
-// Query
 world.entities              // [Entity] - all entities
-world.entities(with: Position.self)                        // With 1 component
-world.entities(with: Position.self, Velocity.self)         // With multiple
+world.entities(with: Position.self)               // With 1 component
+world.entities(with: Position.self, Velocity.self) // With multiple
 world.entityCount           // Int
 ```
 
@@ -160,9 +172,26 @@ struct MySystem: System {
 
 // Usage
 world.addSystem(MySystem())
-world.update(deltaTime: dt)
+try world.update(deltaTime: dt)  // Updates systems, then increments simulationTime
 world.removeAllSystems()
 ```
+
+### SwiftUI Integration
+
+`World` is `@Observable` with carefully curated observable properties:
+
+```swift
+struct GameView: View {
+    let world: World
+    
+    var body: some View {
+        // View updates when simulationTime changes (once per frame)
+        Text("Time: \(world.simulationTime, format: .number.precision(.fractionLength(2)))")
+    }
+}
+```
+
+Only `simulationTime` triggers observation. Internal state (entities, archetypes, systems) is marked `@ObservationIgnored` to avoid excessive UI updates during high-frequency ECS operations.
 
 ## Performance
 

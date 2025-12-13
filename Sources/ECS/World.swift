@@ -1,10 +1,37 @@
+import Collections
+import Observation
+
+/// Metadata for a registered system.
+struct SystemEntry {
+    let system: System
+    let dependencies: [SystemID]
+}
+
 /// Container for entities, components, and systems.
+@Observable
 public final class World {
-    private var nextEntityID: UInt64 = 0
-    private var systems: [System] = []
-    private var archetypes: [ArchetypeSignature: Archetype] = [:]
-    private var entityLocations: [EntityID: EntityLocation] = [:]
+    @ObservationIgnored
+    internal var systems: OrderedDictionary<SystemID, SystemEntry> = [:]
+    @ObservationIgnored
+    internal var systemOrder: [SystemID] = []  // Topologically sorted system IDs
+    @ObservationIgnored
+    private var systemOrderDirty: Bool = false
+    @ObservationIgnored
+    internal var archetypes: [ArchetypeSignature: Archetype] = [:]
+    @ObservationIgnored
+    internal var entityLocations: [EntityID: EntityLocation] = [:]
+    @ObservationIgnored
     private let emptySignature = ArchetypeSignature()
+    @ObservationIgnored
+    private let observers = ObserverRegistry()
+    
+    // Registered query support
+    @ObservationIgnored
+    internal var registeredQueries: [Query: RegisteredQueryCache] = [:]
+    
+    /// The current simulation time (accumulated deltaTime from all updates).
+    /// This is observable and updates once per `update()` call.
+    public private(set) var simulationTime: Double = 0.0
 
     /// Create an empty world.
     public init() {
@@ -16,8 +43,7 @@ public final class World {
     /// Create an entity with no components.
     @discardableResult
     public func createEntity() -> Entity {
-        let id = EntityID(nextEntityID)
-        nextEntityID += 1
+        let id = generateUniqueEntityID()
 
         let archetype = archetypes[emptySignature]!
         let index = archetype.addEntity(id)
@@ -29,11 +55,10 @@ public final class World {
     /// Create an entity with components.
     @discardableResult
     public func createEntity<each T: Component>(_ components: repeat each T) -> Entity {
-        let id = EntityID(nextEntityID)
-        nextEntityID += 1
+        let id = generateUniqueEntityID()
 
-        var typeIDs = Set<ObjectIdentifier>()
-        for typeID in repeat ObjectIdentifier((each T).self) {
+        var typeIDs = Set<ComponentType>()
+        for typeID in repeat ComponentType((each T).self) {
             typeIDs.insert(typeID)
         }
 
@@ -59,6 +84,22 @@ public final class World {
         return true
     }
 
+    /// Clone an entity, creating a new entity with copies of all components.
+    @discardableResult
+    public func cloneEntity(_ id: EntityID) -> Entity? {
+        guard let location = entityLocations[id],
+              let sourceArchetype = archetypes[location.signature] else { return nil }
+
+        let newID = generateUniqueEntityID()
+        let targetArchetype = getOrCreateArchetype(location.signature)
+
+        let newIndex = targetArchetype.addEntity(newID)
+        sourceArchetype.copyComponents(at: location.index, to: targetArchetype, targetIndex: newIndex)
+        entityLocations[newID] = EntityLocation(signature: location.signature, index: newIndex)
+
+        return Entity(id: newID, world: self)
+    }
+
     /// Check if an entity exists.
     public func entityExists(_ id: EntityID) -> Bool {
         entityLocations[id] != nil
@@ -75,21 +116,56 @@ public final class World {
         entityLocations.count
     }
 
+    // MARK: - Entity ID Generation (Private)
+
+    private func generateUniqueEntityID() -> EntityID {
+        var id = EntityID()
+        while entityLocations[id] != nil {
+            id = EntityID()
+        }
+        return id
+    }
+
+    // MARK: - Component Observers
+
+    /// Register an observer for component events.
+    /// Returns a token that can be used to unregister the observer.
+    @discardableResult
+    public func observe<T: Component>(
+        _ type: T.Type,
+        handler: @escaping (ComponentEvent<T>) -> Void
+    ) -> ObservationToken {
+        observers.observe(type, handler: handler)
+    }
+
+    /// Unregister an observer.
+    public func removeObserver(_ token: ObservationToken) {
+        observers.removeObserver(token)
+    }
+
     // MARK: - Component Access (Internal)
 
     internal func addComponent<T: Component>(_ component: T, to entityID: EntityID) {
         guard let location = entityLocations[entityID] else { return }
-        let typeID = ObjectIdentifier(T.self)
+        let typeID = ComponentType(T.self)
 
-        if location.signature.contains(typeID) {
+        let isNewComponent = !location.signature.contains(typeID)
+
+        if !isNewComponent {
+            // Update existing component
             if let archetype = archetypes[location.signature] {
                 archetype.setComponent(component, at: location.index)
             }
+            // Notify observers of change
+            observers.notifyChanged(entity: Entity(id: entityID, world: self), component: component)
             return
         }
 
         let newSignature = location.signature.adding(typeID)
         moveEntity(entityID, from: location, to: newSignature, addingComponent: component)
+
+        // Notify observers of addition
+        observers.notifyAdded(entity: Entity(id: entityID, world: self), component: component)
     }
 
     internal func component<T: Component>(_ type: T.Type, for entityID: EntityID) -> T? {
@@ -101,7 +177,7 @@ public final class World {
     @discardableResult
     internal func removeComponent<T: Component>(_ type: T.Type, from entityID: EntityID) -> T? {
         guard let location = entityLocations[entityID] else { return nil }
-        let typeID = ObjectIdentifier(T.self)
+        let typeID = ComponentType(T.self)
 
         guard location.signature.contains(typeID) else { return nil }
 
@@ -110,12 +186,17 @@ public final class World {
         let newSignature = location.signature.removing(typeID)
         moveEntity(entityID, from: location, to: newSignature, removingType: typeID)
 
+        // Notify observers of removal
+        if let value {
+            observers.notifyRemoved(entity: Entity(id: entityID, world: self), component: value)
+        }
+
         return value
     }
 
     internal func hasComponent<T: Component>(_ type: T.Type, for entityID: EntityID) -> Bool {
         guard let location = entityLocations[entityID] else { return false }
-        return location.signature.contains(ObjectIdentifier(type))
+        return location.signature.contains(ComponentType(type))
     }
 
     // MARK: - Archetype Management (Private)
@@ -126,7 +207,17 @@ public final class World {
         }
         let archetype = Archetype(signature: signature)
         archetypes[signature] = archetype
+        
+        // Invalidate all registered query caches when a new archetype is created
+        invalidateRegisteredQueryCaches()
+        
         return archetype
+    }
+    
+    private func invalidateRegisteredQueryCaches() {
+        for (_, cache) in registeredQueries {
+            cache.isDirty = true
+        }
     }
 
     private func moveEntity<T: Component>(
@@ -153,7 +244,7 @@ public final class World {
         _ entityID: EntityID,
         from oldLocation: EntityLocation,
         to newSignature: ArchetypeSignature,
-        removingType: ObjectIdentifier
+        removingType: ComponentType
     ) {
         guard let oldArchetype = archetypes[oldLocation.signature] else { return }
         let newArchetype = getOrCreateArchetype(newSignature)
@@ -168,161 +259,121 @@ public final class World {
         entityLocations[entityID] = EntityLocation(signature: newSignature, index: newIndex)
     }
 
-    // MARK: - Iteration
-
-    // TODO: Swift compiler crashes (signal 5) in SILGen when using parameter packs with Composite.
-    // This would be the ideal variadic forEach using Composite to bundle components.
-    // Crashes in emitPackExpansionIntoPack - tested with Swift 6.0, 6.1, 6.2.
-    // See: https://github.com/swiftlang/swift/issues
-    //
-    // public func forEach<each T: Component>(
-    //     _ types: repeat (each T).Type,
-    //     body: (Entity, Composite<repeat each T>) -> Void
-    // ) {
-    //     var typeIDs = Set<ObjectIdentifier>()
-    //     for typeID in repeat ObjectIdentifier((each T).self) {
-    //         typeIDs.insert(typeID)
-    //     }
-    //
-    //     for archetype in archetypes.values {
-    //         guard archetype.signature.isSuperset(of: typeIDs) else { continue }
-    //
-    //         let columns = (repeat archetype.column(for: (each T).self))
-    //         var allPresent = true
-    //         for col in repeat each columns {
-    //             if col == nil { allPresent = false }
-    //         }
-    //         guard allPresent else { continue }
-    //
-    //         for i in 0..<archetype.entities.count {
-    //             let components = Composite(repeat (each columns)!.data[i])
-    //             body(Entity(id: archetype.entities[i], world: self), components)
-    //         }
-    //     }
-    // }
-
-    /// Iterate entities with one component.
-    public func forEach<T: Component>(_ type: T.Type, body: (Entity, T) -> Void) {
-        let typeID = ObjectIdentifier(type)
-        for archetype in archetypes.values {
-            guard archetype.signature.contains(typeID),
-                  let col = archetype.column(for: type) else { continue }
-            for i in 0..<archetype.entities.count {
-                body(Entity(id: archetype.entities[i], world: self), col.data[i])
-            }
-        }
-    }
-
-    /// Iterate entities with two components.
-    public func forEach<T1: Component, T2: Component>(
-        _ type1: T1.Type, _ type2: T2.Type,
-        body: (Entity, T1, T2) -> Void
-    ) {
-        let typeIDs: Set<ObjectIdentifier> = [ObjectIdentifier(type1), ObjectIdentifier(type2)]
-        for archetype in archetypes.values {
-            guard archetype.signature.isSuperset(of: typeIDs),
-                  let col1 = archetype.column(for: type1),
-                  let col2 = archetype.column(for: type2) else { continue }
-            for i in 0..<archetype.entities.count {
-                body(Entity(id: archetype.entities[i], world: self), col1.data[i], col2.data[i])
-            }
-        }
-    }
-
-    /// Iterate entities with one component (mutable).
-    public func forEachMutable<T: Component>(_ type: T.Type, body: (Entity, inout T) -> Void) {
-        let typeID = ObjectIdentifier(type)
-        for archetype in archetypes.values {
-            guard archetype.signature.contains(typeID),
-                  let col = archetype.column(for: type) else { continue }
-            for i in 0..<archetype.entities.count {
-                body(Entity(id: archetype.entities[i], world: self), &col.data[i])
-            }
-        }
-    }
-
-    /// Iterate entities with two components (mutable).
-    public func forEachMutable<T1: Component, T2: Component>(
-        _ type1: T1.Type, _ type2: T2.Type,
-        body: (Entity, inout T1, inout T2) -> Void
-    ) {
-        let typeIDs: Set<ObjectIdentifier> = [ObjectIdentifier(type1), ObjectIdentifier(type2)]
-        for archetype in archetypes.values {
-            guard archetype.signature.isSuperset(of: typeIDs),
-                  let col1 = archetype.column(for: type1),
-                  let col2 = archetype.column(for: type2) else { continue }
-            for i in 0..<archetype.entities.count {
-                body(Entity(id: archetype.entities[i], world: self), &col1.data[i], &col2.data[i])
-            }
-        }
-    }
-
-    /// Iterate entities with three components (mutable).
-    public func forEachMutable<T1: Component, T2: Component, T3: Component>(
-        _ type1: T1.Type, _ type2: T2.Type, _ type3: T3.Type,
-        body: (Entity, inout T1, inout T2, inout T3) -> Void
-    ) {
-        let typeIDs: Set<ObjectIdentifier> = [
-            ObjectIdentifier(type1),
-            ObjectIdentifier(type2),
-            ObjectIdentifier(type3)
-        ]
-        for archetype in archetypes.values {
-            guard archetype.signature.isSuperset(of: typeIDs),
-                  let col1 = archetype.column(for: type1),
-                  let col2 = archetype.column(for: type2),
-                  let col3 = archetype.column(for: type3) else { continue }
-            for i in 0..<archetype.entities.count {
-                body(Entity(id: archetype.entities[i], world: self), &col1.data[i], &col2.data[i], &col3.data[i])
-            }
-        }
-    }
-
-    // MARK: - Querying
-
-    /// All entities.
-    public var entities: [Entity] {
-        entityLocations.keys.map { Entity(id: $0, world: self) }
-    }
-
-    /// Get entities with all specified components.
-    public func entities<each T: Component>(with componentTypes: repeat (each T).Type) -> [Entity] {
-        var typeIDs = Set<ObjectIdentifier>()
-        for typeID in repeat ObjectIdentifier((each T).self) {
-            typeIDs.insert(typeID)
-        }
-
-        var result: [Entity] = []
-        for archetype in archetypes.values {
-            guard archetype.signature.isSuperset(of: typeIDs) else { continue }
-            for entityID in archetype.entities {
-                result.append(Entity(id: entityID, world: self))
-            }
-        }
-
-        return result
-    }
-
     // MARK: - System Management
 
-    /// Add a system.
-    public func addSystem(_ system: System) {
-        systems.append(system)
+    /// Add a system with an optional ID and dependencies.
+    /// - Parameters:
+    ///   - system: The system to add.
+    ///   - id: Optional ID for the system. Defaults to the type name.
+    ///   - dependencies: IDs of systems that must run before this one.
+    /// - Throws: `SystemError.duplicateID` if a system with this ID already exists.
+    public func addSystem(
+        _ system: System,
+        id: SystemID? = nil,
+        dependencies: [SystemID] = []
+    ) throws {
+        let systemID = id ?? SystemID(String(describing: type(of: system)))
+
+        if systems[systemID] != nil {
+            throw SystemError.duplicateID(systemID)
+        }
+
+        let entry = SystemEntry(system: system, dependencies: dependencies)
+        systems[systemID] = entry
+        systemOrderDirty = true
+
         system.initialize(world: self)
+    }
+
+    /// Add a system (non-throwing convenience for systems without dependencies).
+    public func addSystem(_ system: System) {
+        try! addSystem(system, id: nil, dependencies: [])
     }
 
     /// Remove all systems.
     public func removeAllSystems() {
-        for system in systems {
-            system.cleanup(world: self)
+        for (_, entry) in systems {
+            entry.system.cleanup(world: self)
         }
         systems.removeAll()
+        systemOrder.removeAll()
+        systemOrderDirty = false
     }
 
-    /// Update all systems.
-    public func update(deltaTime: Double) {
-        for system in systems {
-            system.update(world: self, deltaTime: deltaTime)
+    /// Update all systems in dependency order.
+    /// - Throws: `SystemError` if dependencies cannot be resolved.
+    public func update(deltaTime: Double) throws {
+        if systemOrderDirty {
+            try rebuildSystemOrder()
         }
+
+        // Advance time BEFORE systems run, so simulationTime represents "now"
+        simulationTime += deltaTime
+        
+        for systemID in systemOrder {
+            systems[systemID]!.system.update(world: self, deltaTime: deltaTime)
+        }
+    }
+
+    /// Rebuild the system execution order using topological sort.
+    private func rebuildSystemOrder() throws {
+        let systemIDs = Array(systems.keys)
+        let idToIndex = Dictionary(uniqueKeysWithValues: systemIDs.enumerated().map { ($1, $0) })
+
+        // Build adjacency list and in-degree count
+        var inDegree = [Int](repeating: 0, count: systems.count)
+        var dependents: [[Int]] = Array(repeating: [], count: systems.count)
+
+        for (index, systemID) in systemIDs.enumerated() {
+            let entry = systems[systemID]!
+            for dep in entry.dependencies {
+                guard let depIndex = idToIndex[dep] else {
+                    throw SystemError.dependencyNotFound(system: systemID, dependency: dep)
+                }
+                dependents[depIndex].append(index)
+                inDegree[index] += 1
+            }
+        }
+
+        // Kahn's algorithm for topological sort
+        var queue: [Int] = []
+        for (index, degree) in inDegree.enumerated() where degree == 0 {
+            queue.append(index)
+        }
+
+        var sorted: [Int] = []
+        var queueIndex = 0
+
+        while queueIndex < queue.count {
+            let current = queue[queueIndex]
+            queueIndex += 1
+            sorted.append(current)
+
+            for dependent in dependents[current] {
+                inDegree[dependent] -= 1
+                if inDegree[dependent] == 0 {
+                    queue.append(dependent)
+                }
+            }
+        }
+
+        // Check for cycle
+        if sorted.count != systems.count {
+            // Find systems involved in cycle
+            let cycleIndices = inDegree.enumerated().filter { $0.element > 0 }.map { $0.offset }
+            let cycleIDs = cycleIndices.map { systemIDs[$0] }
+            throw SystemError.cyclicDependency(cycleIDs)
+        }
+
+        systemOrder = sorted.map { systemIDs[$0] }
+        systemOrderDirty = false
+    }
+
+    /// Get the current system execution order.
+    public var systemExecutionOrder: [SystemID] {
+        if systemOrderDirty {
+            try? rebuildSystemOrder()
+        }
+        return systemOrder
     }
 }

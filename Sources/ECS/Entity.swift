@@ -1,16 +1,5 @@
-/// Unique entity identifier.
-public struct EntityID: Hashable, Equatable, Sendable {
-    /// The underlying integer value.
-    public let value: UInt64
-
-    /// Create an entity ID from a raw value.
-    public init(_ value: UInt64) {
-        self.value = value
-    }
-}
-
 /// Handle for accessing an entity's components.
-public struct Entity {
+public struct Entity: Identifiable {
     /// The unique identifier for this entity.
     public let id: EntityID
     internal let world: World
@@ -25,19 +14,33 @@ public struct Entity {
         world.entityExists(id)
     }
 
-    /// Get a component.
-    public subscript<T: Component>(_ type: T.Type) -> T? {
-        world.component(type, for: id)
+    /// Get the component types for this entity.
+    public var componentTypes: [ComponentType] {
+        world.componentTypes(for: self)
     }
 
-    /// Check if entity has a component.
-    public func has<T: Component>(_ type: T.Type) -> Bool {
+    /// Get or set a component.
+    public subscript<T: Component>(_ type: T.Type) -> T? {
+        get {
+            world.component(type, for: id)
+        }
+        nonmutating set {
+            if let newValue {
+                world.addComponent(newValue, to: id)
+            } else {
+                world.removeComponent(type, from: id)
+            }
+        }
+    }
+
+    /// Check if entity contains a component.
+    public func contains<T: Component>(_ type: T.Type) -> Bool {
         world.hasComponent(type, for: id)
     }
 
-    /// Add or update a component.
+    /// Set (add or update) a component.
     @discardableResult
-    public func add<T: Component>(_ component: T) -> Entity {
+    public func set<T: Component>(_ component: T) -> Entity {
         world.addComponent(component, to: id)
         return self
     }
@@ -53,4 +56,37 @@ public struct Entity {
     public func destroy() -> Bool {
         world.removeEntity(id)
     }
+
+    /// Clone this entity, creating a new entity with copies of all components.
+    public func clone() -> Entity? {
+        world.cloneEntity(id)
+    }
+
+    /// Get multiple components as a Composite.
+    /// Returns nil if any of the requested components are missing.
+    public func get<each T: Component>(_ types: repeat (each T).Type) -> Composite<repeat each T>? {
+        // Check all components exist first
+        for type in repeat (each types) {
+            guard world.hasComponent(type, for: id) else {
+                return nil
+            }
+        }
+        // Safe to force unwrap since we verified all exist
+        return Composite(repeat world.component((each T).self, for: id)!)
+    }
+
+    /// Set multiple components from a Composite.
+    @discardableResult
+    public func set<each T: Component>(_ composite: Composite<repeat each T>) -> Entity {
+        repeat world.addComponent(each composite.values, to: id)
+        return self
+    }
+
+    /// Set multiple components.
+    @discardableResult
+    public func set<each T: Component>(_ components: repeat each T) -> Entity {
+        repeat world.addComponent(each components, to: id)
+        return self
+    }
+
 }

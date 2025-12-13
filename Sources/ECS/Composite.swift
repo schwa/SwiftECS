@@ -1,10 +1,11 @@
 /// A variadic container for bundling multiple values using parameter packs.
 public struct Composite<each T> {
-    private let children: (repeat each T)
+    /// The contained values.
+    public let values: (repeat each T)
 
     /// Create a composite from variadic values.
-    public init(_ children: repeat each T) {
-        self.children = (repeat each children)
+    public init(_ values: repeat each T) {
+        self.values = (repeat each values)
     }
 }
 
@@ -12,7 +13,7 @@ public struct Composite<each T> {
 extension Composite: Equatable where repeat each T: Equatable {
     /// Returns true if all corresponding elements are equal.
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        for (left, right) in repeat (each lhs.children, each rhs.children) {
+        for (left, right) in repeat (each lhs.values, each rhs.values) {
             guard left == right else {
                 return false
             }
@@ -25,8 +26,8 @@ extension Composite: Equatable where repeat each T: Equatable {
 extension Composite: Hashable where repeat each T: Hashable {
     /// Hashes all elements into the hasher.
     public func hash(into hasher: inout Hasher) {
-        for child in repeat (each children) {
-            child.hash(into: &hasher)
+        for value in repeat (each values) {
+            value.hash(into: &hasher)
         }
     }
 }

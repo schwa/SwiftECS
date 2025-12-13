@@ -1,28 +1,28 @@
 /// Set of component types identifying an archetype.
 struct ArchetypeSignature: Hashable {
-    let types: Set<ObjectIdentifier>
+    let types: Set<ComponentType>
 
-    init(_ types: Set<ObjectIdentifier> = []) {
+    init(_ types: Set<ComponentType> = []) {
         self.types = types
     }
 
-    func adding(_ type: ObjectIdentifier) -> Self {
+    func adding(_ type: ComponentType) -> Self {
         var newTypes = types
         newTypes.insert(type)
         return Self(newTypes)
     }
 
-    func removing(_ type: ObjectIdentifier) -> Self {
+    func removing(_ type: ComponentType) -> Self {
         var newTypes = types
         newTypes.remove(type)
         return Self(newTypes)
     }
 
-    func contains(_ type: ObjectIdentifier) -> Bool {
+    func contains(_ type: ComponentType) -> Bool {
         types.contains(type)
     }
 
-    func isSuperset(of other: Set<ObjectIdentifier>) -> Bool {
+    func isSuperset(of other: Set<ComponentType>) -> Bool {
         types.isSuperset(of: other)
     }
 }
@@ -69,7 +69,7 @@ final class Column<T: Component>: AnyColumn {
 final class Archetype {
     let signature: ArchetypeSignature
     private(set) var entities: [EntityID] = []
-    private var columns: [ObjectIdentifier: AnyColumn] = [:]
+    internal var columns: [ComponentType: AnyColumn] = [:]
 
     init(signature: ArchetypeSignature) {
         self.signature = signature
@@ -82,7 +82,7 @@ final class Archetype {
     }
 
     func setComponent<T: Component>(_ value: T, at index: Int) {
-        let typeID = ObjectIdentifier(T.self)
+        let typeID = ComponentType(T.self)
         let col: Column<T>
         if let existing = columns[typeID] as? Column<T> {
             col = existing
@@ -102,7 +102,7 @@ final class Archetype {
     }
 
     func getComponent<T: Component>(_ type: T.Type, at index: Int) -> T? {
-        guard let col = columns[ObjectIdentifier(type)] as? Column<T>,
+        guard let col = columns[ComponentType(type)] as? Column<T>,
               index < col.data.count else { return nil }
         return col.data[index]
     }
@@ -126,10 +126,10 @@ final class Archetype {
     }
 
     func column<T: Component>(for type: T.Type) -> Column<T>? {
-        columns[ObjectIdentifier(type)] as? Column<T>
+        columns[ComponentType(type)] as? Column<T>
     }
 
-    func copyComponents(at index: Int, to target: Archetype, targetIndex: Int, excludeType: ObjectIdentifier? = nil) {
+    func copyComponents(at index: Int, to target: Archetype, targetIndex: Int, excludeType: ComponentType? = nil) {
         for (typeID, column) in columns {
             if typeID == excludeType { continue }
 
