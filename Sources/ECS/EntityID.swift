@@ -7,7 +7,7 @@ import Glibc
 /// Unique entity identifier.
 public struct EntityID: Hashable, Equatable, Sendable {
     /// The underlying integer value.
-    private let value: UInt64
+    public let value: UInt64
 
     /// Create a new random entity ID.
     public init() {
