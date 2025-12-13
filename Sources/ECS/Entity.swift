@@ -18,6 +18,11 @@ public struct Entity: Identifiable {
     public var componentTypes: [ComponentType] {
         world.componentTypes(for: self)
     }
+    
+    /// Get all components for this entity.
+    public var allComponents: [any Component] {
+        world.allComponents(for: id)
+    }
 
     /// Get or set a component.
     public subscript<T: Component>(_ type: T.Type) -> T? {

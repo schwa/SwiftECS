@@ -115,6 +115,11 @@ public final class World {
     public var entityCount: Int {
         entityLocations.count
     }
+    
+    /// All entities in the world.
+    public var entities: [Entity] {
+        entityLocations.keys.map { Entity(id: $0, world: self) }
+    }
 
     // MARK: - Entity ID Generation (Private)
 
@@ -172,6 +177,13 @@ public final class World {
         guard let location = entityLocations[entityID],
               let archetype = archetypes[location.signature] else { return nil }
         return archetype.getComponent(type, at: location.index)
+    }
+    
+    /// Get all components for an entity.
+    public func allComponents(for entityID: EntityID) -> [any Component] {
+        guard let location = entityLocations[entityID],
+              let archetype = archetypes[location.signature] else { return [] }
+        return archetype.allComponents(at: location.index)
     }
 
     @discardableResult

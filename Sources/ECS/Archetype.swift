@@ -38,6 +38,7 @@ protocol AnyColumn: AnyObject {
     func swapRemove(at index: Int)
     func makeEmptyColumn() -> AnyColumn
     func copyValue(at sourceIndex: Int, to target: AnyColumn, at targetIndex: Int)
+    func getValue(at index: Int) -> (any Component)?
 }
 
 /// Typed column storage for one component type.
@@ -62,6 +63,11 @@ final class Column<T: Component>: AnyColumn {
             targetColumn.data.append(value)
         }
         targetColumn.data[targetIndex] = value
+    }
+    
+    func getValue(at index: Int) -> (any Component)? {
+        guard index < data.count else { return nil }
+        return data[index]
     }
 }
 
@@ -127,6 +133,10 @@ final class Archetype {
 
     func column<T: Component>(for type: T.Type) -> Column<T>? {
         columns[ComponentType(type)] as? Column<T>
+    }
+    
+    func allComponents(at index: Int) -> [any Component] {
+        columns.values.compactMap { $0.getValue(at: index) }
     }
 
     func copyComponents(at index: Int, to target: Archetype, targetIndex: Int, excludeType: ComponentType? = nil) {
