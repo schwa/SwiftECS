@@ -229,18 +229,17 @@ public struct QueryIterator: IteratorProtocol {
 // MARK: - Fast Archetype-Based Iteration
 
 /// A proxy for fast access to components directly from archetype storage.
-/// 
-/// - Note: Setting components via `EntityRef` bypasses change observers for performance.
-///         Use `entity.set()` if you need change notifications.
 public struct EntityRef {
     public let entityID: EntityID
     private let columns: [ComponentType: AnyColumn]
     private let index: Int
+    private let world: World
     
-    init(entityID: EntityID, columns: [ComponentType: AnyColumn], index: Int) {
+    init(entityID: EntityID, columns: [ComponentType: AnyColumn], index: Int, world: World) {
         self.entityID = entityID
         self.columns = columns
         self.index = index
+        self.world = world
     }
     
     /// Access a component by type.
@@ -252,19 +251,23 @@ public struct EntityRef {
         nonmutating set {
             let col = columns[ComponentType(type)] as! Column<C>
             col.data[index] = newValue
+            // Notify observers
+            world.notifyChanged(entityID: entityID, component: newValue)
         }
     }
 }
 
 /// Fast iterator for entities with specific components.
 public struct FastQueryIterator: IteratorProtocol {
+    let world: World
     let archetypes: [Archetype]
     let componentTypes: [ComponentType]
     var archetypeIndex: Int = 0
     var entityIndex: Int = 0
     var currentColumns: [ComponentType: AnyColumn]?
     
-    init(archetypes: [Archetype], componentTypes: [ComponentType]) {
+    init(world: World, archetypes: [Archetype], componentTypes: [ComponentType]) {
+        self.world = world
         self.archetypes = archetypes
         self.componentTypes = componentTypes
         advanceToNextValidArchetype()
@@ -299,7 +302,8 @@ public struct FastQueryIterator: IteratorProtocol {
                 let ref = EntityRef(
                     entityID: archetype.entities[entityIndex],
                     columns: cols,
-                    index: entityIndex
+                    index: entityIndex,
+                    world: world
                 )
                 entityIndex += 1
                 return ref
@@ -315,11 +319,12 @@ public struct FastQueryIterator: IteratorProtocol {
 
 /// A fast sequence for iterating entities with specific components.
 public struct FastQuerySequence: Sequence {
+    let world: World
     let archetypes: [Archetype]
     let componentTypes: [ComponentType]
     
     public func makeIterator() -> FastQueryIterator {
-        FastQueryIterator(archetypes: archetypes, componentTypes: componentTypes)
+        FastQueryIterator(world: world, archetypes: archetypes, componentTypes: componentTypes)
     }
 }
 
@@ -356,7 +361,7 @@ extension World {
     ) -> FastQuerySequence {
         var componentTypes: [ComponentType] = []
         repeat componentTypes.append(ComponentType((each T).self))
-        return FastQuerySequence(archetypes: matchingArchetypes(for: query), componentTypes: componentTypes)
+        return FastQuerySequence(world: self, archetypes: matchingArchetypes(for: query), componentTypes: componentTypes)
     }
     
     /// Get matching archetypes for a query, using cache if registered.

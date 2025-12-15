@@ -147,6 +147,11 @@ public final class World {
     public func removeObserver(_ token: ObservationToken) {
         observers.removeObserver(token)
     }
+    
+    /// Notify observers of a component change (used by EntityRef).
+    internal func notifyChanged<T: Component>(entityID: EntityID, component: T) {
+        observers.notifyChanged(entity: Entity(id: entityID, world: self), component: component)
+    }
 
     // MARK: - Component Access (Internal)
 
