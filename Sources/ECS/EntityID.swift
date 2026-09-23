@@ -36,4 +36,3 @@ extension EntityID: Codable {
         try container.encode(value)
     }
 }
-

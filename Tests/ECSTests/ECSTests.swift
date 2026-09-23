@@ -921,7 +921,7 @@ struct OrderTrackingSystem: System {
     let name: String
     let order: SharedOrder
 
-    func update(world: World, deltaTime: Double) {
+    func update(world _: World, deltaTime _: Double) {
         order.append(name)
     }
 }
@@ -1045,9 +1045,9 @@ final class SharedOrder: @unchecked Sendable {
 @Test func testRegisterQuery() {
     let world = World()
     let query = Query(with: Position.self)
-    
+
     world.register(query)
-    
+
     #expect(world.isRegistered(query))
 }
 
@@ -1056,15 +1056,15 @@ final class SharedOrder: @unchecked Sendable {
     world.createEntity(Position(x: 1, y: 1))
     world.createEntity(Position(x: 2, y: 2))
     world.createEntity(Velocity(dx: 1, dy: 1))
-    
+
     let query = Query(with: Position.self)
     world.register(query)
-    
+
     var sum = 0.0
     for entity in world.entities(query) {
         sum += entity[Position.self]!.x
     }
-    
+
     #expect(sum == 3.0)
 }
 
@@ -1072,14 +1072,14 @@ final class SharedOrder: @unchecked Sendable {
     let world = World()
     let e1 = world.createEntity(Position(x: 1, y: 1))
     let e2 = world.createEntity(Position(x: 2, y: 2))
-    
+
     let query = Query(with: Position.self)
     world.register(query)
-    
+
     for entity in world.entities(query) {
         entity[Position.self]!.x *= 10
     }
-    
+
     #expect(e1[Position.self]?.x == 10)
     #expect(e2[Position.self]?.x == 20)
 }
@@ -1089,33 +1089,33 @@ final class SharedOrder: @unchecked Sendable {
     world.createEntity(Position(x: 1, y: 1), Velocity(dx: 10, dy: 10))
     world.createEntity(Position(x: 2, y: 2), Velocity(dx: 20, dy: 20))
     world.createEntity(Position(x: 3, y: 3))  // No velocity
-    
+
     let query = Query(with: Position.self, Velocity.self)
     world.register(query)
-    
+
     var sum = 0.0
     for entity in world.entities(query) {
         sum += entity[Position.self]!.x + entity[Velocity.self]!.dx
     }
-    
+
     #expect(sum == 33.0)  // (1+10) + (2+20)
 }
 
 @Test func testQueryCacheInvalidation() {
     let world = World()
     world.createEntity(Position(x: 1, y: 1))
-    
+
     let query = Query(with: Position.self)
     world.register(query)
-    
+
     // First iteration - builds cache
     var count = 0
     for _ in world.entities(query) { count += 1 }
     #expect(count == 1)
-    
+
     // Add entity with new archetype combination
     world.createEntity(Position(x: 2, y: 2), Velocity(dx: 1, dy: 1))
-    
+
     // Cache should be invalidated, should find both
     count = 0
     for _ in world.entities(query) { count += 1 }
@@ -1125,14 +1125,14 @@ final class SharedOrder: @unchecked Sendable {
 @Test func testUnregisterQuery() {
     let world = World()
     world.createEntity(Position(x: 1, y: 1))
-    
+
     let query = Query(with: Position.self)
     world.register(query)
     #expect(world.isRegistered(query))
-    
+
     world.unregister(query)
     #expect(!world.isRegistered(query))
-    
+
     // entities() still works (just slower without cache)
     var count = 0
     for _ in world.entities(query) { count += 1 }
@@ -1143,14 +1143,14 @@ final class SharedOrder: @unchecked Sendable {
     let world = World()
     world.createEntity(Position(x: 1, y: 1))
     world.createEntity(Position(x: 2, y: 2))
-    
+
     // entities() works without registration (just no caching)
     let query = Query(with: Position.self)
     var sum = 0.0
     for entity in world.entities(query) {
         sum += entity[Position.self]!.x
     }
-    
+
     #expect(sum == 3.0)
 }
 

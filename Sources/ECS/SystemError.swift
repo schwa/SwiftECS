@@ -15,7 +15,7 @@ extension SystemError: CustomStringConvertible {
         switch self {
         case .duplicateID(let id):
             return "System with ID '\(id)' already exists"
-        case .dependencyNotFound(let system, let dependency):
+        case let .dependencyNotFound(system, dependency):
             return "System '\(system)' depends on '\(dependency)' which was not found"
         case .cyclicDependency(let cycle):
             let path = cycle.map(\.value).joined(separator: " -> ")

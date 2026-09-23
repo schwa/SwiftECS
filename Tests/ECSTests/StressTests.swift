@@ -3,9 +3,9 @@ import Foundation
 import Testing
 
 // Helper function to measure execution time
-func measureTime(_ block: () -> Void) -> Double {
+func measureTime(_ block: () throws -> Void) rethrows -> Double {
     let start = CFAbsoluteTimeGetCurrent()
-    block()
+    try block()
     return (CFAbsoluteTimeGetCurrent() - start) * 1_000  // Convert to milliseconds
 }
 
@@ -25,7 +25,6 @@ struct Physics: Component {
 
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["ECS_RUN_STRESS_TESTS"] == "1"), .serialized)
 struct StressTests {
-
     // MARK: - Entity Creation Tests
 
     @Test func stressTestEntityCreation_10K() {
@@ -142,7 +141,7 @@ struct StressTests {
 
         let query = Query(with: Position.self, Velocity.self)
         world.register(query)
-    
+
         var sum = 0.0
         let time = measureTime {
             for entity in world.entities(query) {
@@ -240,7 +239,7 @@ struct StressTests {
         print("   Average per frame: \(String(format: "%.2f", time / 60.0))ms")
     }
 
-    @Test func stressTestSystemUpdate_100K() {
+    @Test func stressTestSystemUpdate_100K() throws {
         let world = World()
 
         for i in 0..<100_000 {
@@ -252,9 +251,9 @@ struct StressTests {
 
         world.addSystem(MovementSystem())
 
-        let time = measureTime {
+        let time = try measureTime {
             for _ in 0..<60 {
-                try! world.update(deltaTime: 1.0 / 60.0)
+                try world.update(deltaTime: 1.0 / 60.0)
             }
         }
 

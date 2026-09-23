@@ -27,7 +27,7 @@ private final class StorageTracker: @unchecked Sendable {
 private struct ObservationTestSystem: System {
     let action: (World) -> Void
 
-    func update(world: World, deltaTime: Double) {
+    func update(world: World, deltaTime _: Double) {
         action(world)
     }
 }
@@ -37,7 +37,7 @@ private struct ObservationTestSystem: System {
     let entity = world.createEntity(Position(x: 1, y: 2))
     let query = Query(with: Position.self)
     world.register(query)
-    let reference = try #require(world.entities(query, Position.self).first(where: { _ in true }))
+    let reference = try #require(world.entities(query, Position.self).first { _ in true })
     let sequence = world.entities(query)
     let fastSequence = world.entities(query, Position.self)
     let reads: [() -> Void] = [
@@ -143,7 +143,7 @@ private struct ObservationTestSystem: System {
 @Test func `fast reference writes notify and preserve component events`() throws {
     let world = World()
     world.createEntity(Position(x: 0, y: 0))
-    let reference = try #require(world.entities(Query(with: Position.self), Position.self).first(where: { _ in true }))
+    let reference = try #require(world.entities(Query(with: Position.self), Position.self).first { _ in true })
     let tracker = StorageTracker { _ = reference[Position.self] }
     var events = 0
     let token = world.observe(Position.self) { _ in events += 1 }
@@ -177,7 +177,7 @@ private struct ObservationTestSystem: System {
     let world = World()
     let entity = world.createEntity(Position(x: 0, y: 0))
     let tracker = StorageTracker { _ = entity[Position.self] }
-    let reference = try #require(world.entities(Query(with: Position.self), Position.self).first(where: { _ in true }))
+    let reference = try #require(world.entities(Query(with: Position.self), Position.self).first { _ in true })
     world.addSystem(ObservationTestSystem { world in
         let before = tracker.count
         for index in 0..<10_000 {

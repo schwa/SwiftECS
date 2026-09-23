@@ -1,8 +1,8 @@
 import ECS
 import Foundation
 import Observation
-import Testing
 @testable import StarfallSupport
+import Testing
 
 @Test func `movement uses delta time`() throws {
     let world = World()

@@ -12,11 +12,6 @@ public enum ComponentEvent<T: Component> {
 public struct ObservationToken: Hashable {
     let id: UInt64
     let componentType: ComponentType
-
-    init(id: UInt64, componentType: ComponentType) {
-        self.id = id
-        self.componentType = componentType
-    }
 }
 
 /// Type-erased observer handler.

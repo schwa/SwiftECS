@@ -20,11 +20,11 @@ struct Health: Component {
 
 struct MovementSystem: System {
     static let query = Query(with: Position.self, Velocity.self)
-    
+
     func initialize(world: World) {
         world.register(Self.query)
     }
-    
+
     func update(world: World, deltaTime: Double) {
         for entity in world.entities(Self.query) {
             entity[Position.self]!.x += entity[Velocity.self]!.dx * deltaTime

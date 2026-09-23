@@ -1,7 +1,7 @@
 import ECS
 
 struct CollisionSystem: System {
-    func update(world: World, deltaTime: Double) {
+    func update(world: World, deltaTime _: Double) {
         guard let player = world.query(with: Player.self).first,
               var state = player[Player.self], let catcher = player[Position.self] else {
             return

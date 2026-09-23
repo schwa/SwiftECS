@@ -9,9 +9,9 @@ public protocol System {
 }
 
 /// Default implementations for optional lifecycle methods.
-public extension System {
+extension System {
     /// Default empty implementation.
-    func initialize(world: World) {}
+    public func initialize(world _: World) {}
     /// Default empty implementation.
-    func cleanup(world: World) {}
+    public func cleanup(world _: World) {}
 }

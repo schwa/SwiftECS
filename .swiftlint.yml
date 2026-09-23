@@ -1,5 +1,5 @@
 excluded:
-  - .build
+  - "**/.build"
 
 only_rules:
   - accessibility_label_for_image
@@ -41,10 +41,11 @@ only_rules:
   - discarded_notification_center_observer
   - discouraged_assert
   - discouraged_direct_init
-  - discouraged_none_name
+  # Query.none is a meaningful predicate, not an optional value.
+  # discouraged_none_name is intentionally disabled.
   - discouraged_object_literal
   - discouraged_optional_boolean
-  - discouraged_optional_collection
+  # Optional collections distinguish missing storage from empty storage.
   - duplicate_conditions
   - duplicate_enum_cases
   - duplicate_imports # 6 violations (fixable)
@@ -65,7 +66,7 @@ only_rules:
   - explicit_self
 #  - explicit_top_level_acl # 93 violations
 #  - explicit_type_interface # 182 violations
-  - extension_access_modifier
+  # Prefer declaration-level access control, not extension_access_modifier.
   - fallthrough
   - fatal_error_message
   - file_header
@@ -126,7 +127,7 @@ only_rules:
   - multiple_closures_with_trailing_closure
   - nesting
   - nimble_operator
-  - no_empty_block
+  # Empty default protocol methods and test doubles are intentional.
   - no_extension_access_modifier
   - no_fallthrough_only
 #  - no_grouping_extension # 26 violations
@@ -155,7 +156,7 @@ only_rules:
   - prefer_condition_list
   - prefer_key_path
   - prefer_nimble
-  - prefer_self_in_static_references # 4 violations (fixable)
+  # Explicit type names are useful in recursive predicates and API signatures.
   - prefer_self_type_over_type_of_self
   - prefer_type_checking
   - prefer_zero_over_explicit_init
@@ -178,7 +179,7 @@ only_rules:
   - redundant_discardable_let
   - redundant_nil_coalescing
   - redundant_objc_attribute
-  - redundant_self_in_closure
+  - redundant_self
   - redundant_sendable
   - redundant_set_access_control
   - redundant_string_enum_value
@@ -240,7 +241,7 @@ only_rules:
   - vertical_parameter_alignment
 #  - vertical_parameter_alignment_on_call # 2 violations
   - vertical_whitespace
-  - vertical_whitespace_between_cases
+  # Compact switch cases do not require blank lines.
   - vertical_whitespace_closing_braces
   - vertical_whitespace_opening_braces # 2 violations (fixable)
   - void_function_in_ternary
@@ -249,3 +250,7 @@ only_rules:
   - xct_specific_matcher
   - xctfail_message
   - yoda_condition
+
+type_body_length:
+  warning: 400
+  error: 600

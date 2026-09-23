@@ -64,7 +64,7 @@ final class Column<T: Component>: AnyColumn {
         }
         targetColumn.data[targetIndex] = value
     }
-    
+
     func getValue(at index: Int) -> (any Component)? {
         guard index < data.count else { return nil }
         return data[index]
@@ -134,7 +134,7 @@ final class Archetype {
     func column<T: Component>(for type: T.Type) -> Column<T>? {
         columns[ComponentType(type)] as? Column<T>
     }
-    
+
     func allComponents(at index: Int) -> [any Component] {
         columns.values.compactMap { $0.getValue(at: index) }
     }

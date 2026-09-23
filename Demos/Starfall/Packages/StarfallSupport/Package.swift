@@ -11,7 +11,7 @@ let package = Package(
         .library(
             name: "StarfallSupport",
             targets: ["StarfallSupport"]
-        ),
+        )
     ],
     dependencies: [.package(path: "../../../..")],
     targets: [
@@ -24,7 +24,7 @@ let package = Package(
         .testTarget(
             name: "StarfallSupportTests",
             dependencies: ["StarfallSupport"]
-        ),
+        )
     ],
     swiftLanguageModes: [.v6]
 )

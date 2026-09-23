@@ -28,6 +28,8 @@ struct StarfieldView: View {
                             context.fill(Path(ellipseIn: CGRect(x: point.x - 5, y: point.y + 10, width: 10, height: 16)), with: .color(.cyan.opacity(0.4)))
                         } else if let object = entity[FallingObject.self] {
                             let isStar = object.kind == .star
+                            // Canvas exposes accessibility on the playfield, not on drawing primitives.
+                            // swiftlint:disable:next accessibility_label_for_image
                             let image = Image(systemName: isStar ? "star.fill" : "flame.fill")
                             var resolved = context.resolve(image)
                             resolved.shading = .color(isStar ? .yellow : .red)

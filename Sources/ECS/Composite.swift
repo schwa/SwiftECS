@@ -46,4 +46,3 @@ extension Composite: Comparable where repeat each T: Comparable {
         return true
     }
 }
-

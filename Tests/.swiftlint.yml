@@ -1,0 +1,5 @@
+disabled_rules:
+  # Tests assert exact counts, including scalar notification counters.
+  - empty_count
+  # Suites group related cases; their total size is not a useful limit.
+  - type_body_length

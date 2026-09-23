@@ -11,7 +11,6 @@ struct Poisoned: Component {}
 
 @Suite("Query Tests")
 struct QueryTests {
-
     // MARK: - Basic Predicate Tests
 
     @Test("QueryPredicate.all matches everything")

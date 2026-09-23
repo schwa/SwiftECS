@@ -90,12 +90,16 @@ public struct Query: Hashable, Sendable {
         self.predicate = predicate
     }
 
+    // Pack expansions use types; SwiftLint does not recognize the reference.
+    // swiftlint:disable unused_parameter
     /// Create a query that matches entities with all the given component types.
     public init<each T: Component>(with types: repeat (each T).Type) {
         var predicates: [QueryPredicate] = []
         repeat predicates.append(.contains(ComponentType((each T).self)))
         self.predicate = predicates.isEmpty ? .all : (predicates.count == 1 ? predicates[0] : .and(predicates))
     }
+
+    // swiftlint:enable unused_parameter
 
     /// Create a query matching all entities.
     public static var all: Query {
@@ -199,7 +203,7 @@ final class RegisteredQueryCache {
 public struct QuerySequence: Sequence {
     let world: World
     let archetypes: [Archetype]
-    
+
     public func makeIterator() -> QueryIterator {
         world.trackStorageAccess()
         return QueryIterator(world: world, archetypes: archetypes)
@@ -212,7 +216,7 @@ public struct QueryIterator: IteratorProtocol {
     let archetypes: [Archetype]
     var archetypeIndex: Int = 0
     var entityIndex: Int = 0
-    
+
     public mutating func next() -> Entity? {
         world.trackStorageAccess()
         while archetypeIndex < archetypes.count {
@@ -237,25 +241,29 @@ public struct EntityRef {
     private let columns: [ComponentType: AnyColumn]
     private let index: Int
     private let world: World
-    
+
     init(entityID: EntityID, columns: [ComponentType: AnyColumn], index: Int, world: World) {
         self.entityID = entityID
         self.columns = columns
         self.index = index
         self.world = world
     }
-    
+
     /// Access a component by type.
     public subscript<C: Component>(type: C.Type) -> C {
         get {
             world.trackStorageAccess()
-            let col = columns[ComponentType(type)] as! Column<C>
-            return col.data[index]
+            guard let column = columns[ComponentType(type)] as? Column<C> else {
+                preconditionFailure("Component \(type) was not requested by this fast query")
+            }
+            return column.data[index]
         }
         nonmutating set {
             defer { world.storageDidChange() }
-            let col = columns[ComponentType(type)] as! Column<C>
-            col.data[index] = newValue
+            guard let column = columns[ComponentType(type)] as? Column<C> else {
+                preconditionFailure("Component \(type) was not requested by this fast query")
+            }
+            column.data[index] = newValue
             // Notify observers
             world.notifyChanged(entityID: entityID, component: newValue)
         }
@@ -270,14 +278,14 @@ public struct FastQueryIterator: IteratorProtocol {
     var archetypeIndex: Int = 0
     var entityIndex: Int = 0
     var currentColumns: [ComponentType: AnyColumn]?
-    
+
     init(world: World, archetypes: [Archetype], componentTypes: [ComponentType]) {
         self.world = world
         self.archetypes = archetypes
         self.componentTypes = componentTypes
         advanceToNextValidArchetype()
     }
-    
+
     mutating func advanceToNextValidArchetype() {
         while archetypeIndex < archetypes.count {
             let archetype = archetypes[archetypeIndex]
@@ -289,7 +297,7 @@ public struct FastQueryIterator: IteratorProtocol {
         }
         currentColumns = nil
     }
-    
+
     func getColumns(from archetype: Archetype) -> [ComponentType: AnyColumn]? {
         var result: [ComponentType: AnyColumn] = [:]
         for type in componentTypes {
@@ -298,12 +306,12 @@ public struct FastQueryIterator: IteratorProtocol {
         }
         return result
     }
-    
+
     public mutating func next() -> EntityRef? {
         world.trackStorageAccess()
         while archetypeIndex < archetypes.count {
             let archetype = archetypes[archetypeIndex]
-            
+
             if entityIndex < archetype.entities.count, let cols = currentColumns {
                 let ref = EntityRef(
                     entityID: archetype.entities[entityIndex],
@@ -314,7 +322,7 @@ public struct FastQueryIterator: IteratorProtocol {
                 entityIndex += 1
                 return ref
             }
-            
+
             archetypeIndex += 1
             entityIndex = 0
             advanceToNextValidArchetype()
@@ -328,7 +336,7 @@ public struct FastQuerySequence: Sequence {
     let world: World
     let archetypes: [Archetype]
     let componentTypes: [ComponentType]
-    
+
     public func makeIterator() -> FastQueryIterator {
         world.trackStorageAccess()
         return FastQueryIterator(world: world, archetypes: archetypes, componentTypes: componentTypes)
@@ -343,23 +351,25 @@ extension World {
             registeredQueries[query] = RegisteredQueryCache()
         }
     }
-    
+
     /// Unregister a previously registered query.
     public func unregister(_ query: Query) {
         registeredQueries.removeValue(forKey: query)
     }
-    
+
     /// Check if a query is registered.
     public func isRegistered(_ query: Query) -> Bool {
         registeredQueries[query] != nil
     }
-    
+
     /// Returns a lazy sequence of entities matching the query.
     /// If the query is registered, uses cached archetype matching for better performance.
     public func entities(_ query: Query) -> QuerySequence {
         QuerySequence(world: self, archetypes: matchingArchetypes(for: query))
     }
-    
+
+    // Pack expansions use types; SwiftLint does not recognize the reference.
+    // swiftlint:disable unused_parameter
     /// Returns a fast sequence for iterating entities with specific components.
     /// Uses direct archetype column access for maximum performance.
     public func entities<each T: Component>(
@@ -370,7 +380,9 @@ extension World {
         repeat componentTypes.append(ComponentType((each T).self))
         return FastQuerySequence(world: self, archetypes: matchingArchetypes(for: query), componentTypes: componentTypes)
     }
-    
+
+    // swiftlint:enable unused_parameter
+
     /// Get matching archetypes for a query, using cache if registered.
     internal func matchingArchetypes(for query: Query) -> [Archetype] {
         trackStorageAccess()
@@ -381,9 +393,8 @@ extension World {
                 cache.isDirty = false
             }
             return cache.matchingArchetypes.compactMap { archetypes[$0] }
-        } else {
-            // No cache, filter directly
-            return archetypes.values.filter { query.matches($0.signature) }
         }
+        // No cache, filter directly
+        return archetypes.values.filter { query.matches($0.signature) }
     }
 }

@@ -24,7 +24,7 @@ public final class World {
     private let emptySignature = ArchetypeSignature()
     @ObservationIgnored
     private let observers = ObserverRegistry()
-    
+
     private var storageRevision: UInt64 = 0
     @ObservationIgnored private var updateDepth = 0
     @ObservationIgnored private var storageIsDirty = false
@@ -53,7 +53,7 @@ public final class World {
     // Registered query support
     @ObservationIgnored
     internal var registeredQueries: [Query: RegisteredQueryCache] = [:]
-    
+
     /// The current simulation time (accumulated deltaTime from all updates).
     /// This is observable and updates once per `update()` call.
     public private(set) var simulationTime: Double = 0.0
@@ -146,7 +146,7 @@ public final class World {
         trackStorageAccess()
         return entityLocations.count
     }
-    
+
     /// All entities in the world.
     public var entities: [Entity] {
         trackStorageAccess()
@@ -179,7 +179,7 @@ public final class World {
     public func removeObserver(_ token: ObservationToken) {
         observers.removeObserver(token)
     }
-    
+
     /// Notify observers of a component change (used by EntityRef).
     internal func notifyChanged<T: Component>(entityID: EntityID, component: T) {
         observers.notifyChanged(entity: Entity(id: entityID, world: self), component: component)
@@ -217,7 +217,7 @@ public final class World {
               let archetype = archetypes[location.signature] else { return nil }
         return archetype.getComponent(type, at: location.index)
     }
-    
+
     /// Get all components for an entity.
     public func allComponents(for entityID: EntityID) -> [any Component] {
         trackStorageAccess()
@@ -261,13 +261,13 @@ public final class World {
         }
         let archetype = Archetype(signature: signature)
         archetypes[signature] = archetype
-        
+
         // Invalidate all registered query caches when a new archetype is created
         invalidateRegisteredQueryCaches()
-        
+
         return archetype
     }
-    
+
     private func invalidateRegisteredQueryCaches() {
         for (_, cache) in registeredQueries {
             cache.isDirty = true
@@ -341,7 +341,11 @@ public final class World {
 
     /// Add a system (non-throwing convenience for systems without dependencies).
     public func addSystem(_ system: System) {
-        try! addSystem(system, id: nil, dependencies: [])
+        do {
+            try addSystem(system, id: nil, dependencies: [])
+        } catch {
+            preconditionFailure("Cannot register system: \(error)")
+        }
     }
 
     /// Remove all systems.
@@ -365,7 +369,7 @@ public final class World {
 
         // Advance time BEFORE systems run, so simulationTime represents "now"
         simulationTime += deltaTime
-        
+
         for systemID in systemOrder {
             systems[systemID]!.system.update(world: self, deltaTime: deltaTime)
         }
@@ -416,7 +420,7 @@ public final class World {
         // Check for cycle
         if sorted.count != systems.count {
             // Find systems involved in cycle
-            let cycleIndices = inDegree.enumerated().filter { $0.element > 0 }.map { $0.offset }
+            let cycleIndices = inDegree.enumerated().filter { $0.element > 0 }.map(\.offset)
             let cycleIDs = cycleIndices.map { systemIDs[$0] }
             throw SystemError.cyclicDependency(cycleIDs)
         }
