@@ -10,7 +10,7 @@ public struct TypedQuerySequence<each Value: Component>: Sequence {
 
 @usableFromInline
 internal final class TypedQueryStorage<each Value: Component> {
-    let archetype: Archetype
+    @usableFromInline let archetype: Archetype
     @usableFromInline let columns: (repeat Column<each Value>)
 
     init(archetype: Archetype) {

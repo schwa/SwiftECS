@@ -2,7 +2,7 @@
 
 Umbrella issue: #14. Remaining investigations: #13 (row access), #5 (observation), and #4 (substep batching).
 
-The latest experiment trace is `~/Desktop/ECS-Profiles/typed-query-inline-experiment.trace`. The directory contains logs, analysis, provenance notes, and a patch identifying the tested changes. The previous baseline is `typed-query-0ab9af6b.trace`. Both captures include all processes and need review before sharing.
+The latest experiment trace is `~/Desktop/ECS-Profiles/typed-query-iterator-inline.trace`. The directory contains logs, analysis, provenance notes, and a patch identifying the tested changes. The previous baseline is `typed-query-0ab9af6b.trace`. Both captures include all processes and need review before sharing.
 
 ## Setup
 
@@ -186,6 +186,25 @@ The benchmark now accepts optional `ECS_BENCHMARK_ACCESS` and `ECS_BENCHMARK_FRA
 ```sh
 env ECS_RUN_BENCHMARKS=1 ECS_BENCHMARK_ACCESS=typed ECS_BENCHMARK_FRAMES=100 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter QueryPerformanceTests
 ```
+
+## Iterator specialization
+
+Making `TypedQueryIterator.next` and the row initializer inlinable reduces the remaining iterator cost. Required state becomes `@usableFromInline`. No public signatures change.
+
+Release isolation medians:
+
+| Phase | Before | After |
+|---|---:|---:|
+| Iterator plus identity checksum | 2.851 ms | 0.789 ms |
+| Fresh reads | 4.795 ms | 2.657 ms |
+| Fresh reads and writes | 15.069 ms | 12.537 ms |
+| Retained reads and writes | 11.626 ms | 11.464 ms |
+
+The longer typed-only profile measures 13.418 ms/update without a storage observer and 13.496 ms with one. Each median covers three samples of 100 updates. These numbers leave approximately 3 ms before the 16.7 ms budget, not a guarantee about app rendering.
+
+Trace: `~/Desktop/ECS-Profiles/typed-query-iterator-inline.trace`. With the typed-only update filter, selected CPU weight is 7.821 seconds. Inclusive shares: setter 73.3%, generic metadata lookup 40.7%, getter 13.6%, iterator advancement 4.0%. These overlap.
+
+The latest profile, benchmark log, summary, and patch against `beb20431` are preserved together. Debug/Release tests, macOS demo build/tests, and strict lint pass. Remaining setter and metadata work stays under #13.
 
 ## Reproduce
 

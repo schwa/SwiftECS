@@ -4,6 +4,7 @@ public struct TypedEntityRef<each Value: Component> {
     @usableFromInline internal let index: Int
     @usableFromInline internal let storage: TypedQueryStorage<repeat each Value>
 
+    @inlinable
     internal init(world: World, entityID: EntityID, index: Int, storage: TypedQueryStorage<repeat each Value>) {
         self.world = world
         self.entityID = entityID

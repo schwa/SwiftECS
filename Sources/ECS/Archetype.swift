@@ -73,9 +73,10 @@ final class Column<T: Component>: AnyColumn {
 }
 
 /// Storage for entities with the same component signature.
+@usableFromInline
 final class Archetype {
     let signature: ArchetypeSignature
-    private(set) var entities: [EntityID] = []
+    @usableFromInline private(set) var entities: [EntityID] = []
     internal var columns: [ComponentType: AnyColumn] = [:]
 
     init(signature: ArchetypeSignature) {

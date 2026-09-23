@@ -1,14 +1,15 @@
 public struct TypedQueryIterator<each Value: Component>: IteratorProtocol {
-    internal let world: World
-    internal let storage: [TypedQueryStorage<repeat each Value>]
-    private var archetypeIndex = 0
-    private var entityIndex = 0
+    @usableFromInline internal let world: World
+    @usableFromInline internal let storage: [TypedQueryStorage<repeat each Value>]
+    @usableFromInline internal var archetypeIndex = 0
+    @usableFromInline internal var entityIndex = 0
 
     internal init(world: World, storage: [TypedQueryStorage<repeat each Value>]) {
         self.world = world
         self.storage = storage
     }
 
+    @inlinable
     public mutating func next() -> TypedEntityRef<repeat each Value>? {
         world.trackStorageAccess()
         while archetypeIndex < storage.count {
