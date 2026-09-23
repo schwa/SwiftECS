@@ -118,6 +118,7 @@ World storage observation now tracks ECS reads and invalidates at world scope. C
 
 - `2026-09-23T18:01:44Z`: Related to #4 (substep notification volume) and #6 (component-access cost). Measurements must distinguish observation overhead from dictionary lookup/cast cost.
 - `2026-09-23T18:22:31Z`: Initial query comparison: one rearming storage observer adds no clear large cost in the measured single-archetype workload. This does not isolate the cost of observation instrumentation and does not measure SwiftUI body evaluation/rendering, multiple unrelated views, or substeps. See Experiments/TypedQueryPacks/Performance.md. Broader investigation remains open.
+- `2026-09-23T18:42:11Z`: Related investigation #13 measures row read/write costs without active subscribers. Broader instrumentation cost and SwiftUI behavior remain unmeasured here.
 
 ---
 
@@ -227,5 +228,47 @@ Expected: absence of component-event subscribers should not incur debug-name con
 Reproduce with the opt-in Release comparison in Tests/ECSTests/QueryPerformanceTests.swift. Measurements and profiling methodology: Experiments/TypedQueryPacks/Performance.md. Local trace: /tmp/ecs-query-profile.trace. Related: #5 covers broader observation overhead. This report concerns component-event dispatch, not SwiftUI notification counts.
 
 - `2026-09-23T18:38:35Z`: ObserverRegistry now dispatches by ObjectIdentifier, skips empty registries, and removes empty handler buckets. No debug type names are constructed for registration or event dispatch. Added regression tests for removal/re-registration, self-removal, and distinct type identity. Core and demo tests, macOS build, and strict lint pass. Release typed-query median fell from 111.405 to 54.070 ms/update. Follow-up profile shows observer dispatch below 1% of selected typed-query samples. Details in Experiments/TypedQueryPacks/Performance.md.
+
+---
+
+## 12: Typed iterator advancement spends about 32 ms per 100K rows before component work
+
++++
+status: new
+priority: high
+kind: enhancement
+labels: effort:m
+created: 2026-09-23T18:42:11Z
++++
+
+After #11, the typed-query benchmark still takes about 54 ms/update. Release Time Profiler attributes 59.9% of selected typed-query CPU samples to TypedQueryIterator.next, including per-row generic metadata instantiation, TypedEntityRef construction, and value-witness copy/destruction work. Inclusive percentages overlap.
+
+A separate cost-isolation test measures 100K rows: iterator advancement plus an entity-ID checksum takes 31.715 ms; fresh component reads take 38.321 ms; the same reads from pre-collected rows take 6.102 ms. Query construction is only about 1.9 microseconds per call in this single-archetype workload. Three serial samples, rotated order, warm-up, setup excluded, correctness checks outside timing.
+
+The public typed iterator incurs substantial overhead before useful component work. Preserve sequence behavior, component order, observation coverage, and existing lifetime constraints when addressing it. Pre-collected rows are an isolation experiment, not a safe workaround across structural changes.
+
+Evidence: Tests/ECSTests/TypedQueryCostTests.swift and Experiments/TypedQueryPacks/Performance.md. Local trace: /tmp/ecs-issue-11-profile.trace. Historical lookup optimization #6 is complete; this concerns the newly measured typed-iterator cost.
+
+- `2026-09-23T18:42:11Z`: Related to #13, which isolates remaining component reads/writes after excluding typed iteration. These are separate costs; improvements to one do not establish the cost of the other.
+
+---
+
+## 13: Typed component reads and writes remain costly after iterator overhead is excluded
+
++++
+status: new
+priority: high
+kind: enhancement
+labels: effort:m
+created: 2026-09-23T18:42:11Z
++++
+
+A Release isolation benchmark pre-collects typed rows before timing, avoiding TypedQueryIterator.next and row construction during updates. On 100K entities, reads take a median 6.102 ms/update; equivalent reads plus position arithmetic and writes of Transform and Physics take 22.013 ms/update. No component-event or Swift Observation subscribers are registered. Updates retain normal storage batching.
+
+The retained-row read/write workload alone exceeds 16.7 ms, even before rendering or fresh iteration. Existing profile samples include generic metadata lookup beneath Array.subscript.modify, tuple handling, and row setters. These results do not establish whole-array copy-on-write copies or prove that replacing Array with spans will help.
+
+Identify the remaining read/write costs while preserving component-event delivery, storage invalidation, and correctness. The retained-row workload is only an isolation experiment without structural changes.
+
+Evidence: Tests/ECSTests/TypedQueryCostTests.swift and Experiments/TypedQueryPacks/Performance.md. Related: #12 isolates iterator advancement; #5 covers broader observation measurements. Measurements use three rotated Release samples, warm-up, and setup/result checks outside the timer.
 
 ---

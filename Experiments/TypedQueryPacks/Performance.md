@@ -88,6 +88,33 @@ These percentages overlap. Type-name construction no longer appears in the selec
 
 The benchmark still has no component-event handlers. Regression tests cover event delivery, handler removal, registration after removal, distinct type identities, and batched storage invalidation.
 
+## Iterator and row-cost isolation
+
+A separate opt-in test uses the same entity count and components. Each phase runs three times with a rotated order, two warm-up updates, and ten measured updates. Worlds are fresh, with no observers or structural changes during measurement.
+
+| Phase | Median | Sample range |
+|---|---:|---:|
+| 1,000 typed-query constructions | 1.864 ms | 1.860–1.948 ms |
+| Fresh iteration, entity ID checksum only | 31.715 ms | 31.694–32.246 ms |
+| Fresh iteration, component reads | 38.321 ms | 37.621–40.407 ms |
+| Fresh iteration, component reads and writes | 56.309 ms | 53.913–56.783 ms |
+| Pre-collected rows, component reads | 6.102 ms | 6.029–6.110 ms |
+| Pre-collected rows, component reads and writes | 22.013 ms | 21.980–23.293 ms |
+
+Query construction costs about 1.9 microseconds per call in this single-archetype case. It cannot explain the update cost.
+
+Pre-collecting rows excludes typed iterator advancement and row construction from the timer. It does not remove row copies during array iteration. This isolates costs, not a safe general caching policy. Retained rows remain unsafe across structural changes.
+
+The approximately 32 ms difference between fresh and retained reads agrees with the iterator profile. The remaining read/write work also exceeds a 16.7 ms frame budget in this workload.
+
+The existing profile places generic metadata work beneath iterator advancement and array modification. It does not prove that copy-on-write copies entire arrays or that spans will solve the remaining cost. The profiler label `Swift runtime failure: Variadic generic index out of bounds` is not evidence of a runtime failure: these runs complete successfully.
+
+Run the isolation test from the repository root:
+
+```sh
+env ECS_RUN_BENCHMARKS=1 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter TypedQueryCostTests
+```
+
 ## Reproduce
 
 Run from the repository root:
