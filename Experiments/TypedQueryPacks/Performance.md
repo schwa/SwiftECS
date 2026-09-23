@@ -60,7 +60,33 @@ Sample stacks show string conversion, reflection, dynamic casts, and protocol-co
 
 Iterator construction also incurs generic metadata and reference-management work per row. These costs warrant investigation after the component-event path. The samples do not establish that array storage is the primary bottleneck.
 
-No optimization changes were made during this profile. This identifies candidates, not the speedup that any proposed change will achieve.
+No optimization changes were made during the initial profile.
+
+## After issue #11
+
+Observer dispatch now uses `ObjectIdentifier` keys and returns early when the registry is empty. Removing the last handler also removes its registry bucket.
+
+The same Release benchmark under Time Profiler produced these medians:
+
+| Access | Without storage observer | With storage observer |
+|---|---:|---:|
+| Entity handles | 255.000 ms | 251.961 ms |
+| Fast references | 142.348 ms | 142.878 ms |
+| Typed queries | 54.070 ms | 54.199 ms |
+
+Typed-query time fell about 51% from the initial 111.405 ms median. The unchanged profiling baseline was approximately 112 ms.
+
+The new trace is `/tmp/ecs-issue-11-profile.trace`. With the same stack filter, selected CPU sample weight is 3.621 seconds:
+
+- `ObserverRegistry.notifyChanged`: 0.9% inclusive, down from 52.2%.
+- `TypedQueryIterator.next`: 59.9% inclusive.
+- `TypedEntityRef.set`: 28.4% inclusive.
+- Generic metadata lookup: 24.4% inclusive.
+- `Array.subscript.modify`: 17.3% inclusive.
+
+These percentages overlap. Type-name construction no longer appears in the selected stacks. Iterator advancement is now the largest remaining path.
+
+The benchmark still has no component-event handlers. Regression tests cover event delivery, handler removal, registration after removal, distinct type identities, and batched storage invalidation.
 
 ## Reproduce
 

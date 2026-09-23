@@ -11,7 +11,7 @@ public enum ComponentEvent<T: Component> {
 /// Token returned when registering an observer. Use to unregister.
 public struct ObservationToken: Hashable {
     let id: UInt64
-    let componentType: ComponentType
+    let componentType: ObjectIdentifier
 }
 
 /// Type-erased observer handler.
@@ -48,7 +48,7 @@ final class ObserverHandler<T: Component>: AnyObserverHandler {
 /// Manages component observers for a World.
 final class ObserverRegistry {
     private var nextTokenId: UInt64 = 0
-    private var handlers: [ComponentType: [UInt64: AnyObserverHandler]] = [:]
+    private var handlers: [ObjectIdentifier: [UInt64: AnyObserverHandler]] = [:]
 
     /// Register an observer for a component type.
     func observe<T: Component>(
@@ -58,7 +58,7 @@ final class ObserverRegistry {
         let tokenId = nextTokenId
         nextTokenId += 1
 
-        let componentType = ComponentType(type)
+        let componentType = ObjectIdentifier(type)
         let observerHandler = ObserverHandler(handler: handler)
 
         if handlers[componentType] == nil {
@@ -72,12 +72,16 @@ final class ObserverRegistry {
     /// Unregister an observer.
     func removeObserver(_ token: ObservationToken) {
         handlers[token.componentType]?.removeValue(forKey: token.id)
+        if handlers[token.componentType]?.isEmpty == true {
+            handlers.removeValue(forKey: token.componentType)
+        }
     }
 
     /// Notify observers that a component was added.
     func notifyAdded<T: Component>(entity: Entity, component: T) {
-        let componentType = ComponentType(T.self)
-        guard let typeHandlers = handlers[componentType] else { return }
+        guard !handlers.isEmpty, let typeHandlers = handlers[ObjectIdentifier(T.self)] else {
+            return
+        }
         for (_, handler) in typeHandlers {
             handler.notifyAdded(entity: entity, component: component)
         }
@@ -85,8 +89,9 @@ final class ObserverRegistry {
 
     /// Notify observers that a component was removed.
     func notifyRemoved<T: Component>(entity: Entity, component: T) {
-        let componentType = ComponentType(T.self)
-        guard let typeHandlers = handlers[componentType] else { return }
+        guard !handlers.isEmpty, let typeHandlers = handlers[ObjectIdentifier(T.self)] else {
+            return
+        }
         for (_, handler) in typeHandlers {
             handler.notifyRemoved(entity: entity, component: component)
         }
@@ -94,8 +99,9 @@ final class ObserverRegistry {
 
     /// Notify observers that a component was changed.
     func notifyChanged<T: Component>(entity: Entity, component: T) {
-        let componentType = ComponentType(T.self)
-        guard let typeHandlers = handlers[componentType] else { return }
+        guard !handlers.isEmpty, let typeHandlers = handlers[ObjectIdentifier(T.self)] else {
+            return
+        }
         for (_, handler) in typeHandlers {
             handler.notifyChanged(entity: entity, component: component)
         }
@@ -103,8 +109,6 @@ final class ObserverRegistry {
 
     /// Check if there are any observers for a component type.
     func hasObservers<T: Component>(for type: T.Type) -> Bool {
-        let componentType = ComponentType(type)
-        guard let typeHandlers = handlers[componentType] else { return false }
-        return !typeHandlers.isEmpty
+        handlers[ObjectIdentifier(type)] != nil
     }
 }

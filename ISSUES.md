@@ -209,11 +209,13 @@ Applications currently own pause state and decide whether to call World.update. 
 ## 11: Component-event dispatch constructs debug type names even without observers
 
 +++
-status: new
+status: closed
 priority: high
 kind: enhancement
 labels: effort:s
 created: 2026-09-23T18:33:29Z
+updated: 2026-09-23T18:38:35Z
+closed: 2026-09-23T18:38:35Z
 +++
 
 Release Time Profiler samples show substantial overhead in component-event dispatch during typed-query writes. ObserverRegistry.notifyChanged constructs ComponentType(T.self), including String(describing: type), before checking whether handlers exist. The benchmark registers no component-event handlers, yet every write pays this cost.
@@ -223,5 +225,7 @@ In samples containing QueryBenchmarkSystem.update and TypedEntityRef or TypedQue
 Expected: absence of component-event subscribers should not incur debug-name construction for each write. Event delivery with subscribers and batched Swift Observation must remain correct.
 
 Reproduce with the opt-in Release comparison in Tests/ECSTests/QueryPerformanceTests.swift. Measurements and profiling methodology: Experiments/TypedQueryPacks/Performance.md. Local trace: /tmp/ecs-query-profile.trace. Related: #5 covers broader observation overhead. This report concerns component-event dispatch, not SwiftUI notification counts.
+
+- `2026-09-23T18:38:35Z`: ObserverRegistry now dispatches by ObjectIdentifier, skips empty registries, and removes empty handler buckets. No debug type names are constructed for registration or event dispatch. Added regression tests for removal/re-registration, self-removal, and distinct type identity. Core and demo tests, macOS build, and strict lint pass. Release typed-query median fell from 111.405 to 54.070 ms/update. Follow-up profile shows observer dispatch below 1% of selected typed-query samples. Details in Experiments/TypedQueryPacks/Performance.md.
 
 ---
