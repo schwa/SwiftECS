@@ -47,6 +47,7 @@ extension World {
 
     /// Get all component types for an entity.
     public func componentTypes(for entity: Entity) -> [ComponentType] {
+        trackStorageAccess()
         guard let location = entityLocations[entity.id] else { return [] }
         return Array(location.signature.types)
     }
@@ -88,6 +89,7 @@ extension World {
     /// Get a detailed string representation including component values.
     /// Note: Only works for components that conform to CustomStringConvertible.
     public func dumpDetailed() -> String {
+        trackStorageAccess()
         var lines: [String] = []
         lines.append("World Dump (Detailed):")
         lines.append("======================")

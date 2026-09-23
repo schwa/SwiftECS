@@ -8,7 +8,6 @@ struct StarfieldView: View {
         TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !game.running || game.paused)) { timeline in
             GeometryReader { geometry in
                 Canvas { context, size in
-                    let _ = game.frame
                     for index in 0..<90 {
                         let horizontalSeed: Int = (index * 137 + 31) % 997
                         let verticalSeed: Int = (index * 251 + 17) % 991

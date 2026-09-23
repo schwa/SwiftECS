@@ -1,5 +1,6 @@
 import ECS
 import Foundation
+import Observation
 import Testing
 @testable import StarfallSupport
 
@@ -53,6 +54,67 @@ import Testing
     #expect(game.lives == 3)
     #expect(!game.paused)
     #expect(game.failure == nil)
+}
+
+// Observation callbacks run synchronously on the main actor in these tests.
+private final class InvalidationFlag: @unchecked Sendable {
+    var changed = false
+}
+
+@MainActor @Test func `steering and restart invalidate reads without a frame counter`() throws {
+    let game = GameSession()
+    game.start()
+    let oldWorld = game.world
+    let steering = InvalidationFlag()
+    withObservationTracking {
+        _ = game.world.query(with: Player.self).first?[Position.self]
+    } onChange: {
+        steering.changed = true
+    }
+    game.move(to: 0.75)
+    #expect(steering.changed)
+    let replacement = InvalidationFlag()
+    withObservationTracking {
+        _ = game.world.query(with: Player.self)
+    } onChange: {
+        replacement.changed = true
+    }
+    game.start()
+    #expect(replacement.changed)
+    #expect(game.world !== oldWorld)
+    let current = InvalidationFlag()
+    withObservationTracking {
+        _ = game.world.query(with: Player.self).first?[Position.self]
+    } onChange: {
+        current.changed = true
+    }
+    oldWorld.createEntity()
+    #expect(!current.changed)
+    game.move(to: 0.25)
+    #expect(current.changed)
+}
+
+@MainActor @Test func `pause holds storage and resume observes movement and spawning`() {
+    let game = GameSession()
+    game.start()
+    let invalidation = InvalidationFlag()
+    withObservationTracking {
+        _ = game.world.entities
+    } onChange: {
+        invalidation.changed = true
+    }
+    let now = Date()
+    game.setPaused(true)
+    game.tick(at: now)
+    game.move(to: 0.1)
+    #expect(!invalidation.changed)
+    game.setPaused(false)
+    game.tick(at: now)
+    for step in 1...5 {
+        game.tick(at: now.addingTimeInterval(Double(step) * 0.1))
+    }
+    #expect(invalidation.changed)
+    #expect(game.world.query(with: FallingObject.self).count == 1)
 }
 
 @MainActor @Test func `last heart ends the game and freezes simulation`() throws {

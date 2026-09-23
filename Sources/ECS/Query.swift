@@ -171,6 +171,7 @@ extension Query {
 extension World {
     /// Execute a query and return matching entities.
     public func query(_ query: Query) -> [Entity] {
+        trackStorageAccess()
         var result: [Entity] = []
         for archetype in archetypes.values where query.matches(archetype.signature) {
             for entityID in archetype.entities {
@@ -200,7 +201,8 @@ public struct QuerySequence: Sequence {
     let archetypes: [Archetype]
     
     public func makeIterator() -> QueryIterator {
-        QueryIterator(world: world, archetypes: archetypes)
+        world.trackStorageAccess()
+        return QueryIterator(world: world, archetypes: archetypes)
     }
 }
 
@@ -212,6 +214,7 @@ public struct QueryIterator: IteratorProtocol {
     var entityIndex: Int = 0
     
     public mutating func next() -> Entity? {
+        world.trackStorageAccess()
         while archetypeIndex < archetypes.count {
             let archetype = archetypes[archetypeIndex]
             if entityIndex < archetype.entities.count {
@@ -245,10 +248,12 @@ public struct EntityRef {
     /// Access a component by type.
     public subscript<C: Component>(type: C.Type) -> C {
         get {
+            world.trackStorageAccess()
             let col = columns[ComponentType(type)] as! Column<C>
             return col.data[index]
         }
         nonmutating set {
+            defer { world.storageDidChange() }
             let col = columns[ComponentType(type)] as! Column<C>
             col.data[index] = newValue
             // Notify observers
@@ -295,6 +300,7 @@ public struct FastQueryIterator: IteratorProtocol {
     }
     
     public mutating func next() -> EntityRef? {
+        world.trackStorageAccess()
         while archetypeIndex < archetypes.count {
             let archetype = archetypes[archetypeIndex]
             
@@ -324,7 +330,8 @@ public struct FastQuerySequence: Sequence {
     let componentTypes: [ComponentType]
     
     public func makeIterator() -> FastQueryIterator {
-        FastQueryIterator(world: world, archetypes: archetypes, componentTypes: componentTypes)
+        world.trackStorageAccess()
+        return FastQueryIterator(world: world, archetypes: archetypes, componentTypes: componentTypes)
     }
 }
 
@@ -366,6 +373,7 @@ extension World {
     
     /// Get matching archetypes for a query, using cache if registered.
     internal func matchingArchetypes(for query: Query) -> [Archetype] {
+        trackStorageAccess()
         if let cache = registeredQueries[query] {
             // Use cached archetype signatures
             if cache.isDirty {

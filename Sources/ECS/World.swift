@@ -25,6 +25,31 @@ public final class World {
     @ObservationIgnored
     private let observers = ObserverRegistry()
     
+    private var storageRevision: UInt64 = 0
+    @ObservationIgnored private var updateDepth = 0
+    @ObservationIgnored private var storageIsDirty = false
+
+    internal func trackStorageAccess() {
+        _ = storageRevision
+    }
+
+    internal func storageDidChange() {
+        if updateDepth > 0 {
+            storageIsDirty = true
+        } else {
+            storageRevision &+= 1
+        }
+    }
+
+    private func finishStorageUpdate() {
+        updateDepth -= 1
+        guard updateDepth == 0, storageIsDirty else {
+            return
+        }
+        storageIsDirty = false
+        storageRevision &+= 1
+    }
+
     // Registered query support
     @ObservationIgnored
     internal var registeredQueries: [Query: RegisteredQueryCache] = [:]
@@ -43,6 +68,7 @@ public final class World {
     /// Create an entity with no components.
     @discardableResult
     public func createEntity() -> Entity {
+        defer { storageDidChange() }
         let id = generateUniqueEntityID()
 
         let archetype = archetypes[emptySignature]!
@@ -55,6 +81,7 @@ public final class World {
     /// Create an entity with components.
     @discardableResult
     public func createEntity<each T: Component>(_ components: repeat each T) -> Entity {
+        defer { storageDidChange() }
         let id = generateUniqueEntityID()
 
         var typeIDs = Set<ComponentType>()
@@ -77,6 +104,7 @@ public final class World {
         guard let location = entityLocations.removeValue(forKey: id) else { return false }
         guard let archetype = archetypes[location.signature] else { return false }
 
+        defer { storageDidChange() }
         if let movedEntity = archetype.removeEntity(at: location.index) {
             entityLocations[movedEntity]?.index = location.index
         }
@@ -90,6 +118,7 @@ public final class World {
         guard let location = entityLocations[id],
               let sourceArchetype = archetypes[location.signature] else { return nil }
 
+        defer { storageDidChange() }
         let newID = generateUniqueEntityID()
         let targetArchetype = getOrCreateArchetype(location.signature)
 
@@ -102,7 +131,8 @@ public final class World {
 
     /// Check if an entity exists.
     public func entityExists(_ id: EntityID) -> Bool {
-        entityLocations[id] != nil
+        trackStorageAccess()
+        return entityLocations[id] != nil
     }
 
     /// Get an entity handle.
@@ -113,12 +143,14 @@ public final class World {
 
     /// Number of entities.
     public var entityCount: Int {
-        entityLocations.count
+        trackStorageAccess()
+        return entityLocations.count
     }
     
     /// All entities in the world.
     public var entities: [Entity] {
-        entityLocations.keys.map { Entity(id: $0, world: self) }
+        trackStorageAccess()
+        return entityLocations.keys.map { Entity(id: $0, world: self) }
     }
 
     // MARK: - Entity ID Generation (Private)
@@ -157,6 +189,7 @@ public final class World {
 
     internal func addComponent<T: Component>(_ component: T, to entityID: EntityID) {
         guard let location = entityLocations[entityID] else { return }
+        defer { storageDidChange() }
         let typeID = ComponentType(T.self)
 
         let isNewComponent = !location.signature.contains(typeID)
@@ -179,6 +212,7 @@ public final class World {
     }
 
     internal func component<T: Component>(_ type: T.Type, for entityID: EntityID) -> T? {
+        trackStorageAccess()
         guard let location = entityLocations[entityID],
               let archetype = archetypes[location.signature] else { return nil }
         return archetype.getComponent(type, at: location.index)
@@ -186,6 +220,7 @@ public final class World {
     
     /// Get all components for an entity.
     public func allComponents(for entityID: EntityID) -> [any Component] {
+        trackStorageAccess()
         guard let location = entityLocations[entityID],
               let archetype = archetypes[location.signature] else { return [] }
         return archetype.allComponents(at: location.index)
@@ -197,6 +232,7 @@ public final class World {
         let typeID = ComponentType(T.self)
 
         guard location.signature.contains(typeID) else { return nil }
+        defer { storageDidChange() }
 
         let value = archetypes[location.signature]?.getComponent(type, at: location.index)
 
@@ -212,6 +248,7 @@ public final class World {
     }
 
     internal func hasComponent<T: Component>(_ type: T.Type, for entityID: EntityID) -> Bool {
+        trackStorageAccess()
         guard let location = entityLocations[entityID] else { return false }
         return location.signature.contains(ComponentType(type))
     }
@@ -320,6 +357,8 @@ public final class World {
     /// Update all systems in dependency order.
     /// - Throws: `SystemError` if dependencies cannot be resolved.
     public func update(deltaTime: Double) throws {
+        updateDepth += 1
+        defer { finishStorageUpdate() }
         if systemOrderDirty {
             try rebuildSystemOrder()
         }

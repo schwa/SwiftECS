@@ -9,10 +9,9 @@ final class GameSession {
     private(set) var running = false
     private(set) var paused = false
     private(set) var failure: String?
-    @ObservationIgnored private(set) var world = World()
+    private(set) var world = World()
     @ObservationIgnored private var player: Entity?
     @ObservationIgnored private var lastDate: Date?
-    private(set) var frame = 0
 
     func start() {
         world = World()
@@ -27,7 +26,6 @@ final class GameSession {
             running = true
             paused = false
             lastDate = nil
-            frame += 1
         } catch {
             failure = error.localizedDescription
             running = false
@@ -39,7 +37,6 @@ final class GameSession {
             return
         }
         player?.set(Position(x: min(max(x, 0.08), 0.92), y: 0.9))
-        frame += 1
     }
 
     func nudge(_ offset: Double) {
@@ -73,7 +70,6 @@ final class GameSession {
                     running = lives > 0
                 }
             }
-            frame += 1
         } catch {
             failure = error.localizedDescription
             running = false

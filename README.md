@@ -9,7 +9,7 @@ ECS is an architectural pattern that separates data (Components) from behavior (
 ## Features
 
 - **Archetype-based storage** for cache-friendly iteration
-- **@Observable World** with curated observable properties for SwiftUI integration
+- **@Observable World** with batched storage observation for SwiftUI integration
 - **Simulation time tracking** via `world.simulationTime`
 - **Query predicates** for flexible entity filtering
 - **System dependencies** with automatic topological ordering
@@ -178,20 +178,41 @@ world.removeAllSystems()
 
 ### SwiftUI Integration
 
-`World` is `@Observable` with carefully curated observable properties:
+Reading ECS storage registers a Swift Observation dependency, including reads that return missing components or empty queries. No frame counter or simulation-time dependency is needed.
 
 ```swift
 struct GameView: View {
     let world: World
-    
+
     var body: some View {
-        // View updates when simulationTime changes (once per frame)
-        Text("Time: \(world.simulationTime, format: .number.precision(.fractionLength(2)))")
+        Text("Entities: \(world.entityCount)")
     }
 }
 ```
 
-Only `simulationTime` triggers observation. Internal state (entities, archetypes, systems) is marked `@ObservationIgnored` to avoid excessive UI updates during high-frequency ECS operations.
+Component access, presence checks, entity lookup/enumeration, and ordinary, registered, and fast queries all participate. Invalidation is world-wide, not per component or entity.
+
+Successful ECS writes notify synchronously before the mutation API returns. During `world.update()`, writes only mark storage dirty. The outermost update publishes one storage invalidation when it exits, including error exits. An update without storage changes publishes none. Nested updates share the outer batch. Ten thousand component writes therefore produce one storage notification, not ten thousand.
+
+The private observation token follows Swift Observation will-set/did-set semantics. Tracking callbacks signal invalidation; read the resulting state after the mutation or update returns. `simulationTime` remains separately observable and can generate an additional notification if read alongside storage. Existing component-event observers still receive individual events.
+
+Writes through entity handles and query references participate. Internal changes to reference-type components do not participate unless written back through ECS. Recreate lazy query sequences when reevaluating queries; they retain the archetypes selected when created. Query references are for iteration, not retention across structural changes.
+
+`World` is not thread-safe or main-actor isolated. Serialize all access on its owning executor; keep SwiftUI-owned worlds on the main actor. If an observable app model replaces its world, keep that world property observable too, so views switch to the replacement.
+
+## Tests
+
+Run the default suite from the repository root:
+
+```sh
+xcb test "$PWD/Package.swift/ECS"
+```
+
+Stress tests are skipped by default. To run them serially in Release:
+
+```sh
+env ECS_RUN_STRESS_TESTS=1 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter StressTests
+```
 
 ## Performance
 

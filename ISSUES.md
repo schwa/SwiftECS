@@ -5,11 +5,12 @@
 ## 1: Component mutations do not directly invalidate SwiftUI views
 
 +++
-status: open
+status: closed
 priority: high
 kind: enhancement
 created: 2026-09-23T17:28:58Z
-updated: 2026-09-23T17:34:58Z
+updated: 2026-09-23T17:50:27Z
+closed: 2026-09-23T17:50:27Z
 +++
 
 ## Problem
@@ -43,6 +44,8 @@ Guarantee ECS-mediated mutations, not arbitrary internal mutations of reference-
 ## Completion criteria
 All public read/write paths are accounted for in tests, update batching obeys the observation contract, and Starfall renders correctly with no frame counter or simulationTime workaround.
 
+- `2026-09-23T17:50:27Z`: Implemented world-wide storage observation, outermost-update batching, mutation/read coverage, and Starfall integration without a frame counter. Tests cover 10,000 writes producing one invalidation, nested/error paths, empty queries, and world replacement. Default tests pass; stress tests are now opt-in. macOS gameplay manually verified by user. Follow-ups: #4 and #5.
+
 ---
 
 ## 2: System execution order does not preserve registration order
@@ -68,5 +71,31 @@ created: 2026-09-23T17:28:58Z
 +++
 
 World.query(with:) filters entities by component presence but returns untyped Entity handles. Systems must then retrieve each requested component through an optional subscript and repeat presence checks. Starfall MovementSystem and CollisionSystem demonstrate this repeated query-and-guard pattern. The query result cannot express typed access to the components it matched.
+
+---
+
+## 4: Multiple simulation substeps produce separate storage invalidations within one rendered frame
+
++++
+status: new
+priority: medium
+kind: enhancement
+created: 2026-09-23T17:47:35Z
++++
+
+Storage observation is batched per outermost world.update(), not per rendered frame. Apps that perform several sequential simulation substeps per frame receive one storage invalidation for each changed substep. Starfall uses this pattern. Notification volume therefore scales with substep count even when the UI only needs the final frame state. The existing per-update guarantee remains correct; batching across sequential updates is not currently supported.
+
+---
+
+## 5: Observation overhead and world-wide redraw scope lack dedicated measurements
+
++++
+status: new
+priority: medium
+kind: task
+created: 2026-09-23T17:47:35Z
++++
+
+World storage observation now tracks ECS reads and invalidates at world scope. Correctness tests cover notification batching, but dedicated measurements do not establish its runtime overhead or the UI work caused by broad invalidation. Measure representative large-world workloads with and without active observers, ordinary and fast-query reads/writes, sequential simulation substeps, and multiple views reading unrelated entities or components. Distinguish storage notifications from actual SwiftUI body evaluations and rendering work. These measurements are needed before deciding whether finer-grained observation is worthwhile.
 
 ---
