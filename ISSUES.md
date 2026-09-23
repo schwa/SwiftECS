@@ -99,3 +99,68 @@ created: 2026-09-23T17:47:35Z
 World storage observation now tracks ECS reads and invalidates at world scope. Correctness tests cover notification batching, but dedicated measurements do not establish its runtime overhead or the UI work caused by broad invalidation. Measure representative large-world workloads with and without active observers, ordinary and fast-query reads/writes, sequential simulation substeps, and multiple views reading unrelated entities or components. Distinguish storage notifications from actual SwiftUI body evaluations and rendering work. These measurements are needed before deciding whether finer-grained observation is worthwhile.
 
 ---
+
+## 6: Fast component access still performs per-access dictionary lookups and casts
+
++++
+status: new
+priority: medium
+kind: enhancement
+created: 2026-09-23T17:57:52Z
++++
+
+EntityRef stores type-erased columns in a ComponentType-keyed dictionary. Every component read/write performs a lookup and cast, including repeated accesses in tight simulation loops. PLAN.md identified this as a performance concern, but its timings are historical and not verified against the current implementation. Establish current Release baselines and assess typed fast-query access without losing storage observation or component events. Related: #3 covers typed query ergonomics; #5 covers observation overhead.
+
+---
+
+## 7: Parameter-pack typed query references remain unverified on current Swift
+
++++
+status: new
+priority: low
+kind: task
+created: 2026-09-23T17:57:52Z
++++
+
+The retired PLAN.md records a compiler crash when attempting EntityRef<each T: Component>: signal 11 in emitPackExpansionIntoPack. There is no current reproduction or verification against the supported toolchain. Determine whether the limitation still applies and capture a minimal reproduction and compiler version if it does. Explicit overloads and macros were alternatives in the old plan, not committed requirements.
+
+---
+
+## 8: Empty archetypes remain allocated after component transitions
+
++++
+status: new
+priority: low
+kind: enhancement
+created: 2026-09-23T17:57:52Z
++++
+
+Adding and removing component types can leave empty intermediate archetypes in World. No empty-archetype reclamation exists. Long-lived worlds with changing component signatures can retain unused storage and query-cache entries. Any future reclamation must account for registered query caches and the lifetime rules of lazy sequences and query references.
+
+---
+
+## 9: System count changes are not observable for debug interfaces
+
++++
+status: new
+priority: low
+kind: enhancement
+created: 2026-09-23T17:57:52Z
++++
+
+World.systemCount reports the registered system count but reads ignored system storage without establishing an observation dependency. Debug views reading only systemCount do not automatically refresh when systems are added or removed. Storage observation does not cover system registration. This was a future consideration in PLAN.md, not part of the completed storage-observation contract.
+
+---
+
+## 10: Pause and resume require application-owned simulation state
+
++++
+status: new
+priority: low
+kind: feature
+created: 2026-09-23T17:57:52Z
++++
+
+World has no pause/resume state or policy. Applications such as Starfall keep their own pause flag and decide whether to call update. PLAN.md suggested observable pause state as a future possibility. Whether this belongs in the library is unresolved; define its intended semantics and value before implementation, including simulationTime, system execution, and direct component writes while paused.
+
+---
