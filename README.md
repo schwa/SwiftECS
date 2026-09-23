@@ -1,73 +1,316 @@
 # ECS
 
-Our Swift entity-component-system experiment. No customers or stable API yet.
+## Usage
 
-## Layout
+### Components and entities
 
-- `Sources/ECS/`: archetype storage, entities, queries, systems, and observation.
-- `Tests/ECSTests/`: unit tests and opt-in stress tests.
-- `Demos/SwiftECSDemos/`: SwiftUI arcade with a launch picker, Starfall, and the emoji-based Midnight Survivors. Current validation targets macOS.
-- `ISSUES.md`: open work and unresolved design questions.
-- `RFCs/`: design proposals.
+```swift
+import ECS
 
-## Design notes
+struct Position: Component {
+    var x: Double
+    var y: Double
+}
 
-Entities with the same component types share an archetype. Each component type has its own storage column.
+struct Velocity: Component {
+    var x: Double
+    var y: Double
+}
 
-Component additions and removals move entities between archetypes. Creation with all initial components avoids intermediate archetypes. Empty archetypes remain allocated.
+struct Health: Component {
+    var value: Int
+}
+struct Disabled: Component {}
 
-Registered queries cache matching archetypes. New archetypes invalidate the cache. The older `EntityRef` still uses a dictionary lookup and cast for each component access.
+let world = World()
+let player = world.createEntity(
+    Position(x: 0, y: 0),
+    Velocity(x: 1, y: 0),
+    Health(value: 100)
+)
+let empty = world.createEntity()
 
-`typedQuery` binds typed columns once per matching archetype. Rows expose a read-only `values` tuple and a variadic `set` method. Component types must be distinct.
-
-The optional `matching` predicate restricts results further and supports registered queries. An empty component pack selects entities without component requirements.
-
-`set` writes every supplied component and emits an event for each, including unchanged values. It emits one storage invalidation outside updates. Initial performance measurements are in `Experiments/TypedQueryPacks/Performance.md`.
-
-Lazy query sequences retain their selected archetypes. Query references are not safe across structural changes. The typed API has the same restriction.
-
-Structural changes during iteration are unsupported. This includes entity creation, deletion, and component additions or removals from event handlers.
-
-Typed relationships use separate forward/reverse indexes. `ChildOf` enforces one parent and rejects cycles. Ordinary deletion detaches children; explicit recursive deletion removes a subtree.
-
-Relationship queries filter live links after archetype matching. Decisions and examples are in `Experiments/Relationships.md`.
-
-Systems declare dependencies for execution order. `World.update()` advances `simulationTime` before it runs systems.
-
-## Observation
-
-Storage reads establish world-wide observation dependencies, including missing components and empty queries.
-
-During an update, writes only mark storage dirty. The outermost update emits one storage invalidation on exit. Updates without storage changes emit none.
-
-Writes outside an update notify immediately. Sequential simulation substeps each emit their own invalidation. `simulationTime` has separate observation.
-
-Component-event observers still receive individual events, including writes through fast query references. Internal mutations of reference-type components bypass ECS observation.
-
-World replacement must remain observable in app models. Starfall no longer needs a frame counter to trigger redraws.
-
-`World` is not thread-safe. SwiftUI-owned worlds stay on the main actor. The library does not enforce actor isolation.
-
-## Local checks
-
-Run from the repository root:
-
-```sh
-swiftlint --strict --quiet
-xcb build "$PWD/Package.swift/ECS"
-xcb test "$PWD/Package.swift/ECS"
+let id = player.id
+let found = world[id]                  // Entity?
+let exists = player.exists
+let count = world.entityCount
+let entities = world.entities
 ```
 
-Stress tests are opt-in and run serially:
+### Read and change components
 
-```sh
-env ECS_RUN_STRESS_TESTS=1 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter StressTests
+```swift
+let position = player[Position.self]   // Position?
+let hasHealth = player.contains(Health.self)
+
+player[Position.self] = Position(x: 10, y: 20)
+player.set(Health(value: 80))
+player.set(Position(x: 0, y: 0), Velocity(x: 2, y: 1))
+
+if let components = player.get(Position.self, Velocity.self) {
+    let (position, velocity) = components.values
+    player.set(Composite(position, velocity))
+}
+
+let removed = player.remove(Health.self) // Health?
+player[Disabled.self] = nil
+
+let copy = player.clone()              // Entity?
+copy?.destroy()
+empty.destroy()
 ```
 
-The query comparison is also opt-in:
+### Build queries
 
-```sh
-env ECS_RUN_BENCHMARKS=1 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter QueryPerformanceTests
+```swift
+let moving = Query(with: Position.self, Velocity.self)
+let active = moving.without(Disabled.self)
+let healthy = Query(with: Health.self)
+
+let both = active.and(healthy)
+let either = active.or(healthy)
+let excluded = active.negated
+let positions = Query.all.with(Position.self)
+let nothing = Query.none
+
+let predicate = Query(
+    .contains(Position.self) &&
+    (.contains(Velocity.self) || .contains(Health.self)) &&
+    !QueryPredicate.contains(Disabled.self)
+)
+
+let matches = world.query(active)      // [Entity]
+let withHealth = world.query(with: Health.self)
 ```
 
-Old performance figures came from different iteration APIs. Current measurements cover one workload, not general performance.
+### Iterate and update
+
+Typed queries return components without optional lookups. `set` writes every supplied component, including unchanged values.
+
+```swift
+let deltaTime = 1.0 / 60
+
+for row in world.typedQuery(Position.self, Velocity.self, matching: active) {
+    var (position, velocity) = row.values
+    position.x += velocity.x * deltaTime
+    position.y += velocity.y * deltaTime
+    row.set(position, velocity)
+    let id = row.entityID
+}
+
+for row in world.typedQuery(Health.self) {
+    let health = row.values            // A single component, not a tuple
+    row.set(Health(value: health.value + 1))
+}
+
+for entity in world.entities(active) {
+    let position = entity[Position.self]
+}
+
+for reference in world.entities(active, Position.self, Velocity.self) {
+    var position = reference[Position.self]
+    position.x += reference[Velocity.self].x * deltaTime
+    reference[Position.self] = position
+}
+```
+
+Do not create or destroy entities, or add or remove component types, during lazy or typed iteration. Collect handles first:
+
+```swift
+let doomed = world.query(with: Disabled.self)
+for entity in doomed {
+    entity.destroy()
+}
+```
+
+Query references are not safe across structural changes. Recreate lazy sequences to include new archetypes.
+
+### Cache repeated queries
+
+Registration caches matching archetypes, not component values or relationship results.
+
+```swift
+world.register(active)
+let registered = world.isRegistered(active)
+
+for row in world.typedQuery(Position.self, Velocity.self, matching: active) {
+    let (position, velocity) = row.values
+}
+
+world.unregister(active)
+```
+
+### Run systems
+
+```swift
+struct MovementSystem: System {
+    func update(world: World, deltaTime: Double) {
+        for row in world.typedQuery(Position.self, Velocity.self) {
+            var (position, velocity) = row.values
+            position.x += velocity.x * deltaTime
+            position.y += velocity.y * deltaTime
+            row.set(position, velocity)
+        }
+    }
+}
+
+struct RegenerationSystem: System {
+    static let query = Query(with: Health.self)
+
+    func initialize(world: World) {
+        world.register(Self.query)
+    }
+
+    func update(world: World, deltaTime: Double) {
+        for row in world.typedQuery(Health.self, matching: Self.query) {
+            row.set(Health(value: min(100, row.values.value + 1)))
+        }
+    }
+
+    func cleanup(world: World) {
+        world.unregister(Self.query)
+    }
+}
+
+try world.addSystem(MovementSystem(), id: "movement")
+try world.addSystem(RegenerationSystem(), id: "regeneration", dependencies: ["movement"])
+try world.update(deltaTime: 1.0 / 60)
+
+let elapsed = world.simulationTime
+let order = world.systemExecutionOrder
+let systemCount = world.systemCount
+world.removeAllSystems()
+
+world.addSystem(MovementSystem())      // Uses the type name as its ID
+let movementID = SystemID.of(MovementSystem.self)
+```
+
+Lifecycle methods have empty defaults. `update` advances simulation time before it runs systems. Duplicate system IDs, missing dependencies, and cycles produce `SystemError` through the throwing APIs.
+
+### Link entities
+
+Relationships have no payload. They allow multiple targets and cycles unless their type restricts them.
+
+```swift
+enum Likes: Relationship {}
+
+enum EquippedBy: Relationship {
+    static var isExclusive: Bool { true }
+    static var isAcyclic: Bool { true }
+}
+
+let friend = world.createEntity()
+let weapon = world.createEntity()
+
+try player.addRelationship(Likes.self, to: friend)
+try weapon.addRelationship(EquippedBy.self, to: player)
+
+let liked = player.targets(of: Likes.self)
+let admirers = friend.sources(of: Likes.self)
+let linked = player.hasRelationship(Likes.self, to: friend)
+let equipmentOwners = weapon.ancestors(via: EquippedBy.self)
+let equipment = player.descendants(via: EquippedBy.self)
+
+try player.removeRelationship(Likes.self, to: friend)
+```
+
+Exclusive relationships replace the previous target. Acyclic relationships reject cycles. Writes reject dead entities and cross-world links with `RelationshipError`.
+
+### Hierarchies and deletion
+
+`ChildOf` allows one parent and rejects cycles. Traversal is breadth-first, excludes the starting entity, and visits each entity once.
+
+```swift
+let parent = world.createEntity()
+let child = world.createEntity()
+let grandchild = world.createEntity()
+
+try child.setParent(parent)
+try grandchild.setParent(child)
+
+let currentParent = child.parent
+let children = parent.children
+let ancestors = grandchild.ancestors()
+let descendants = parent.descendants()
+
+try child.setParent(nil)               // Detach
+try child.setParent(parent)            // Reparent
+
+parent.destroy()                      // Children survive as roots
+child.destroyRecursively()            // Delete child and grandchild
+player.destroyRecursively(following: EquippedBy.self)
+```
+
+Deletion removes all incoming and outgoing links. Cloning copies outgoing links with their original targets, but does not clone descendants.
+
+### Query relationships
+
+```swift
+let owner = world.createEntity()
+let projectile = world.createEntity(Position(x: 0, y: 0))
+try projectile.setParent(owner)
+
+let directChildren = Query(.related(ChildOf.self, to: owner.id))
+let hasParent = Query(.related(ChildOf.self))
+let roots = Query(!QueryPredicate.related(ChildOf.self))
+let subtree = Query(.descendant(of: owner.id))
+let equipped = Query(.descendant(of: owner.id, via: EquippedBy.self))
+
+for row in world.typedQuery(Position.self, matching: directChildren) {
+    let position = row.values
+}
+```
+
+Relationship predicates work with every query API. Lazy queries check current links during iteration. Descendant queries exclude their root and do not imply traversal order.
+
+### Observe component events
+
+```swift
+var events: [ComponentEvent<Health>] = []
+let token = world.observe(Health.self) { event in
+    events.append(event)               // .added, .changed, or .removed
+}
+
+owner.set(Health(value: 100))
+owner.set(Health(value: 90))
+owner.remove(Health.self)
+world.removeObserver(token)
+```
+
+Callbacks run synchronously. Typed writes also emit component events. These events are separate from Swift Observation and do not describe relationships.
+
+### Use SwiftUI observation
+
+```swift
+import SwiftUI
+
+@MainActor
+struct EntityCountView: View {
+    @State private var world = World()
+
+    var body: some View {
+        VStack {
+            Text("Entities: \(world.entityCount)")
+            Button("Add entity") {
+                world.createEntity(Position(x: 0, y: 0))
+            }
+        }
+    }
+}
+```
+
+Component, query, and relationship reads establish world-wide observation dependencies. Writes inside one outermost `world.update()` produce one storage invalidation. Writes outside updates notify immediately.
+
+`World` is not thread-safe. Keep SwiftUI-owned worlds on the main actor. Internal mutations of reference-type components require an ECS write to notify observation.
+
+### Inspect storage
+
+```swift
+let types = owner.componentTypes
+let components = owner.allComponents
+let typeName = ComponentType(Health.self).name
+
+let stats = world.stats
+let summary = world.dumpString()
+let detail = world.dumpDetailed()
+```
