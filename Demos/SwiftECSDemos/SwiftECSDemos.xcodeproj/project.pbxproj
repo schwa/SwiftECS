@@ -11,41 +11,41 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		451594472F64A8DC005F944D /* Starfall.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Starfall.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		451594472F64A8DC005F944D /* SwiftECSDemos.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftECSDemos.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		4515947D2F64AAA7005F944D /* Exceptions for "Packages" folder in "Starfall" target */ = {
+		4515947D2F64AAA7005F944D /* Exceptions for "Packages" folder in "SwiftECSDemos" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				StarfallSupport,
 			);
-			target = 451594462F64A8DC005F944D /* Starfall */;
+			target = 451594462F64A8DC005F944D /* SwiftECSDemos */;
 		};
-		451594922F64AAB2005F944D /* Exceptions for "Configuration" folder in "Starfall" target */ = {
+		451594922F64AAB2005F944D /* Exceptions for "Configuration" folder in "SwiftECSDemos" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				"Project-Debug.xcconfig",
 				"Project-Release.xcconfig",
 				"Project-Shared.xcconfig",
-				"Starfall-Debug.xcconfig",
-				"Starfall-Release.xcconfig",
-				"Starfall-Shared.xcconfig",
+				"SwiftECSDemos-Debug.xcconfig",
+				"SwiftECSDemos-Release.xcconfig",
+				"SwiftECSDemos-Shared.xcconfig",
 			);
-			target = 451594462F64A8DC005F944D /* Starfall */;
+			target = 451594462F64A8DC005F944D /* SwiftECSDemos */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		451594492F64A8DC005F944D /* Starfall */ = {
+		451594492F64A8DC005F944D /* SwiftECSDemos */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Starfall;
+			path = SwiftECSDemos;
 			sourceTree = "<group>";
 		};
 		451594742F64AA9A005F944D /* Configuration */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				451594922F64AAB2005F944D /* Exceptions for "Configuration" folder in "Starfall" target */,
+				451594922F64AAB2005F944D /* Exceptions for "Configuration" folder in "SwiftECSDemos" target */,
 			);
 			path = Configuration;
 			sourceTree = "<group>";
@@ -53,7 +53,7 @@
 		4515947C2F64AAA6005F944D /* Packages */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				4515947D2F64AAA7005F944D /* Exceptions for "Packages" folder in "Starfall" target */,
+				4515947D2F64AAA7005F944D /* Exceptions for "Packages" folder in "SwiftECSDemos" target */,
 			);
 			path = Packages;
 			sourceTree = "<group>";
@@ -77,7 +77,7 @@
 			children = (
 				451594742F64AA9A005F944D /* Configuration */,
 				4515947C2F64AAA6005F944D /* Packages */,
-				451594492F64A8DC005F944D /* Starfall */,
+				451594492F64A8DC005F944D /* SwiftECSDemos */,
 				451594482F64A8DC005F944D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -85,7 +85,7 @@
 		451594482F64A8DC005F944D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				451594472F64A8DC005F944D /* Starfall.app */,
+				451594472F64A8DC005F944D /* SwiftECSDemos.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -93,9 +93,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		451594462F64A8DC005F944D /* Starfall */ = {
+		451594462F64A8DC005F944D /* SwiftECSDemos */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 451594522F64A8DD005F944D /* Build configuration list for PBXNativeTarget "Starfall" */;
+			buildConfigurationList = 451594522F64A8DD005F944D /* Build configuration list for PBXNativeTarget "SwiftECSDemos" */;
 			buildPhases = (
 				451594432F64A8DC005F944D /* Sources */,
 				451594442F64A8DC005F944D /* Frameworks */,
@@ -106,16 +106,16 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				451594492F64A8DC005F944D /* Starfall */,
+				451594492F64A8DC005F944D /* SwiftECSDemos */,
 				451594742F64AA9A005F944D /* Configuration */,
 				4515947C2F64AAA6005F944D /* Packages */,
 			);
-			name = Starfall;
+			name = SwiftECSDemos;
 			packageProductDependencies = (
 				451594942F64AAE8005F944D /* StarfallSupport */,
 			);
-			productName = Starfall;
-			productReference = 451594472F64A8DC005F944D /* Starfall.app */;
+			productName = SwiftECSDemos;
+			productReference = 451594472F64A8DC005F944D /* SwiftECSDemos.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -133,7 +133,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 451594422F64A8DC005F944D /* Build configuration list for PBXProject "Starfall" */;
+			buildConfigurationList = 451594422F64A8DC005F944D /* Build configuration list for PBXProject "SwiftECSDemos" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -147,7 +147,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				451594462F64A8DC005F944D /* Starfall */,
+				451594462F64A8DC005F944D /* SwiftECSDemos */,
 			);
 		};
 /* End PBXProject section */
@@ -192,7 +192,7 @@
 		451594532F64A8DD005F944D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = 451594742F64AA9A005F944D /* Configuration */;
-			baseConfigurationReferenceRelativePath = "Starfall-Debug.xcconfig";
+			baseConfigurationReferenceRelativePath = "SwiftECSDemos-Debug.xcconfig";
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6E23EP94PG;
 			};
@@ -201,7 +201,7 @@
 		451594542F64A8DD005F944D /* Release */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = 451594742F64AA9A005F944D /* Configuration */;
-			baseConfigurationReferenceRelativePath = "Starfall-Release.xcconfig";
+			baseConfigurationReferenceRelativePath = "SwiftECSDemos-Release.xcconfig";
 			buildSettings = {
 				DEVELOPMENT_TEAM = 6E23EP94PG;
 			};
@@ -210,7 +210,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		451594422F64A8DC005F944D /* Build configuration list for PBXProject "Starfall" */ = {
+		451594422F64A8DC005F944D /* Build configuration list for PBXProject "SwiftECSDemos" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				451594502F64A8DD005F944D /* Debug */,
@@ -219,7 +219,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		451594522F64A8DD005F944D /* Build configuration list for PBXNativeTarget "Starfall" */ = {
+		451594522F64A8DD005F944D /* Build configuration list for PBXNativeTarget "SwiftECSDemos" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				451594532F64A8DD005F944D /* Debug */,

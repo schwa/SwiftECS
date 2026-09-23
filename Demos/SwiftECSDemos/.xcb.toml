@@ -4,7 +4,7 @@
 [defaults]
 # destination = "iphone-sim"    # Default build destination
 # scheme = "MyApp"              # Default scheme to build
-target = "Starfall"
+target = "SwiftECSDemos"
 # xcode_version = "16.0"        # Xcode version to use
 
 [output]

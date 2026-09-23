@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  Starfall
+//  SwiftECSDemos
 //
 //  Created by Jonathan Wight.
 //
