@@ -46,6 +46,11 @@ protocol AnyColumn: AnyObject {
 final class Column<T: Component>: AnyColumn {
     @usableFromInline var data: [T] = []
 
+    @inlinable
+    func setValue(_ value: T, at index: Int) {
+        data[index] = value
+    }
+
     func swapRemove(at index: Int) {
         if index < data.count - 1 {
             data[index] = data[data.count - 1]

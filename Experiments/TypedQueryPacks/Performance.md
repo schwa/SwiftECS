@@ -2,7 +2,7 @@
 
 Umbrella issue: #14. Remaining investigations: #13 (row access), #5 (observation), and #4 (substep batching).
 
-The latest experiment trace is `~/Desktop/ECS-Profiles/typed-query-iterator-inline.trace`. The directory contains logs, analysis, provenance notes, and a patch identifying the tested changes. The previous baseline is `typed-query-0ab9af6b.trace`. Both captures include all processes and need review before sharing.
+The latest experiment trace is `~/Desktop/ECS-Profiles/typed-query-column-inline.trace`. The directory contains logs, analysis, provenance notes, and a patch identifying the tested changes. The previous baseline is `typed-query-0ab9af6b.trace`. Both captures include all processes and need review before sharing.
 
 ## Setup
 
@@ -205,6 +205,25 @@ The longer typed-only profile measures 13.418 ms/update without a storage observ
 Trace: `~/Desktop/ECS-Profiles/typed-query-iterator-inline.trace`. With the typed-only update filter, selected CPU weight is 7.821 seconds. Inclusive shares: setter 73.3%, generic metadata lookup 40.7%, getter 13.6%, iterator advancement 4.0%. These overlap.
 
 The latest profile, benchmark log, summary, and patch against `beb20431` are preserved together. Debug/Release tests, macOS demo build/tests, and strict lint pass. Remaining setter and metadata work stays under #13.
+
+## Inlinable column setter
+
+The earlier column-method experiment preceded cross-module specialization. Retesting an `@inlinable Column.setValue` method now produces a useful improvement. The row setter delegates each write to this method. Storage remains Array, and observation and component events remain unchanged.
+
+Isolation medians: fresh read/write 10.319 ms, retained read/write 9.305 ms. The preceding iterator-specialized measurements were 12.537 ms and 11.464 ms respectively.
+
+Back-to-back longer runs use three 100-update samples for each observer case:
+
+| Variant | Without storage observer | With storage observer |
+|---|---:|---:|
+| Direct array write (baseline) | 13.668 ms | 13.679 ms |
+| Inlinable column setter | 9.951 ms | 9.971 ms |
+
+The candidate ran under Time Profiler. Its unobserved samples range from 9.947 to 10.052 ms. These runs establish a useful gain, not a general guarantee for other workloads.
+
+Trace: `~/Desktop/ECS-Profiles/typed-query-column-inline.trace`. Selected typed-only update sample weight is 5.691 seconds. Inclusive shares: row setter 72.5%, column setter 54.3%, generic metadata lookup 28.8%, getter 18.2%, iterator 4.7%. These overlap.
+
+The profile directory contains baseline/candidate logs, summary, and a production patch against `1ff4b5db`. Debug/Release and demo tests, macOS build, and lint pass. No public signature changes.
 
 ## Reproduce
 

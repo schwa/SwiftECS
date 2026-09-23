@@ -27,7 +27,7 @@ public struct TypedEntityRef<each Value: Component> {
             }
         }
         for (column, value) in repeat (each storage.columns, each values) {
-            column.data[index] = value
+            column.setValue(value, at: index)
             changed = true
         }
         // Complete all writes before event handlers can change entity storage.
