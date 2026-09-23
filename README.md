@@ -22,7 +22,7 @@ Registered queries cache matching archetypes. New archetypes invalidate the cach
 
 The optional `matching` predicate restricts results further and supports registered queries. An empty component pack selects entities without component requirements.
 
-`set` writes every supplied component and emits an event for each, including unchanged values. It emits one storage invalidation outside updates. Performance remains unmeasured.
+`set` writes every supplied component and emits an event for each, including unchanged values. It emits one storage invalidation outside updates. Initial performance measurements are in `Experiments/TypedQueryPacks/Performance.md`.
 
 Lazy query sequences retain their selected archetypes. Query references are not safe across structural changes. The typed API has the same restriction.
 
@@ -60,4 +60,10 @@ Stress tests are opt-in and run serially:
 env ECS_RUN_STRESS_TESTS=1 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter StressTests
 ```
 
-Old performance figures came from different iteration APIs. We need fresh measurements before we make performance claims.
+The query comparison is also opt-in:
+
+```sh
+env ECS_RUN_BENCHMARKS=1 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter QueryPerformanceTests
+```
+
+Old performance figures came from different iteration APIs. Current measurements cover one workload, not general performance.
