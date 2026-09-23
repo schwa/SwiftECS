@@ -26,7 +26,7 @@ struct MovementSystem: System {
     }
 
     func update(world: World, deltaTime: Double) {
-        for entity in world.entities(Self.query) {
+        for entity in world.entities(matching: Self.query) {
             entity[Position.self]!.x += entity[Velocity.self]!.dx * deltaTime
             entity[Position.self]!.y += entity[Velocity.self]!.dy * deltaTime
         }

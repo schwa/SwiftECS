@@ -12,13 +12,13 @@ struct SurvivalArenaView: View {
                     let scale = size.width / SurvivalSystem.arena.x
                     context.scaleBy(x: scale, y: scale)
                     drawGround(context: &context)
-                    for row in game.world.typedQuery(SurvivalComponents.Body.self, SurvivalComponents.Sprite.self) {
+                    for row in game.world.query(SurvivalComponents.Body.self, SurvivalComponents.Sprite.self) {
                         let (body, sprite) = row.values
                         let point = CGPoint(x: body.position.x, y: body.position.y)
                         let glyph = context.resolve(Text(sprite.emoji).font(.system(size: sprite.emoji == "💎" ? 18 : body.radius * 2)))
                         context.draw(glyph, at: point)
                     }
-                    if game.hero.invulnerability > 0, let player = game.world.query(with: SurvivalComponents.Hero.self).first,
+                    if game.hero.invulnerability > 0, let player = game.world.snapshot(with: SurvivalComponents.Hero.self).first,
                        let body = player[SurvivalComponents.Body.self] {
                         let ring = CGRect(x: body.position.x - 25, y: body.position.y - 25, width: 50, height: 50)
                         context.stroke(Path(ellipseIn: ring), with: .color(.cyan.opacity(0.8)), lineWidth: 3)

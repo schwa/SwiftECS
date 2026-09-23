@@ -426,3 +426,71 @@ Measure deep trees, broad trees, multi-parent graphs, frequent reparenting, dire
 Record scaling and profiles before deciding whether transitive caching or other changes are warranted. Preserve cycle rejection, cache correctness, traversal order, and deletion semantics. Related: #16 introduced relationships; #14 tracks overall performance. Existing component-only benchmarks do not establish relationship performance.
 
 ---
+
+## 20: Lifecycle results conflate stale handles with foreign-world mistakes
+
++++
+status: closed
+priority: medium
+kind: enhancement
+created: 2026-09-23T22:35:47Z
+updated: 2026-09-23T23:01:41Z
+closed: 2026-09-23T23:01:41Z
++++
+
+World.clone returns nil, World.destroy returns false, and recursive deletion returns zero for both stale handles and handles belonging to another world. Callers cannot distinguish an already-removed entity from an ownership mistake using the result. Define a consistent failure contract that distinguishes these cases without mutating either world. Current ownership checks are correct; the missing distinction is in the public API.
+
+- `2026-09-23T23:01:41Z`: World lifecycle APIs now throw WorldError.foreignEntity for handles from another world. Stale handles preserve nil/false/0 results. Ownership is checked before existence; failed calls do not mutate or invalidate either world. Updated demos/examples and ownership regression tests.
+
+---
+
+## 21: System registration overloads have inconsistent failure behavior
+
++++
+status: closed
+priority: medium
+kind: enhancement
+created: 2026-09-23T22:35:47Z
+updated: 2026-09-23T23:01:41Z
+closed: 2026-09-23T23:01:41Z
++++
+
+World.addSystem(system) is nonthrowing and traps when registration fails, while the overload with an explicit ID or dependencies throws SystemError. Adding an argument changes how callers must handle the same duplicate-system failure. The API does not provide a consistent registration failure contract across these forms.
+
+- `2026-09-23T23:01:41Z`: Removed the trapping nonthrowing addSystem overload. The single registration API now throws with default or explicit IDs. Added duplicate-default-ID tests proving the rejected system is not initialized and registry contents remain unchanged. Updated all call sites.
+
+---
+
+## 22: Typed row writes cannot update only selected components
+
++++
+status: closed
+priority: medium
+kind: enhancement
+created: 2026-09-23T22:35:47Z
+updated: 2026-09-23T23:01:41Z
+closed: 2026-09-23T23:01:41Z
++++
+
+TypedEntityRef.set requires values for the entire queried component pack. A system that changes Position but only reads Velocity must write both through this API, emitting changed events for the unchanged Velocity too. Existing entity handles offer individual writes but lose the typed-row access path. The typed API lacks selective mutation that preserves its type guarantees, component-event behavior, and batched storage observation.
+
+- `2026-09-23T23:01:41Z`: Added typed ComponentRef<Value> handles through row.components. Reading value participates in observation; writing or modifying value emits only that component event and preserves update batching. Tuple reads and whole-row set remain available. Starfall movement now demonstrates selective writes. Tests cover single/multiple component packs, event isolation, and rearming observation.
+
+---
+
+## 23: Query API names obscure snapshot and lazy iteration differences
+
++++
+status: closed
+priority: medium
+kind: enhancement
+created: 2026-09-23T22:35:48Z
+updated: 2026-09-23T23:01:41Z
+closed: 2026-09-23T23:01:41Z
++++
+
+World.query returns an entity-array snapshot, World.entities exposes lazy entity and fast-reference sequences, and World.typedQuery exposes typed row sequences. These overlapping names do not make the default path or the snapshot-versus-lazy distinction clear. Callers must inspect overloads and return types to understand component access, allocation, and lifetime differences. Review naming and organization while retaining the useful capabilities of each path.
+
+- `2026-09-23T23:01:41Z`: Renamed typedQuery to query as the default typed lazy API. Entity-array snapshots use snapshot(matching:) or snapshot(with:); lazy handles use entities(matching:); the older untyped fast path uses references. Removed old spellings and migrated library tests, benchmarks, demos, and README. Added tests distinguishing fixed snapshot membership from live lazy iteration and documenting that snapshot handles do not freeze component values. All 170 core tests and 15 demo tests pass, Debug/Release and macOS build pass, strict lint is clean. Typed benchmark remains approximately 10.2 ms/100K entities.
+
+---

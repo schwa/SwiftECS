@@ -21,7 +21,7 @@ private final class TypedQueryCostSystem: System {
     func initialize(world: World) {
         world.register(query)
         if phase == .retainedRead || phase == .retainedWrite {
-            retained = Array(world.typedQuery(Transform.self, Physics.self, matching: query))
+            retained = Array(world.query(Transform.self, Physics.self, matching: query))
         }
     }
 
@@ -30,18 +30,18 @@ private final class TypedQueryCostSystem: System {
         switch phase {
         case .setup:
             for _ in 0..<1_000 {
-                consume(world.typedQuery(Transform.self, Physics.self, matching: query))
+                consume(world.query(Transform.self, Physics.self, matching: query))
             }
         case .iterate:
             var total: UInt64 = 0
-            for row in world.typedQuery(Transform.self, Physics.self, matching: query) {
+            for row in world.query(Transform.self, Physics.self, matching: query) {
                 total &+= row.entityID.value
             }
             identityChecksum = total
         case .read:
-            checksum = read(world.typedQuery(Transform.self, Physics.self, matching: query))
+            checksum = read(world.query(Transform.self, Physics.self, matching: query))
         case .write:
-            write(world.typedQuery(Transform.self, Physics.self, matching: query), deltaTime: deltaTime)
+            write(world.query(Transform.self, Physics.self, matching: query), deltaTime: deltaTime)
         case .retainedRead:
             checksum = read(retained)
         case .retainedWrite:
@@ -103,7 +103,7 @@ struct TypedQueryCostTests {
             expectedIdentity &+= entity.id.value
         }
         let system = TypedQueryCostSystem(phase: phase)
-        world.addSystem(system)
+        try world.addSystem(system)
         for _ in 0..<2 {
             try world.update(deltaTime: 1.0 / 60)
         }
@@ -120,7 +120,7 @@ struct TypedQueryCostTests {
         case .read, .retainedRead:
             #expect(system.checksum == 5_000_050_000)
         case .write, .retainedWrite:
-            #expect(world.typedQuery(Transform.self).allSatisfy { abs($0.values.y - 0.4) < 0.000001 })
+            #expect(world.query(Transform.self).allSatisfy { abs($0.values.y - 0.4) < 0.000001 })
         }
         let seconds = Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
         return seconds * 100

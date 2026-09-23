@@ -18,7 +18,7 @@ struct Velocity: Component {
 }
 
 struct Health: Component {
-    var value: Int
+    var current: Int
 }
 struct Disabled: Component {}
 
@@ -26,7 +26,7 @@ let world = World()
 let player = world.createEntity(
     Position(x: 0, y: 0),
     Velocity(x: 1, y: 0),
-    Health(value: 100)
+    Health(current: 100)
 )
 let empty = world.createEntity()
 
@@ -44,7 +44,7 @@ let position = player[Position.self]   // Position?
 let hasHealth = player.contains(Health.self)
 
 player[Position.self] = Position(x: 10, y: 20)
-player.set(Health(value: 80))
+player.set(Health(current: 80))
 player.set(Position(x: 0, y: 0), Velocity(x: 2, y: 1))
 
 if let components = player.get(Position.self, Velocity.self) {
@@ -55,11 +55,11 @@ if let components = player.get(Position.self, Velocity.self) {
 let removed = player.remove(Health.self) // Health?
 player[Disabled.self] = nil
 
-let copy = world.clone(player)         // Entity?
+let copy = try world.clone(player)         // Entity?
 if let copy {
-    world.destroy(copy)
+    try world.destroy(copy)
 }
-world.destroy(empty)
+try world.destroy(empty)
 ```
 
 ### Build queries
@@ -81,51 +81,59 @@ let predicate = Query(
     !QueryPredicate.contains(Disabled.self)
 )
 
-let matches = world.query(active)      // [Entity]
-let withHealth = world.query(with: Health.self)
+let matches = world.snapshot(matching: active)      // [Entity]
+let withHealth = world.snapshot(with: Health.self)
 ```
 
 ### Iterate and update
 
-Typed queries return components without optional lookups. `set` writes every supplied component, including unchanged values.
+`query` is the typed, lazy path. Component references support selective writes without optional lookups.
 
 ```swift
 let deltaTime = 1.0 / 60
 
-for row in world.typedQuery(Position.self, Velocity.self, matching: active) {
-    var (position, velocity) = row.values
-    position.x += velocity.x * deltaTime
-    position.y += velocity.y * deltaTime
-    row.set(position, velocity)
+for row in world.query(Position.self, Velocity.self, matching: active) {
+    let (position, velocity) = row.components
+    var updated = position.value
+    updated.x += velocity.value.x * deltaTime
+    updated.y += velocity.value.y * deltaTime
+    position.value = updated          // Only Position emits a change event
     let id = row.entityID
 }
 
-for row in world.typedQuery(Health.self) {
-    let health = row.values            // A single component, not a tuple
-    row.set(Health(value: health.value + 1))
+for row in world.query(Health.self) {
+    let health = row.components        // A single reference, not a tuple
+    health.value.current += 1
 }
 
-for entity in world.entities(active) {
+for row in world.query(Position.self, Velocity.self) {
+    let (position, velocity) = row.values
+    row.set(position, velocity)        // Whole-row write emits events for both
+}
+
+for entity in world.entities(matching: active) {
     let position = entity[Position.self]
 }
 
-for reference in world.entities(active, Position.self, Velocity.self) {
+for reference in world.references(active, Position.self, Velocity.self) {
     var position = reference[Position.self]
     position.x += reference[Velocity.self].x * deltaTime
     reference[Position.self] = position
 }
 ```
 
+`entities(matching:)` lazily returns handles. `references` is the older untyped fast-reference path. `snapshot` returns an array of handles with fixed membership, not frozen component values.
+
 Do not create or destroy entities, or add or remove component types, during lazy or typed iteration. Collect handles first:
 
 ```swift
-let doomed = world.query(with: Disabled.self)
+let doomed = world.snapshot(with: Disabled.self)
 for entity in doomed {
-    world.destroy(entity)
+    try world.destroy(entity)
 }
 ```
 
-Query references are not safe across structural changes. Recreate lazy sequences to include new archetypes.
+Query rows and component references are not safe across structural changes. Recreate lazy sequences to include new archetypes.
 
 ### Cache repeated queries
 
@@ -135,7 +143,7 @@ Registration caches matching archetypes, not component values or relationship re
 world.register(active)
 let registered = world.isRegistered(active)
 
-for row in world.typedQuery(Position.self, Velocity.self, matching: active) {
+for row in world.query(Position.self, Velocity.self, matching: active) {
     let (position, velocity) = row.values
 }
 
@@ -147,7 +155,7 @@ world.unregister(active)
 ```swift
 struct MovementSystem: System {
     func update(world: World, deltaTime: Double) {
-        for row in world.typedQuery(Position.self, Velocity.self) {
+        for row in world.query(Position.self, Velocity.self) {
             var (position, velocity) = row.values
             position.x += velocity.x * deltaTime
             position.y += velocity.y * deltaTime
@@ -164,8 +172,8 @@ struct RegenerationSystem: System {
     }
 
     func update(world: World, deltaTime: Double) {
-        for row in world.typedQuery(Health.self, matching: Self.query) {
-            row.set(Health(value: min(100, row.values.value + 1)))
+        for row in world.query(Health.self, matching: Self.query) {
+            row.set(Health(current: min(100, row.values.current + 1)))
         }
     }
 
@@ -183,11 +191,11 @@ let order = world.systemExecutionOrder
 let systemCount = world.systemCount
 world.removeAllSystems()
 
-world.addSystem(MovementSystem())      // Uses the type name as its ID
+try world.addSystem(MovementSystem())      // Uses the type name as its ID
 let movementID = SystemID.of(MovementSystem.self)
 ```
 
-Lifecycle methods have empty defaults. `update` advances simulation time before it runs systems. Duplicate system IDs, missing dependencies, and cycles produce `SystemError` through the throwing APIs.
+System lifecycle hooks have empty defaults. Registration always throws on duplicate IDs. `update` advances simulation time before it runs systems and throws for missing dependencies or cycles.
 
 ### Link entities
 
@@ -238,14 +246,14 @@ let descendants = parent.descendants()
 try child.setParent(nil)               // Detach
 try child.setParent(parent)            // Reparent
 
-world.destroy(parent)                 // Children survive as roots
-world.destroyRecursively(child)       // Delete child and grandchild
-world.destroyRecursively(player, following: EquippedBy.self)
+try world.destroy(parent)                 // Children survive as roots
+try world.destroyRecursively(child)       // Delete child and grandchild
+try world.destroyRecursively(player, following: EquippedBy.self)
 ```
 
 Deletion removes all incoming and outgoing links. Cloning copies outgoing links with their original targets, but does not clone descendants.
 
-Lifecycle methods reject dead or foreign-world handles without mutation: `destroy` returns `false`, `clone` returns `nil`, and recursive deletion returns `0`.
+Lifecycle methods throw `WorldError.foreignEntity` for a handle from another world. For stale handles, `destroy` returns `false`, `clone` returns `nil`, and recursive deletion returns `0`. Neither case mutates storage.
 
 ### Query relationships
 
@@ -260,7 +268,7 @@ let roots = Query(!QueryPredicate.related(ChildOf.self))
 let subtree = Query(.descendant(of: owner.id))
 let equipped = Query(.descendant(of: owner.id, via: EquippedBy.self))
 
-for row in world.typedQuery(Position.self, matching: directChildren) {
+for row in world.query(Position.self, matching: directChildren) {
     let position = row.values
 }
 ```
@@ -275,8 +283,8 @@ let token = world.observe(Health.self) { event in
     events.append(event)               // .added, .changed, or .removed
 }
 
-owner.set(Health(value: 100))
-owner.set(Health(value: 90))
+owner.set(Health(current: 100))
+owner.set(Health(current: 90))
 owner.remove(Health.self)
 world.removeObserver(token)
 ```

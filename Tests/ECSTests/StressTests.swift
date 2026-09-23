@@ -87,7 +87,7 @@ struct StressTests {
         print("⏱ Created 100000 entities with 3 components in \(String(format: "%.2f", time))ms")
     }
 
-    @Test func stressTestEntityRemoval_10K() {
+    @Test func stressTestEntityRemoval_10K() throws {
         let world = World()
         var entities: [Entity] = []
 
@@ -95,9 +95,9 @@ struct StressTests {
             entities.append(world.createEntity(Position(x: Double(i), y: 0)))
         }
 
-        let time = measureTime {
+        let time = try measureTime {
             for entity in entities {
-                world.destroy(entity)
+                try world.destroy(entity)
             }
         }
 
@@ -119,7 +119,7 @@ struct StressTests {
 
         var sum = 0.0
         let time = measureTime {
-            for entity in world.query(with: Position.self, Velocity.self) {
+            for entity in world.snapshot(with: Position.self, Velocity.self) {
                 let (pos, vel) = entity.get(Position.self, Velocity.self)!.values
                 sum += pos.x + vel.dx
             }
@@ -144,7 +144,7 @@ struct StressTests {
 
         var sum = 0.0
         let time = measureTime {
-            for entity in world.entities(query) {
+            for entity in world.entities(matching: query) {
                 let pos = entity[Position.self]!
                 let vel = entity[Velocity.self]!
                 sum += pos.x + vel.dx
@@ -169,7 +169,7 @@ struct StressTests {
 
         let time = measureTime {
             for _ in 0..<60 {
-                for entity in world.query(with: Transform.self, Physics.self) {
+                for entity in world.snapshot(with: Transform.self, Physics.self) {
                     var (transform, physics) = entity.get(Transform.self, Physics.self)!.values
                     transform.x += physics.velocityX * deltaTime
                     transform.y += physics.velocityY * deltaTime
@@ -199,7 +199,7 @@ struct StressTests {
 
         let time = measureTime {
             for _ in 0..<60 {
-                for entity in world.entities(query) {
+                for entity in world.entities(matching: query) {
                     entity[Transform.self]!.x += entity[Physics.self]!.velocityX * deltaTime
                     entity[Transform.self]!.y += entity[Physics.self]!.velocityY * deltaTime
                     entity[Transform.self]!.z += entity[Physics.self]!.velocityZ * deltaTime
@@ -227,7 +227,7 @@ struct StressTests {
 
         let time = measureTime {
             for _ in 0..<60 {
-                for ref in world.entities(query, Transform.self, Physics.self) {
+                for ref in world.references(query, Transform.self, Physics.self) {
                     ref[Transform.self].x += ref[Physics.self].velocityX * deltaTime
                     ref[Transform.self].y += ref[Physics.self].velocityY * deltaTime
                     ref[Transform.self].z += ref[Physics.self].velocityZ * deltaTime
@@ -249,7 +249,7 @@ struct StressTests {
             )
         }
 
-        world.addSystem(MovementSystem())
+        try world.addSystem(MovementSystem())
 
         let time = try measureTime {
             for _ in 0..<60 {
@@ -280,9 +280,9 @@ struct StressTests {
         var total = 0
         let time = measureTime {
             for _ in 0..<100 {
-                total += world.query(with: Position.self).count
-                total += world.query(with: Velocity.self).count
-                total += world.query(with: Position.self, Velocity.self).count
+                total += world.snapshot(with: Position.self).count
+                total += world.snapshot(with: Velocity.self).count
+                total += world.snapshot(with: Position.self, Velocity.self).count
             }
         }
 
@@ -292,7 +292,7 @@ struct StressTests {
 
     // MARK: - Mixed Operations Test
 
-    @Test func stressTestMixedOperations_50K() {
+    @Test func stressTestMixedOperations_50K() throws {
         let world = World()
         var entities: [Entity] = []
 
@@ -310,7 +310,7 @@ struct StressTests {
         // Update (30 frames)
         let updateTime = measureTime {
             for _ in 0..<30 {
-                for entity in world.query(with: Position.self, Velocity.self) {
+                for entity in world.snapshot(with: Position.self, Velocity.self) {
                     var (pos, vel) = entity.get(Position.self, Velocity.self)!.values
                     pos.x += vel.dx
                     pos.y += vel.dy
@@ -320,9 +320,9 @@ struct StressTests {
         }
 
         // Remove half
-        let removeTime = measureTime {
+        let removeTime = try measureTime {
             for i in stride(from: 0, to: entities.count, by: 2) {
-                world.destroy(entities[i])
+                try world.destroy(entities[i])
             }
         }
 

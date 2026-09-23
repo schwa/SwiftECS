@@ -20,7 +20,7 @@ struct QueryTests {
         world.createEntity(Velocity(dx: 1, dy: 1))
         world.createEntity()
 
-        let results = world.query(Query(.all))
+        let results = world.snapshot(matching: Query(.all))
         #expect(results.count == 3)
     }
 
@@ -30,7 +30,7 @@ struct QueryTests {
         world.createEntity(Position(x: 0, y: 0))
         world.createEntity(Velocity(dx: 1, dy: 1))
 
-        let results = world.query(Query(.none))
+        let results = world.snapshot(matching: Query(.none))
         #expect(results.count == 0)
     }
 
@@ -41,7 +41,7 @@ struct QueryTests {
         world.createEntity(Velocity(dx: 1, dy: 1))
         world.createEntity(Position(x: 1, y: 1), Velocity(dx: 0, dy: 0))
 
-        let results = world.query(Query(.contains(Position.self)))
+        let results = world.snapshot(matching: Query(.contains(Position.self)))
         #expect(results.count == 2)
     }
 
@@ -55,7 +55,7 @@ struct QueryTests {
         world.createEntity(Position(x: 1, y: 1), Velocity(dx: 0, dy: 0))
 
         let query = Query(!.contains(Position.self))
-        let results = world.query(query)
+        let results = world.snapshot(matching: query)
         #expect(results.count == 1)
         // Should only have entity with just Velocity
         #expect(results[0].contains(Velocity.self))
@@ -91,7 +91,7 @@ struct QueryTests {
         world.createEntity(Position(x: 2, y: 2), Velocity(dx: 1, dy: 1), Health(current: 100))
 
         let query = Query(.contains(Position.self) && .contains(Velocity.self))
-        let results = world.query(query)
+        let results = world.snapshot(matching: query)
         #expect(results.count == 2)
     }
 
@@ -129,7 +129,7 @@ struct QueryTests {
         world.createEntity()
 
         let query = Query(.contains(Position.self) || .contains(Velocity.self))
-        let results = world.query(query)
+        let results = world.snapshot(matching: query)
         #expect(results.count == 2)
     }
 
@@ -167,7 +167,7 @@ struct QueryTests {
 
         // Entities with Position but NOT Enemy
         let query = Query(.contains(Position.self) && !.contains(Enemy.self))
-        let results = world.query(query)
+        let results = world.snapshot(matching: query)
         #expect(results.count == 1)
         #expect(results[0].contains(Position.self))
         #expect(!results[0].contains(Enemy.self))
@@ -184,7 +184,7 @@ struct QueryTests {
 
         // Entities with (Position OR Velocity) AND Health
         let query = Query((.contains(Position.self) || .contains(Velocity.self)) && .contains(Health.self))
-        let results = world.query(query)
+        let results = world.snapshot(matching: query)
         #expect(results.count == 2)
     }
 
@@ -204,7 +204,7 @@ struct QueryTests {
 
         // Flying enemies OR poisoned units
         let query = Query((.contains(Enemy.self) && .contains(Flying.self)) || .contains(Poisoned.self))
-        let results = world.query(query)
+        let results = world.snapshot(matching: query)
         #expect(results.count == 2)
     }
 
@@ -217,7 +217,7 @@ struct QueryTests {
         world.createEntity(Position(x: 1, y: 1), Velocity(dx: 0, dy: 0))
 
         let query = Query.all.with(Position.self).with(Velocity.self)
-        let results = world.query(query)
+        let results = world.snapshot(matching: query)
         #expect(results.count == 1)
     }
 
@@ -228,7 +228,7 @@ struct QueryTests {
         world.createEntity(Position(x: 1, y: 1), Enemy())
 
         let query = Query.all.with(Position.self).without(Enemy.self)
-        let results = world.query(query)
+        let results = world.snapshot(matching: query)
         #expect(results.count == 1)
         #expect(!results[0].contains(Enemy.self))
     }
@@ -242,7 +242,7 @@ struct QueryTests {
 
         let q1 = Query(with: Position.self)
         let q2 = Query(with: Health.self)
-        let results = world.query(q1.and(q2))
+        let results = world.snapshot(matching: q1.and(q2))
         #expect(results.count == 1)
     }
 
@@ -255,7 +255,7 @@ struct QueryTests {
 
         let q1 = Query(with: Position.self)
         let q2 = Query(with: Velocity.self)
-        let results = world.query(q1.or(q2))
+        let results = world.snapshot(matching: q1.or(q2))
         #expect(results.count == 2)
     }
 
@@ -266,7 +266,7 @@ struct QueryTests {
         world.createEntity(Velocity(dx: 1, dy: 1))
 
         let query = Query(with: Position.self).negated
-        let results = world.query(query)
+        let results = world.snapshot(matching: query)
         #expect(results.count == 1)
         #expect(results[0].contains(Velocity.self))
     }
@@ -280,7 +280,7 @@ struct QueryTests {
         world.createEntity(Position(x: 1, y: 1), Velocity(dx: 0, dy: 0))
         world.createEntity(Position(x: 2, y: 2))
 
-        let results = world.query(with: Position.self, Velocity.self)
+        let results = world.snapshot(with: Position.self, Velocity.self)
         #expect(results.count == 2)
     }
 
@@ -290,7 +290,7 @@ struct QueryTests {
         world.createEntity(Position(x: 0, y: 0))
         world.createEntity(Velocity(dx: 1, dy: 1))
 
-        let results = world.query(with: Position.self)
+        let results = world.snapshot(with: Position.self)
         #expect(results.count == 1)
     }
 
@@ -299,7 +299,7 @@ struct QueryTests {
     @Test("Empty world returns empty results")
     func testEmptyWorld() {
         let world = World()
-        let results = world.query(Query(.contains(Position.self)))
+        let results = world.snapshot(matching: Query(.contains(Position.self)))
         #expect(results.count == 0)
     }
 
@@ -308,7 +308,7 @@ struct QueryTests {
         let world = World()
         world.createEntity(Position(x: 0, y: 0))
 
-        #expect(world.query(Query.all).count == 1)
-        #expect(world.query(Query.none).count == 0)
+        #expect(world.snapshot(matching: Query.all).count == 1)
+        #expect(world.snapshot(matching: Query.none).count == 0)
     }
 }

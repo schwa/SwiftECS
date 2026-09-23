@@ -13,6 +13,11 @@ public struct TypedEntityRef<each Value: Component> {
     }
 
     @inlinable
+    public var components: (repeat ComponentRef<each Value>) {
+        (repeat ComponentRef(world: world, entityID: entityID, column: each storage.columns, index: index))
+    }
+
+    @inlinable
     public var values: (repeat each Value) {
         world.trackStorageAccess()
         return (repeat read(each storage.columns))

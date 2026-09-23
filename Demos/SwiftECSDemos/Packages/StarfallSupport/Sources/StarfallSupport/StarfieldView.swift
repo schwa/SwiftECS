@@ -16,7 +16,7 @@ struct StarfieldView: View {
                         let radius = index.isMultiple(of: 5) ? 1.5 : 0.8
                         context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: radius * 2, height: radius * 2)), with: .color(.white.opacity(0.35)))
                     }
-                    for entity in game.world.query(with: Position.self) {
+                    for entity in game.world.snapshot(with: Position.self) {
                         guard let position = entity[Position.self] else {
                             continue
                         }

@@ -363,15 +363,6 @@ public final class World {
         system.initialize(world: self)
     }
 
-    /// Add a system (non-throwing convenience for systems without dependencies).
-    public func addSystem(_ system: System) {
-        do {
-            try addSystem(system, id: nil, dependencies: [])
-        } catch {
-            preconditionFailure("Cannot register system: \(error)")
-        }
-    }
-
     /// Remove all systems.
     public func removeAllSystems() {
         for (_, entry) in systems {

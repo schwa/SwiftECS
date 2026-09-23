@@ -14,7 +14,7 @@ private struct QueryBenchmarkSystem: System {
     func update(world: World, deltaTime: Double) {
         switch access {
         case .entity:
-            for entity in world.entities(query) {
+            for entity in world.entities(matching: query) {
                 guard var transform = entity[Transform.self], let physics = entity[Physics.self] else {
                     preconditionFailure("Benchmark entity is missing components")
                 }
@@ -24,7 +24,7 @@ private struct QueryBenchmarkSystem: System {
                 entity.set(transform, physics)
             }
         case .fast:
-            for reference in world.entities(query, Transform.self, Physics.self) {
+            for reference in world.references(query, Transform.self, Physics.self) {
                 var transform = reference[Transform.self]
                 let physics = reference[Physics.self]
                 transform.x += physics.velocityX * deltaTime
@@ -34,7 +34,7 @@ private struct QueryBenchmarkSystem: System {
                 reference[Physics.self] = physics
             }
         case .typed:
-            for row in world.typedQuery(Transform.self, Physics.self, matching: query) {
+            for row in world.query(Transform.self, Physics.self, matching: query) {
                 var (transform, physics) = row.values
                 transform.x += physics.velocityX * deltaTime
                 transform.y += physics.velocityY * deltaTime
@@ -93,7 +93,7 @@ struct QueryPerformanceTests {
                     }
                     let query = Query(with: Transform.self, Physics.self)
                     world.register(query)
-                    world.addSystem(QueryBenchmarkSystem(access: access, query: query))
+                    try world.addSystem(QueryBenchmarkSystem(access: access, query: query))
                     let observation = observed ? BenchmarkObservation(world: world) : nil
                     for _ in 0..<warmupFrames {
                         try world.update(deltaTime: deltaTime)
@@ -131,7 +131,7 @@ struct QueryPerformanceTests {
 
     private func verify(world: World, elapsed: Double, entityCount: Int) {
         var count = 0
-        for row in world.typedQuery(Transform.self) {
+        for row in world.query(Transform.self) {
             #expect(abs(row.values.y - 2 * elapsed) < 0.000001)
             #expect(abs(row.values.z - 3 * elapsed) < 0.000001)
             count += 1

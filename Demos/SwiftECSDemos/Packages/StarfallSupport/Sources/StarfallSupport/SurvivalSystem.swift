@@ -11,7 +11,15 @@ final class SurvivalSystem: System {
     private var spawnCount = 0
 
     func update(world: World, deltaTime: Double) {
-        guard let player = world.query(with: SurvivalComponents.Hero.self).first,
+        do {
+            try step(world: world, deltaTime: deltaTime)
+        } catch {
+            preconditionFailure("Survival entities must belong to their simulation world: \(error)")
+        }
+    }
+
+    private func step(world: World, deltaTime: Double) throws {
+        guard let player = world.snapshot(with: SurvivalComponents.Hero.self).first,
               var hero = player[SurvivalComponents.Hero.self], var body = player[SurvivalComponents.Body.self],
               !hero.finished, !hero.needsUpgrade else {
             return
@@ -22,9 +30,9 @@ final class SurvivalSystem: System {
         spawn(world: world, elapsed: hero.elapsed, deltaTime: deltaTime)
         moveEnemies(world: world, target: body.position, deltaTime: deltaTime)
         fire(world: world, shooter: player, body: body, hero: hero, deltaTime: deltaTime)
-        moveShots(world: world, deltaTime: deltaTime)
-        resolveCombat(world: world, hero: &hero, body: body)
-        collectGems(world: world, hero: &hero, position: body.position, deltaTime: deltaTime)
+        try moveShots(world: world, deltaTime: deltaTime)
+        try resolveCombat(world: world, hero: &hero, body: body)
+        try collectGems(world: world, hero: &hero, position: body.position, deltaTime: deltaTime)
         if hero.experience >= hero.experienceNeeded, !hero.finished {
             hero.experience -= hero.experienceNeeded
             hero.level += 1
@@ -74,7 +82,7 @@ final class SurvivalSystem: System {
 
     private func moveEnemies(world: World, target: SIMD2<Double>, deltaTime: Double) {
         var launches: [(EntityID, SIMD2<Double>)] = []
-        for row in world.typedQuery(SurvivalComponents.Body.self, SurvivalComponents.Enemy.self) {
+        for row in world.query(SurvivalComponents.Body.self, SurvivalComponents.Enemy.self) {
             var (body, enemy) = row.values
             let offset = target - body.position
             let distance = simd_length(offset)
@@ -106,7 +114,7 @@ final class SurvivalSystem: System {
         }
         var nearest: SIMD2<Double>?
         var bestDistance = Double.infinity
-        for row in world.typedQuery(SurvivalComponents.Body.self, SurvivalComponents.Enemy.self) {
+        for row in world.query(SurvivalComponents.Body.self, SurvivalComponents.Enemy.self) {
             let offset = row.values.0.position - body.position
             let distance = simd_length_squared(offset)
             if distance < bestDistance {
@@ -139,9 +147,9 @@ final class SurvivalSystem: System {
         }
     }
 
-    private func moveShots(world: World, deltaTime: Double) {
+    private func moveShots(world: World, deltaTime: Double) throws {
         var expired: [EntityID] = []
-        for row in world.typedQuery(SurvivalComponents.Body.self, SurvivalComponents.Shot.self) {
+        for row in world.query(SurvivalComponents.Body.self, SurvivalComponents.Shot.self) {
             var (body, shot) = row.values
             body.position += shot.velocity * deltaTime
             shot.lifetime -= deltaTime
@@ -152,24 +160,24 @@ final class SurvivalSystem: System {
         }
         for id in expired {
             if let entity = world[id] {
-                world.destroy(entity)
+                try world.destroy(entity)
             }
         }
     }
 
-    private func resolveCombat(world: World, hero: inout SurvivalComponents.Hero, body: SurvivalComponents.Body) {
-        let enemies = world.query(with: SurvivalComponents.Enemy.self)
-        for shotEntity in world.query(with: SurvivalComponents.Shot.self) {
+    private func resolveCombat(world: World, hero: inout SurvivalComponents.Hero, body: SurvivalComponents.Body) throws {
+        let enemies = world.snapshot(with: SurvivalComponents.Enemy.self)
+        for shotEntity in world.snapshot(with: SurvivalComponents.Shot.self) {
             guard let shot = shotEntity[SurvivalComponents.Shot.self], let shotBody = shotEntity[SurvivalComponents.Body.self] else {
                 continue
             }
             if shot.hostile {
                 if overlaps(body, shotBody) {
                     hurt(&hero)
-                    world.destroy(shotEntity)
+                    try world.destroy(shotEntity)
                 }
             } else {
-                hitEnemy(world: world, enemies: enemies, projectile: shotEntity, hero: &hero)
+                try hitEnemy(world: world, enemies: enemies, projectile: shotEntity, hero: &hero)
             }
         }
         for enemy in enemies {
@@ -179,7 +187,7 @@ final class SurvivalSystem: System {
         }
     }
 
-    private func hitEnemy(world: World, enemies: [Entity], projectile: Entity, hero: inout SurvivalComponents.Hero) {
+    private func hitEnemy(world: World, enemies: [Entity], projectile: Entity, hero: inout SurvivalComponents.Hero) throws {
         guard let shot = projectile[SurvivalComponents.Shot.self], let body = projectile[SurvivalComponents.Body.self] else {
             return
         }
@@ -188,9 +196,9 @@ final class SurvivalSystem: System {
                 continue
             }
             enemy.health -= shot.damage
-            world.destroy(projectile)
+            try world.destroy(projectile)
             if enemy.health <= 0 {
-                world.destroy(entity)
+                try world.destroy(entity)
                 hero.kills += 1
                 world.createEntity(target, SurvivalComponents.Sprite(emoji: "💎"), SurvivalComponents.Gem())
             } else {
@@ -200,8 +208,8 @@ final class SurvivalSystem: System {
         }
     }
 
-    private func collectGems(world: World, hero: inout SurvivalComponents.Hero, position: SIMD2<Double>, deltaTime: Double) {
-        for entity in world.query(with: SurvivalComponents.Gem.self) {
+    private func collectGems(world: World, hero: inout SurvivalComponents.Hero, position: SIMD2<Double>, deltaTime: Double) throws {
+        for entity in world.snapshot(with: SurvivalComponents.Gem.self) {
             guard var body = entity[SurvivalComponents.Body.self] else {
                 continue
             }
@@ -209,7 +217,7 @@ final class SurvivalSystem: System {
             let distance = simd_length(offset)
             if distance < 26 {
                 hero.experience += 1
-                world.destroy(entity)
+                try world.destroy(entity)
             } else if distance < 130 {
                 body.position += offset / distance * min(distance, 300 * deltaTime)
                 entity.set(body)

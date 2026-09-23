@@ -27,11 +27,11 @@ final class SurvivalSession {
             return 0
         }
         let query = Query(.related(FiredBy.self, to: player.id)).with(SurvivalComponents.Shot.self)
-        return world.query(query).count
+        return world.snapshot(matching: query).count
     }
 
     var visibleEntityCount: Int {
-        world.typedQuery(SurvivalComponents.Body.self, SurvivalComponents.Sprite.self).reduce(into: 0) { count, row in
+        world.query(SurvivalComponents.Body.self, SurvivalComponents.Sprite.self).reduce(into: 0) { count, row in
             let body = row.values.0
             if body.position.x + body.radius >= 0, body.position.y + body.radius >= 0,
                body.position.x - body.radius <= SurvivalSystem.arena.x, body.position.y - body.radius <= SurvivalSystem.arena.y {
@@ -43,7 +43,14 @@ final class SurvivalSession {
     func start() {
         world = World()
         system = SurvivalSystem()
-        world.addSystem(system)
+        do {
+            try world.addSystem(system)
+        } catch {
+            failure = error.localizedDescription
+            started = false
+            paused = true
+            return
+        }
         player = world.createEntity(
             SurvivalComponents.Body(position: SurvivalSystem.arena / 2, radius: 18),
             SurvivalComponents.Sprite(emoji: "🧙"),

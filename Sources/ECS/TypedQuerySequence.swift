@@ -30,7 +30,7 @@ internal final class TypedQueryStorage<each Value: Component> {
 extension World {
     // Pack expansions use types; SwiftLint does not recognize the reference.
     // swiftlint:disable unused_parameter
-    public func typedQuery<each Value: Component>(_ types: repeat (each Value).Type, matching query: Query = .all) -> TypedQuerySequence<repeat each Value> {
+    public func query<each Value: Component>(_ types: repeat (each Value).Type, matching query: Query = .all) -> TypedQuerySequence<repeat each Value> {
         trackStorageAccess()
         var requiredTypes = Set<ComponentType>()
         for type in repeat (each Value).self {

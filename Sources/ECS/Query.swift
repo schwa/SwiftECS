@@ -207,7 +207,7 @@ extension Query {
 
 extension World {
     /// Execute a query and return matching entities.
-    public func query(_ query: Query) -> [Entity] {
+    public func snapshot(matching query: Query) -> [Entity] {
         trackStorageAccess()
         var result: [Entity] = []
         let filter = query.entityFilter
@@ -220,8 +220,8 @@ extension World {
     }
 
     /// Execute a query with component type requirements.
-    public func query<each T: Component>(with types: repeat (each T).Type) -> [Entity] {
-        query(Query(with: repeat each types))
+    public func snapshot<each T: Component>(with types: repeat (each T).Type) -> [Entity] {
+        snapshot(matching: Query(with: repeat each types))
     }
 }
 
@@ -410,7 +410,7 @@ extension World {
 
     /// Returns a lazy sequence of entities matching the query.
     /// If the query is registered, uses cached archetype matching for better performance.
-    public func entities(_ query: Query) -> QuerySequence {
+    public func entities(matching query: Query) -> QuerySequence {
         QuerySequence(world: self, archetypes: matchingArchetypes(for: query), filter: query.entityFilter)
     }
 
@@ -418,7 +418,7 @@ extension World {
     // swiftlint:disable unused_parameter
     /// Returns a fast sequence for iterating entities with specific components.
     /// Uses direct archetype column access for maximum performance.
-    public func entities<each T: Component>(
+    public func references<each T: Component>(
         _ query: Query,
         _ types: repeat (each T).Type
     ) -> FastQuerySequence {

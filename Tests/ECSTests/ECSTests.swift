@@ -46,7 +46,7 @@ import Testing
     #expect(entity[Health.self]?.current == 100)
 }
 
-@Test func testRemoveEntity() {
+@Test func testRemoveEntity() throws {
     let world = World()
     let e1 = world.createEntity(Position(x: 1, y: 1))
     let e2 = world.createEntity(Position(x: 2, y: 2))
@@ -54,7 +54,7 @@ import Testing
 
     #expect(world.entityCount == 3)
 
-    let removed = world.destroy(e2)
+    let removed = try world.destroy(e2)
     #expect(removed == true)
     #expect(world.entityCount == 2)
     #expect(e2.exists == false)
@@ -75,14 +75,14 @@ import Testing
     #expect(entity == nil)
 }
 
-@Test func testCloneEntity() {
+@Test func testCloneEntity() throws {
     let world = World()
     let original = world.createEntity(
         Position(x: 10, y: 20),
         Velocity(dx: 1, dy: 2)
     )
 
-    let cloned = world.clone(original)
+    let cloned = try world.clone(original)
 
     #expect(cloned != nil)
     #expect(cloned?.id != original.id)
@@ -93,11 +93,11 @@ import Testing
     #expect(world.entityCount == 2)
 }
 
-@Test func testCloneEntityIndependence() {
+@Test func testCloneEntityIndependence() throws {
     let world = World()
     let original = world.createEntity(Position(x: 10, y: 20))
 
-    let cloned = world.clone(original)!
+    let cloned = try world.clone(original)!
 
     // Modify original
     original.set(Position(x: 100, y: 200))
@@ -107,23 +107,23 @@ import Testing
     #expect(cloned[Position.self]?.x == 10)
 }
 
-@Test func testCloneEmptyEntity() {
+@Test func testCloneEmptyEntity() throws {
     let world = World()
     let original = world.createEntity()
 
-    let cloned = world.clone(original)
+    let cloned = try world.clone(original)
 
     #expect(cloned != nil)
     #expect(cloned?.id != original.id)
     #expect(world.entityCount == 2)
 }
 
-@Test func testCloneNonexistentEntity() {
+@Test func testCloneNonexistentEntity() throws {
     let world = World()
     let entity = world.createEntity()
-    world.destroy(entity)
+    try world.destroy(entity)
 
-    let cloned = world.clone(entity)
+    let cloned = try world.clone(entity)
 
     #expect(cloned == nil)
 }
@@ -131,12 +131,12 @@ import Testing
 @Test func testAllEntities() {
     let world = World()
 
-    #expect(world.query(.all).isEmpty)
+    #expect(world.snapshot(matching: .all).isEmpty)
 
     let e1 = world.createEntity()
     let e2 = world.createEntity()
 
-    let all = world.query(.all)
+    let all = world.snapshot(matching: .all)
     #expect(all.count == 2)
     #expect(all.contains { $0.id == e1.id })
     #expect(all.contains { $0.id == e2.id })
@@ -214,10 +214,10 @@ import Testing
     #expect(entity.contains(Velocity.self) == false)
 }
 
-@Test func testSetComponentToNonexistentEntity() {
+@Test func testSetComponentToNonexistentEntity() throws {
     let world = World()
     let entity = world.createEntity()
-    world.destroy(entity)
+    try world.destroy(entity)
 
     // Should not crash - entity no longer exists
     entity.set(Position(x: 0, y: 0))
@@ -234,7 +234,7 @@ import Testing
     world.createEntity(Position(x: 3, y: 3))
 
     var sum = 0.0
-    for entity in world.query(with: Position.self) {
+    for entity in world.snapshot(with: Position.self) {
         let pos = entity.get(Position.self)!.values
         sum += pos.x + pos.y
     }
@@ -248,7 +248,7 @@ import Testing
     let e1 = world.createEntity(Position(x: 1, y: 1))
     let e2 = world.createEntity(Position(x: 2, y: 2))
 
-    for entity in world.query(with: Position.self) {
+    for entity in world.snapshot(with: Position.self) {
         var pos = entity[Position.self]!
         pos.x *= 10
         pos.y *= 10
@@ -267,7 +267,7 @@ import Testing
     world.createEntity(Position(x: 100, y: 100))  // No velocity
 
     var count = 0
-    for entity in world.query(with: Position.self, Velocity.self) {
+    for entity in world.snapshot(with: Position.self, Velocity.self) {
         let (pos, vel) = entity.get(Position.self, Velocity.self)!.values
         count += 1
         #expect(pos.x >= 0)
@@ -285,7 +285,7 @@ import Testing
         Velocity(dx: 10, dy: 5)
     )
 
-    for e in world.query(with: Position.self, Velocity.self) {
+    for e in world.snapshot(with: Position.self, Velocity.self) {
         var (pos, vel) = e.get(Position.self, Velocity.self)!.values
         pos.x += vel.dx
         pos.y += vel.dy
@@ -305,7 +305,7 @@ import Testing
         Health(current: 100)
     )
 
-    for e in world.query(with: Position.self, Velocity.self, Health.self) {
+    for e in world.snapshot(with: Position.self, Velocity.self, Health.self) {
         var (pos, vel, health) = e.get(Position.self, Velocity.self, Health.self)!.values
         pos.x += vel.dx
         health.current -= 10
@@ -325,13 +325,13 @@ import Testing
     let e2 = world.createEntity(Position(x: 2, y: 2), Velocity(dx: 1, dy: 1))
     let e3 = world.createEntity(Velocity(dx: 2, dy: 2))
 
-    let withPos = world.query(with: Position.self)
+    let withPos = world.snapshot(with: Position.self)
     #expect(withPos.count == 2)
     #expect(withPos.contains { $0.id == e1.id })
     #expect(withPos.contains { $0.id == e2.id })
     #expect(!withPos.contains { $0.id == e3.id })
 
-    let withVel = world.query(with: Velocity.self)
+    let withVel = world.snapshot(with: Velocity.self)
     #expect(withVel.count == 2)
     #expect(withVel.contains { $0.id == e2.id })
     #expect(withVel.contains { $0.id == e3.id })
@@ -344,7 +344,7 @@ import Testing
     let e2 = world.createEntity(Position(x: 2, y: 2), Velocity(dx: 1, dy: 1))
     world.createEntity(Velocity(dx: 2, dy: 2))
 
-    let withBoth = world.query(with: Position.self, Velocity.self)
+    let withBoth = world.snapshot(with: Position.self, Velocity.self)
     #expect(withBoth.count == 1)
     #expect(withBoth.first?.id == e2.id)
 }
@@ -356,7 +356,7 @@ import Testing
     world.createEntity()
     world.createEntity()
 
-    let all = world.query(.all)
+    let all = world.snapshot(matching: .all)
     #expect(all.count == 3)
 }
 
@@ -369,7 +369,7 @@ import Testing
         Velocity(dx: 10, dy: 5)
     )
 
-    world.addSystem(MovementSystem())
+    try world.addSystem(MovementSystem())
     try world.update(deltaTime: 1.0)
 
     #expect(entity[Position.self]?.x == 10)
@@ -388,7 +388,7 @@ import Testing
         Velocity(dx: -5, dy: -10)
     )
 
-    world.addSystem(MovementSystem())
+    try world.addSystem(MovementSystem())
     try world.update(deltaTime: 2.0)
 
     #expect(entity1[Position.self]?.x == 20)
@@ -398,9 +398,9 @@ import Testing
     #expect(entity2[Position.self]?.y == 80)
 }
 
-@Test func testInitializableSystem() {
+@Test func testInitializableSystem() throws {
     let world = World()
-    world.addSystem(InitializableMovementSystem())
+    try world.addSystem(InitializableMovementSystem())
 
     // Just verify no crash - system should have been initialized
     #expect(world.entityCount == 0)
@@ -408,7 +408,7 @@ import Testing
 
 @Test func testCleanupSystem() throws {
     let world = World()
-    world.addSystem(CleanupMovementSystem())
+    try world.addSystem(CleanupMovementSystem())
     world.removeAllSystems()
 
     // Verify systems were removed
@@ -481,13 +481,13 @@ import Testing
     #expect(entity.contains(Velocity.self) == false)
 }
 
-@Test func testEntityExistsAfterDestroy() {
+@Test func testEntityExistsAfterDestroy() throws {
     let world = World()
     let entity = world.createEntity(Position(x: 1, y: 2))
 
     #expect(entity.exists == true)
 
-    world.destroy(entity)
+    try world.destroy(entity)
     #expect(entity.exists == false)
 }
 
@@ -773,14 +773,14 @@ import Testing
 
 // MARK: - Debug Tests
 
-@Test func testWorldStats() {
+@Test func testWorldStats() throws {
     let world = World()
 
     world.createEntity(Position(x: 0, y: 0))
     world.createEntity(Position(x: 1, y: 1), Velocity(dx: 1, dy: 1))
     world.createEntity(Velocity(dx: 2, dy: 2))
 
-    world.addSystem(MovementSystem())
+    try world.addSystem(MovementSystem())
 
     let stats = world.stats
 
@@ -1034,7 +1034,7 @@ final class SharedOrder: @unchecked Sendable {
 @Test func testSystemDefaultID() throws {
     let world = World()
 
-    world.addSystem(MovementSystem())
+    try world.addSystem(MovementSystem())
 
     let executionOrder = world.systemExecutionOrder
     #expect(executionOrder.contains("MovementSystem"))
@@ -1061,7 +1061,7 @@ final class SharedOrder: @unchecked Sendable {
     world.register(query)
 
     var sum = 0.0
-    for entity in world.entities(query) {
+    for entity in world.entities(matching: query) {
         sum += entity[Position.self]!.x
     }
 
@@ -1076,7 +1076,7 @@ final class SharedOrder: @unchecked Sendable {
     let query = Query(with: Position.self)
     world.register(query)
 
-    for entity in world.entities(query) {
+    for entity in world.entities(matching: query) {
         entity[Position.self]!.x *= 10
     }
 
@@ -1094,7 +1094,7 @@ final class SharedOrder: @unchecked Sendable {
     world.register(query)
 
     var sum = 0.0
-    for entity in world.entities(query) {
+    for entity in world.entities(matching: query) {
         sum += entity[Position.self]!.x + entity[Velocity.self]!.dx
     }
 
@@ -1110,7 +1110,7 @@ final class SharedOrder: @unchecked Sendable {
 
     // First iteration - builds cache
     var count = 0
-    for _ in world.entities(query) { count += 1 }
+    for _ in world.entities(matching: query) { count += 1 }
     #expect(count == 1)
 
     // Add entity with new archetype combination
@@ -1118,7 +1118,7 @@ final class SharedOrder: @unchecked Sendable {
 
     // Cache should be invalidated, should find both
     count = 0
-    for _ in world.entities(query) { count += 1 }
+    for _ in world.entities(matching: query) { count += 1 }
     #expect(count == 2)
 }
 
@@ -1135,7 +1135,7 @@ final class SharedOrder: @unchecked Sendable {
 
     // entities() still works (just slower without cache)
     var count = 0
-    for _ in world.entities(query) { count += 1 }
+    for _ in world.entities(matching: query) { count += 1 }
     #expect(count == 1)
 }
 
@@ -1147,7 +1147,7 @@ final class SharedOrder: @unchecked Sendable {
     // entities() works without registration (just no caching)
     let query = Query(with: Position.self)
     var sum = 0.0
-    for entity in world.entities(query) {
+    for entity in world.entities(matching: query) {
         sum += entity[Position.self]!.x
     }
 

@@ -6,7 +6,7 @@ import Testing
 @MainActor @Test func `survival steering is clamped and pause freezes the world`() throws {
     let game = SurvivalSession()
     game.start()
-    let player = try #require(game.world.query(with: SurvivalComponents.Hero.self).first)
+    let player = try #require(game.world.snapshot(with: SurvivalComponents.Hero.self).first)
     let start = try #require(player[SurvivalComponents.Body.self]).position
     let now = Date()
     game.setKey("d", pressed: true)
@@ -34,7 +34,7 @@ import Testing
     system.update(world: world, deltaTime: 0.01)
     #expect(!enemy.exists)
     #expect(player[SurvivalComponents.Hero.self]?.kills == 1)
-    #expect(world.query(with: SurvivalComponents.Gem.self).count == 1)
+    #expect(world.snapshot(with: SurvivalComponents.Gem.self).count == 1)
     for _ in 0..<3 {
         world.createEntity(SurvivalComponents.Body(position: SIMD2(500, 350), radius: 17), SurvivalComponents.Enemy(health: 10, speed: 0, shoots: false, cooldown: 10))
     }
@@ -47,7 +47,7 @@ import Testing
 @MainActor @Test func `gems offer upgrades and restart clears the run`() throws {
     let game = SurvivalSession()
     game.start()
-    let player = try #require(game.world.query(with: SurvivalComponents.Hero.self).first)
+    let player = try #require(game.world.snapshot(with: SurvivalComponents.Hero.self).first)
     for _ in 0..<5 {
         game.world.createEntity(SurvivalComponents.Body(position: SIMD2(500, 350), radius: 10), SurvivalComponents.Gem())
     }
@@ -79,7 +79,7 @@ import Testing
     world.createEntity(SurvivalComponents.Body(position: SIMD2(800, 350), radius: 17), SurvivalComponents.Enemy(health: 3, speed: 0, shoots: true, cooldown: 0))
     let expired = world.createEntity(SurvivalComponents.Body(position: SIMD2(100, 100), radius: 7), SurvivalComponents.Shot(velocity: .zero, damage: 1, hostile: false, lifetime: 0.001))
     SurvivalSystem().update(world: world, deltaTime: 0.01)
-    let hostile = world.query(with: SurvivalComponents.Shot.self).filter { $0[SurvivalComponents.Shot.self]?.hostile == true }
+    let hostile = world.snapshot(with: SurvivalComponents.Shot.self).filter { $0[SurvivalComponents.Shot.self]?.hostile == true }
     #expect(hostile.count == 3)
     #expect(!expired.exists)
 }
@@ -87,7 +87,7 @@ import Testing
 @MainActor @Test func `haste and vitality upgrades apply only at level up`() throws {
     let game = SurvivalSession()
     game.start()
-    let player = try #require(game.world.query(with: SurvivalComponents.Hero.self).first)
+    let player = try #require(game.world.snapshot(with: SurvivalComponents.Hero.self).first)
     game.choose(.magic)
     #expect(game.hero.damage == 1)
     var hero = game.hero
@@ -119,7 +119,7 @@ import Testing
 @MainActor @Test func `projectile ownership drives the HUD and detaches when a shooter dies`() throws {
     let game = SurvivalSession()
     game.start()
-    let player = try #require(game.world.query(with: SurvivalComponents.Hero.self).first)
+    let player = try #require(game.world.snapshot(with: SurvivalComponents.Hero.self).first)
     let demon = game.world.createEntity(
         SurvivalComponents.Body(position: SIMD2(800, 350), radius: 17),
         SurvivalComponents.Enemy(health: 3, speed: 0, shoots: true, cooldown: 0)
@@ -128,13 +128,13 @@ import Testing
     game.tick(at: now)
     game.tick(at: now.addingTimeInterval(0.01))
     #expect(game.activePlayerShotCount == 1)
-    let playerShots = game.world.query(Query(.related(FiredBy.self, to: player.id)))
-    let demonShots = game.world.query(Query(.related(FiredBy.self, to: demon.id)))
+    let playerShots = game.world.snapshot(matching: Query(.related(FiredBy.self, to: player.id)))
+    let demonShots = game.world.snapshot(matching: Query(.related(FiredBy.self, to: demon.id)))
     #expect(playerShots.count == 1)
     #expect(demonShots.count == 3)
     #expect(demonShots.allSatisfy { $0[SurvivalComponents.Shot.self]?.hostile == true })
     #expect(player.sources(of: FiredBy.self).count == 1)
-    game.world.destroy(demon)
+    try game.world.destroy(demon)
     #expect(demonShots.allSatisfy { $0.exists && $0.targets(of: FiredBy.self).isEmpty })
     #expect(demonShots.allSatisfy { $0[SurvivalComponents.Shot.self]?.hostile == true })
     #expect(game.activePlayerShotCount == 1)

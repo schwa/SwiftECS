@@ -2,11 +2,19 @@ import ECS
 
 struct CollisionSystem: System {
     func update(world: World, deltaTime _: Double) {
-        guard let player = world.query(with: Player.self).first,
+        do {
+            try resolveCollisions(world: world)
+        } catch {
+            preconditionFailure("Collision entities must belong to their simulation world: \(error)")
+        }
+    }
+
+    private func resolveCollisions(world: World) throws {
+        guard let player = world.snapshot(with: Player.self).first,
               var state = player[Player.self], let catcher = player[Position.self] else {
             return
         }
-        for entity in world.query(with: FallingObject.self, Position.self) {
+        for entity in world.snapshot(with: FallingObject.self, Position.self) {
             guard state.lives > 0, let object = entity[FallingObject.self], let position = entity[Position.self] else {
                 continue
             }
@@ -16,12 +24,12 @@ struct CollisionSystem: System {
                 case .star: state.score += 10
                 case .meteor: state.lives -= 1
                 }
-                world.destroy(entity)
+                try world.destroy(entity)
             } else if position.y > 1.05 {
                 if object.kind == .star {
                     state.lives -= 1
                 }
-                world.destroy(entity)
+                try world.destroy(entity)
             }
         }
         player.set(state)

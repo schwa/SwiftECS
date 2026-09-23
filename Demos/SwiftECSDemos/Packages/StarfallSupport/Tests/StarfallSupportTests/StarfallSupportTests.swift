@@ -37,7 +37,7 @@ import Testing
     let game = GameSession()
     game.start()
     game.move(to: -10)
-    let player = try #require(game.world.query(with: Player.self).first)
+    let player = try #require(game.world.snapshot(with: Player.self).first)
     #expect(player[Position.self]?.x == 0.08)
     let now = Date()
     game.tick(at: now)
@@ -67,7 +67,7 @@ private final class InvalidationFlag: @unchecked Sendable {
     let oldWorld = game.world
     let steering = InvalidationFlag()
     withObservationTracking {
-        _ = game.world.query(with: Player.self).first?[Position.self]
+        _ = game.world.snapshot(with: Player.self).first?[Position.self]
     } onChange: {
         steering.changed = true
     }
@@ -75,7 +75,7 @@ private final class InvalidationFlag: @unchecked Sendable {
     #expect(steering.changed)
     let replacement = InvalidationFlag()
     withObservationTracking {
-        _ = game.world.query(with: Player.self)
+        _ = game.world.snapshot(with: Player.self)
     } onChange: {
         replacement.changed = true
     }
@@ -84,7 +84,7 @@ private final class InvalidationFlag: @unchecked Sendable {
     #expect(game.world !== oldWorld)
     let current = InvalidationFlag()
     withObservationTracking {
-        _ = game.world.query(with: Player.self).first?[Position.self]
+        _ = game.world.snapshot(with: Player.self).first?[Position.self]
     } onChange: {
         current.changed = true
     }
@@ -114,13 +114,13 @@ private final class InvalidationFlag: @unchecked Sendable {
         game.tick(at: now.addingTimeInterval(Double(step) * 0.1))
     }
     #expect(invalidation.changed)
-    #expect(game.world.query(with: FallingObject.self).count == 1)
+    #expect(game.world.snapshot(with: FallingObject.self).count == 1)
 }
 
 @MainActor @Test func `last heart ends the game and freezes simulation`() throws {
     let game = GameSession()
     game.start()
-    let player = try #require(game.world.query(with: Player.self).first)
+    let player = try #require(game.world.snapshot(with: Player.self).first)
     player.set(Player(score: 20, lives: 1))
     game.world.createEntity(Position(x: 0.5, y: 0.9), FallingObject(kind: .meteor))
     let now = Date()
