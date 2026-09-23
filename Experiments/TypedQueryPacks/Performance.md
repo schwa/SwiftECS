@@ -1,5 +1,9 @@
 # Query access measurements
 
+Umbrella issue: #14. Remaining investigations: #13 (row access), #5 (observation), and #4 (substep batching).
+
+The latest experiment trace is `~/Desktop/ECS-Profiles/typed-query-inline-experiment.trace`. The directory contains logs, analysis, provenance notes, and a patch identifying the tested changes. The previous baseline is `typed-query-0ab9af6b.trace`. Both captures include all processes and need review before sharing.
+
 ## Setup
 
 - Apple M5 Max, 128 GB memory, macOS 27.0 (26A428).
@@ -133,7 +137,7 @@ Iterator-only time fell about 91%. The retained-row costs stayed similar. This s
 
 The full comparison under Time Profiler measured 25.250 ms/update without a storage observer and 25.502 ms with one. Entity handles measured 255.067 ms and fast references measured 138.202 ms without observers.
 
-Trace: `/tmp/ecs-issue-12-profile.trace`. With the same stack filter, selected sample weight is 1.621 seconds. Iterator advancement now accounts for 9.7% inclusive, down from 59.9%.
+Trace: `~/Desktop/ECS-Profiles/typed-query-0ab9af6b.trace`. With the same stack filter, selected sample weight is 1.621 seconds. Iterator advancement now accounts for 9.7% inclusive, down from 59.9%.
 
 The setter accounts for 67.3% inclusive, including array modification and generic metadata work. These overlapping costs remain under #13. This workload still exceeds the 16.7 ms budget.
 
@@ -152,6 +156,36 @@ The same Release isolation benchmark, three samples per variant:
 The ordinary helper difference is too small to establish a benefit across separate runs. The experiment does not establish whether array storage or specialization is the underlying problem.
 
 Both helper variants were removed. Production code remains unchanged, and #13 remains open.
+
+## Cross-module specialization experiment (#13)
+
+Further variants produced these Release isolation medians for fresh reads and writes:
+
+| Variant | Median |
+|---|---:|
+| Baseline after #12 | 24.726 ms |
+| Non-inlined setter on Column | 24.175 ms |
+| Column setter with scoped mutable buffer access | 22.681 ms |
+| ContiguousArray column storage | 22.742 ms |
+| Inlinable typed accessors, original Array storage | 15.069 ms |
+
+The first three variants were removed. The retained change marks typed row accessors as `@inlinable`, with the required internal declarations marked `@usableFromInline`. This exposes implementation details to client compilation but adds no public methods. Internal representation changes now require care because compiled clients can embed these accessor bodies.
+
+Core and demo tests pass. Event delivery and storage observation remain active. The retained-row read/write median falls to 11.626 ms, and fresh reads fall to 4.795 ms.
+
+The mixed comparison under Time Profiler measured 16.548 ms/update without a storage observer and 16.731 ms with one. Other paths also ran slower than earlier captures, so these separate runs do not isolate compiler changes from machine variation.
+
+A longer typed-only capture used 100 measured updates per sample. It measured 14.987 ms without an observer and 15.003 ms with one. This is near the simulation budget, not evidence of rendering headroom or steady 60 Hz performance.
+
+Trace: `~/Desktop/ECS-Profiles/typed-query-inline-experiment.trace`. The stack filter now selects `QueryBenchmarkSystem.update` because inlining removes some typed-accessor frames. The benchmark contains only the typed access path. Selected CPU weight is 8.962 seconds, including warm-up updates and both observer cases.
+
+Inclusive costs still overlap: specialized setter 59.3%, generic metadata lookup 40.7%, iterator advancement 16.0%, and specialized getter 12.6%. Metadata work remains significant. Issue #13 remains open.
+
+The benchmark now accepts optional `ECS_BENCHMARK_ACCESS` and `ECS_BENCHMARK_FRAMES` overrides. Defaults remain all access paths and ten measured updates.
+
+```sh
+env ECS_RUN_BENCHMARKS=1 ECS_BENCHMARK_ACCESS=typed ECS_BENCHMARK_FRAMES=100 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter QueryPerformanceTests
+```
 
 ## Reproduce
 

@@ -42,8 +42,9 @@ protocol AnyColumn: AnyObject {
 }
 
 /// Typed column storage for one component type.
+@usableFromInline
 final class Column<T: Component>: AnyColumn {
-    var data: [T] = []
+    @usableFromInline var data: [T] = []
 
     func swapRemove(at index: Int) {
         if index < data.count - 1 {

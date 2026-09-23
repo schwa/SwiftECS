@@ -29,10 +29,12 @@ public final class World {
     @ObservationIgnored private var updateDepth = 0
     @ObservationIgnored private var storageIsDirty = false
 
+    @usableFromInline
     internal func trackStorageAccess() {
         _ = storageRevision
     }
 
+    @usableFromInline
     internal func storageDidChange() {
         if updateDepth > 0 {
             storageIsDirty = true
@@ -181,6 +183,7 @@ public final class World {
     }
 
     /// Notify observers of a component change (used by EntityRef).
+    @usableFromInline
     internal func notifyChanged<T: Component>(entityID: EntityID, component: T) {
         observers.notifyChanged(entity: Entity(id: entityID, world: self), component: component)
     }

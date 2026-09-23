@@ -100,6 +100,7 @@ updated: 2026-09-23T18:01:44Z
 Storage observation is batched per outermost world.update(), not per rendered frame. Apps that perform several sequential simulation substeps per frame receive one storage invalidation for each changed substep. Starfall uses this pattern. Notification volume therefore scales with substep count even when the UI only needs the final frame state. The existing per-update guarantee remains correct; batching across sequential updates is not currently supported.
 
 - `2026-09-23T18:01:44Z`: Related to #5: notification counts across substeps are part of the observation measurements. This issue concerns batching semantics across sequential updates.
+- `2026-09-23T19:29:01Z`: Tracked by umbrella #14 alongside observation measurements in #5 and row-cost work in #13.
 
 ---
 
@@ -119,6 +120,7 @@ World storage observation now tracks ECS reads and invalidates at world scope. C
 - `2026-09-23T18:01:44Z`: Related to #4 (substep notification volume) and #6 (component-access cost). Measurements must distinguish observation overhead from dictionary lookup/cast cost.
 - `2026-09-23T18:22:31Z`: Initial query comparison: one rearming storage observer adds no clear large cost in the measured single-archetype workload. This does not isolate the cost of observation instrumentation and does not measure SwiftUI body evaluation/rendering, multiple unrelated views, or substeps. See Experiments/TypedQueryPacks/Performance.md. Broader investigation remains open.
 - `2026-09-23T18:42:11Z`: Related investigation #13 measures row read/write costs without active subscribers. Broader instrumentation cost and SwiftUI behavior remain unmeasured here.
+- `2026-09-23T19:29:01Z`: Tracked by umbrella #14. Current baseline and trace provenance are in Experiments/TypedQueryPacks/Performance.md and ~/Desktop/ECS-Profiles/README.md.
 
 ---
 
@@ -276,5 +278,35 @@ Evidence: Tests/ECSTests/TypedQueryCostTests.swift and Experiments/TypedQueryPac
 
 - `2026-09-23T18:47:11Z`: After #12 removes most iterator overhead, fresh read/write median is 24.726 ms and retained read/write is 21.891 ms. New profile: TypedEntityRef.set is 67.3% inclusive, Array.subscript.modify 44.9%, generic metadata lookup 53.7% (overlapping). Trace /tmp/ecs-issue-12-profile.trace. This further isolates the remaining setter/read costs; no evidence yet of whole-array copying.
 - `2026-09-23T18:50:41Z`: Tested extracting the array write into a generic helper. Fresh read/write median: baseline 24.726 ms, helper 24.619 ms, @inline(never) helper 25.447 ms. Retained writes: 21.891, 21.658, 22.439 ms respectively. Three Release samples per variant. No meaningful gain from normal helper; noinline is slower. Removed both variants, leaving production code unchanged. Results recorded in Experiments/TypedQueryPacks/Performance.md.
+- `2026-09-23T19:29:01Z`: Tracked by umbrella #14. Latest profile is preserved at ~/Desktop/ECS-Profiles/typed-query-0ab9af6b.trace with benchmark logs, analysis script/summary, and provenance notes. The trace matches current production code; subsequent helper experiments were reverted.
+- `2026-09-23T19:39:22Z`: Further investigation: Column setter 24.175 ms, scoped buffer write 22.681 ms, ContiguousArray 22.742 ms; these variants were removed. Retained candidate: @inlinable typed accessors with required @usableFromInline internals, original Array storage. Isolation read/write median 15.069 ms; retained-row writes 11.626 ms. Longer typed-only profile: 14.987 ms unobserved, 15.003 ms observed. Mixed comparison varied up to 16.7 ms. Metadata remains 40.7% inclusive under the typed-only update filter. Debug/Release tests, demo tests/build, and lint pass. Keep open: improvement leaves little frame headroom and residual metadata costs. See Performance.md and ~/Desktop/ECS-Profiles/typed-query-inline-experiment.trace.
+
+---
+
+## 14: Track ECS performance against the 60 Hz simulation budget
+
++++
+status: open
+priority: high
+kind: task
+labels: effort:l
+created: 2026-09-23T19:28:16Z
+updated: 2026-09-23T19:29:01Z
++++
+
+Umbrella issue for the remaining ECS performance work. The current 100K-entity Release workload takes approximately 25 ms per update, exceeding the 16.7 ms budget for 60 Hz before rendering. This is a synthetic simulation workload, not a measured Starfall frame time.
+
+Current evidence: Experiments/TypedQueryPacks/Performance.md. The latest Time Profiler capture matches production code at 0ab9af6b; later write-helper experiments were reverted. Durable local trace: ~/Desktop/ECS-Profiles/typed-query-0ab9af6b.trace, with benchmark output, stack summary, and provenance notes alongside it. The capture includes all processes and must be reviewed before sharing.
+
+Remaining work:
+- #13: typed component reads/writes. Current profile is dominated by setter work, array modification, and generic metadata. The plain and non-inlined write-helper experiments did not help.
+- #5: broader observation overhead and actual SwiftUI work, including multiple observing views.
+- #4: sequential simulation substeps each produce storage invalidation.
+
+Completed milestones: #6 introduced and measured typed access; #11 removed debug-name construction from observer dispatch; #12 removed most per-row iterator construction overhead. Comparable workload medians progressed from about 111 ms to 54 ms to 25 ms.
+
+Completion criteria: repeatable Release measurements below 16.7 ms for the defined 100K-entity workload, with rendering headroom reported rather than implied; characterization of observation and component-event costs; correctness tests still passing; retained profiles and measurement notes identifying the tested revision, toolchain, hardware, workload, and limitations. Timing improvements must not silently omit event delivery or observation. This issue coordinates the related work rather than duplicating its implementation scope.
+
+- `2026-09-23T19:39:22Z`: Current candidate uses cross-module specialization of typed accessors. Typed-only 100-frame samples now measure about 15 ms/update; mixed comparison reaches 16.5–16.7 ms, so no claim of reliable rendering headroom. Latest preserved trace: ~/Desktop/ECS-Profiles/typed-query-inline-experiment.trace, with benchmark log, summary, provenance, and patch. Older 0ab9af6b trace remains as the previous baseline. #13 and #5 remain open.
 
 ---

@@ -1,8 +1,8 @@
 public struct TypedEntityRef<each Value: Component> {
     public let entityID: EntityID
-    private let world: World
-    private let index: Int
-    private let storage: TypedQueryStorage<repeat each Value>
+    @usableFromInline internal let world: World
+    @usableFromInline internal let index: Int
+    @usableFromInline internal let storage: TypedQueryStorage<repeat each Value>
 
     internal init(world: World, entityID: EntityID, index: Int, storage: TypedQueryStorage<repeat each Value>) {
         self.world = world
@@ -11,11 +11,13 @@ public struct TypedEntityRef<each Value: Component> {
         self.storage = storage
     }
 
+    @inlinable
     public var values: (repeat each Value) {
         world.trackStorageAccess()
         return (repeat read(each storage.columns))
     }
 
+    @inlinable
     public func set(_ values: repeat each Value) {
         var changed = false
         defer {
@@ -34,7 +36,8 @@ public struct TypedEntityRef<each Value: Component> {
     }
 
     // Direct array subscripting in a pack expansion fails on Swift 6.4.
-    private func read<T: Component>(_ column: Column<T>) -> T {
+    @inlinable
+    internal func read<T: Component>(_ column: Column<T>) -> T {
         column.data[index]
     }
 }

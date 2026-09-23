@@ -73,16 +73,20 @@ struct QueryPerformanceTests {
     @Test func compareQueryAccess() throws {
         let entityCount = 100_000
         let warmupFrames = 2
-        let measuredFrames = 10
+        let measuredFrames = Int(ProcessInfo.processInfo.environment["ECS_BENCHMARK_FRAMES"] ?? "10") ?? 10
+        precondition(measuredFrames > 0)
         let rounds = 3
+        let accessFilter = ProcessInfo.processInfo.environment["ECS_BENCHMARK_ACCESS"]
+        let accesses = QueryAccess.allCases.filter { accessFilter == nil || "\($0)" == accessFilter }
+        precondition(!accesses.isEmpty, "Unknown ECS_BENCHMARK_ACCESS")
         let deltaTime = 1.0 / 60
         let clock = ContinuousClock()
         var samples: [String: [Double]] = [:]
 
         for round in 0..<rounds {
             for observed in [false, true] {
-                for offset in 0..<QueryAccess.allCases.count {
-                    let access = QueryAccess.allCases[(round + offset) % QueryAccess.allCases.count]
+                for offset in accesses.indices {
+                    let access = accesses[(round + offset) % accesses.count]
                     let world = World()
                     for index in 0..<entityCount {
                         world.createEntity(Transform(x: Double(index), y: 0, z: 0), Physics(velocityX: 1, velocityY: 2, velocityZ: 3))
@@ -112,6 +116,10 @@ struct QueryPerformanceTests {
                 }
             }
         }
+        summarize(samples)
+    }
+
+    private func summarize(_ samples: [String: [Double]]) {
         for key in samples.keys.sorted() {
             guard let values = samples[key]?.sorted(), let minimum = values.first, let maximum = values.last else {
                 continue
