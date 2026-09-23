@@ -137,6 +137,22 @@ Trace: `/tmp/ecs-issue-12-profile.trace`. With the same stack filter, selected s
 
 The setter accounts for 67.3% inclusive, including array modification and generic metadata work. These overlapping costs remain under #13. This workload still exceeds the 16.7 ms budget.
 
+## Write-helper experiment (#13)
+
+Moving `column.data[index] = value` into a generic helper did not produce a useful improvement. Preventing helper inlining made the measured workload slower.
+
+The same Release isolation benchmark, three samples per variant:
+
+| Variant | Fresh read/write median | Retained read/write median |
+|---|---:|---:|
+| Existing inline array write | 24.726 ms | 21.891 ms |
+| Generic write helper | 24.619 ms | 21.658 ms |
+| Helper with `@inline(never)` | 25.447 ms | 22.439 ms |
+
+The ordinary helper difference is too small to establish a benefit across separate runs. The experiment does not establish whether array storage or specialization is the underlying problem.
+
+Both helper variants were removed. Production code remains unchanged, and #13 remains open.
+
 ## Reproduce
 
 Run from the repository root:
