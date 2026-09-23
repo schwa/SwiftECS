@@ -51,88 +51,115 @@ All public read/write paths are accounted for in tests, update batching obeys th
 ## 2: System execution order does not preserve registration order
 
 +++
-status: new
+status: closed
 priority: medium
-kind: none
+kind: task
+labels: effort:xs
 created: 2026-09-23T17:28:58Z
+updated: 2026-09-23T18:01:44Z
+closed: 2026-09-23T18:01:44Z
 +++
 
 Independent systems do not execute in registration order. World rebuilds its execution order from dictionary keys, so registering spawn, movement, and collision in that sequence does not establish that sequence at runtime. The Starfall demo must declare explicit dependencies for each stage. This is surprising for small sequential simulations, where registration order might otherwise be assumed to determine execution.
+
+- `2026-09-23T18:01:44Z`: Triage correction: systems uses OrderedDictionary, not an unordered dictionary. rebuildSystemOrder seeds independent systems in registration order. Dependencies can reorder execution. The original report was inaccurate; closing as invalid with user approval.
 
 ---
 
 ## 3: Component queries require repeated optional component lookups
 
 +++
-status: new
+status: open
 priority: medium
-kind: none
+kind: enhancement
+labels: effort:m
 created: 2026-09-23T17:28:58Z
+updated: 2026-09-23T18:01:44Z
 +++
 
 World.query(with:) filters entities by component presence but returns untyped Entity handles. Systems must then retrieve each requested component through an optional subscript and repeat presence checks. Starfall MovementSystem and CollisionSystem demonstrate this repeated query-and-guard pattern. The query result cannot express typed access to the components it matched.
+
+- `2026-09-23T18:01:44Z`: Related to #6: typed query ergonomics and fast access overlap, but #3 concerns compile-time component access while #6 concerns lookup cost. #7 investigates parameter-pack feasibility for both.
 
 ---
 
 ## 4: Multiple simulation substeps produce separate storage invalidations within one rendered frame
 
 +++
-status: new
+status: open
 priority: medium
 kind: enhancement
+labels: effort:m
 created: 2026-09-23T17:47:35Z
+updated: 2026-09-23T18:01:44Z
 +++
 
 Storage observation is batched per outermost world.update(), not per rendered frame. Apps that perform several sequential simulation substeps per frame receive one storage invalidation for each changed substep. Starfall uses this pattern. Notification volume therefore scales with substep count even when the UI only needs the final frame state. The existing per-update guarantee remains correct; batching across sequential updates is not currently supported.
+
+- `2026-09-23T18:01:44Z`: Related to #5: notification counts across substeps are part of the observation measurements. This issue concerns batching semantics across sequential updates.
 
 ---
 
 ## 5: Observation overhead and world-wide redraw scope lack dedicated measurements
 
 +++
-status: new
+status: open
 priority: medium
 kind: task
+labels: effort:m
 created: 2026-09-23T17:47:35Z
+updated: 2026-09-23T18:01:44Z
 +++
 
 World storage observation now tracks ECS reads and invalidates at world scope. Correctness tests cover notification batching, but dedicated measurements do not establish its runtime overhead or the UI work caused by broad invalidation. Measure representative large-world workloads with and without active observers, ordinary and fast-query reads/writes, sequential simulation substeps, and multiple views reading unrelated entities or components. Distinguish storage notifications from actual SwiftUI body evaluations and rendering work. These measurements are needed before deciding whether finer-grained observation is worthwhile.
+
+- `2026-09-23T18:01:44Z`: Related to #4 (substep notification volume) and #6 (component-access cost). Measurements must distinguish observation overhead from dictionary lookup/cast cost.
 
 ---
 
 ## 6: Fast component access still performs per-access dictionary lookups and casts
 
 +++
-status: new
+status: open
 priority: medium
 kind: enhancement
+labels: effort:l
 created: 2026-09-23T17:57:52Z
+updated: 2026-09-23T18:01:44Z
 +++
 
 EntityRef stores type-erased columns in a ComponentType-keyed dictionary. Every component read/write performs a lookup and cast, including repeated accesses in tight simulation loops. PLAN.md identified this as a performance concern, but its timings are historical and not verified against the current implementation. Establish current Release baselines and assess typed fast-query access without losing storage observation or component events. Related: #3 covers typed query ergonomics; #5 covers observation overhead.
+
+- `2026-09-23T18:01:44Z`: Related to #3 (typed access), #5 (observation measurements), and #7 (parameter-pack feasibility). Performance changes must preserve existing observation and component-event behavior.
 
 ---
 
 ## 7: Parameter-pack typed query references remain unverified on current Swift
 
 +++
-status: new
+status: open
 priority: low
 kind: task
+labels: effort:s
 created: 2026-09-23T17:57:52Z
+updated: 2026-09-23T18:01:44Z
 +++
 
 The retired PLAN.md records a compiler crash when attempting EntityRef<each T: Component>: signal 11 in emitPackExpansionIntoPack. There is no current reproduction or verification against the supported toolchain. Determine whether the limitation still applies and capture a minimal reproduction and compiler version if it does. Explicit overloads and macros were alternatives in the old plan, not committed requirements.
+
+- `2026-09-23T18:01:44Z`: Related to #3 and #6: this bounded compiler investigation informs typed-query designs, without committing to a specific implementation.
 
 ---
 
 ## 8: Empty archetypes remain allocated after component transitions
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
+labels: effort:l
 created: 2026-09-23T17:57:52Z
+updated: 2026-09-23T18:01:44Z
 +++
 
 Adding and removing component types can leave empty intermediate archetypes in World. No empty-archetype reclamation exists. Long-lived worlds with changing component signatures can retain unused storage and query-cache entries. Any future reclamation must account for registered query caches and the lifetime rules of lazy sequences and query references.
@@ -142,25 +169,29 @@ Adding and removing component types can leave empty intermediate archetypes in W
 ## 9: System count changes are not observable for debug interfaces
 
 +++
-status: new
+status: open
 priority: low
 kind: enhancement
+labels: effort:s
 created: 2026-09-23T17:57:52Z
+updated: 2026-09-23T18:01:44Z
 +++
 
 World.systemCount reports the registered system count but reads ignored system storage without establishing an observation dependency. Debug views reading only systemCount do not automatically refresh when systems are added or removed. Storage observation does not cover system registration. This was a future consideration in PLAN.md, not part of the completed storage-observation contract.
 
 ---
 
-## 10: Pause and resume require application-owned simulation state
+## 10: Decide whether pause and resume belong in World
 
 +++
-status: new
+status: open
 priority: low
-kind: feature
+kind: task
+labels: effort:s
 created: 2026-09-23T17:57:52Z
+updated: 2026-09-23T18:01:44Z
 +++
 
-World has no pause/resume state or policy. Applications such as Starfall keep their own pause flag and decide whether to call update. PLAN.md suggested observable pause state as a future possibility. Whether this belongs in the library is unresolved; define its intended semantics and value before implementation, including simulationTime, system execution, and direct component writes while paused.
+Applications currently own pause state and decide whether to call World.update. There is no agreed reason to move this policy into the ECS. Decide whether pause belongs in World or remains application-owned. Record the rationale and, if library support is warranted, define simulationTime, system execution, and direct-write behavior while paused. This is a design task only; implementation requires a separate decision.
 
 ---
