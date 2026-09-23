@@ -6,7 +6,7 @@ Our Swift entity-component-system experiment. No customers or stable API yet.
 
 - `Sources/ECS/`: archetype storage, entities, queries, systems, and observation.
 - `Tests/ECSTests/`: unit tests and opt-in stress tests.
-- `Demos/Starfall/`: SwiftUI game that exercises the library. Current validation targets macOS.
+- `Demos/Starfall/`: SwiftUI arcade with a launch picker, Starfall, and the emoji-based Midnight Survivors. Current validation targets macOS.
 - `ISSUES.md`: open work and unresolved design questions.
 - `RFCs/`: design proposals.
 

@@ -64,6 +64,7 @@ public struct StarfallView: View {
         .padding()
         .background(Color(red: 0.035, green: 0.045, blue: 0.11))
         .preferredColorScheme(.dark)
+        .onDisappear { game.setPaused(true) }
         .onChange(of: scenePhase) {
             if scenePhase != .active, game.running {
                 game.setPaused(true)
