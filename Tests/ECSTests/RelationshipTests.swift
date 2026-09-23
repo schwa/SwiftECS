@@ -82,16 +82,16 @@ private final class RelationshipChanges: @unchecked Sendable {
     try child.setParent(root)
     try leaf.setParent(child)
     try outside.addRelationship(Likes.self, to: child)
-    root.destroy()
+    world.destroy(root)
     #expect(child.exists)
     #expect(child.parent == nil)
     #expect(leaf.parent?.id == child.id)
     let changes = RelationshipChanges { _ = world.entityCount }
-    #expect(child.destroyRecursively() == 2)
+    #expect(world.destroyRecursively(child) == 2)
     #expect(changes.count == 1)
     #expect(outside.exists)
     #expect(outside.targets(of: Likes.self).isEmpty)
-    #expect(child.destroyRecursively() == 0)
+    #expect(world.destroyRecursively(child) == 0)
 }
 
 @Test func `general traversal visits cycles and diamonds once in breadth first order`() throws {
@@ -106,7 +106,7 @@ private final class RelationshipChanges: @unchecked Sendable {
     try leaf.addRelationship(Likes.self, to: second)
     try root.addRelationship(Likes.self, to: leaf)
     #expect(root.descendants(via: Likes.self).map(\.id) == [first.id, second.id, leaf.id])
-    #expect(root.destroyRecursively(following: Likes.self) == 4)
+    #expect(world.destroyRecursively(root, following: Likes.self) == 4)
     #expect(world.entityCount == 0)
 }
 
@@ -114,7 +114,7 @@ private final class RelationshipChanges: @unchecked Sendable {
     let world = World()
     let source = world.createEntity()
     let dead = world.createEntity()
-    dead.destroy()
+    world.destroy(dead)
     let foreign = World().createEntity()
     #expect(throws: RelationshipError.differentWorlds) { try source.setParent(foreign) }
     #expect(throws: RelationshipError.missingEntity(dead.id)) { try source.setParent(dead) }
@@ -148,7 +148,7 @@ private final class RelationshipChanges: @unchecked Sendable {
     }
     try source.setParent(target)
     let changes = RelationshipChanges { _ = source.parent }
-    target.destroy()
+    world.destroy(target)
     #expect(changes.count == 1)
     #expect(source.parent == nil)
 }
@@ -168,7 +168,7 @@ private final class RelationshipChanges: @unchecked Sendable {
     #expect(first.targets(of: Selected.self).map(\.id) == [third.id])
     #expect(second.sources(of: Selected.self).isEmpty)
     try first.addRelationship(Likes.self, to: first)
-    first.destroy()
+    world.destroy(first)
     #expect(third.targets(of: Selected.self).isEmpty)
 }
 
@@ -201,7 +201,7 @@ private final class RelationshipChanges: @unchecked Sendable {
     }
     #expect(root.descendants().count == 200)
     #expect(parent.ancestors().count == 200)
-    #expect(root.destroyRecursively() == 201)
+    #expect(world.destroyRecursively(root) == 201)
     #expect(world.entityCount == 0)
 }
 
@@ -213,11 +213,11 @@ private final class RelationshipChanges: @unchecked Sendable {
     try source.setParent(parent)
     try child.setParent(source)
     try source.addRelationship(Likes.self, to: child)
-    let clone = try #require(source.clone())
+    let clone = try #require(world.clone(source))
     #expect(clone.parent?.id == parent.id)
     #expect(clone.children.isEmpty)
     #expect(clone.hasRelationship(Likes.self, to: child))
-    clone.destroy()
+    world.destroy(clone)
     #expect(source.parent?.id == parent.id)
     #expect(child.parent?.id == source.id)
 }

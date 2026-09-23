@@ -134,7 +134,7 @@ import Testing
     #expect(demonShots.count == 3)
     #expect(demonShots.allSatisfy { $0[SurvivalComponents.Shot.self]?.hostile == true })
     #expect(player.sources(of: FiredBy.self).count == 1)
-    demon.destroy()
+    game.world.destroy(demon)
     #expect(demonShots.allSatisfy { $0.exists && $0.targets(of: FiredBy.self).isEmpty })
     #expect(demonShots.allSatisfy { $0[SurvivalComponents.Shot.self]?.hostile == true })
     #expect(game.activePlayerShotCount == 1)

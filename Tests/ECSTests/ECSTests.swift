@@ -54,7 +54,7 @@ import Testing
 
     #expect(world.entityCount == 3)
 
-    let removed = e2.destroy()
+    let removed = world.destroy(e2)
     #expect(removed == true)
     #expect(world.entityCount == 2)
     #expect(e2.exists == false)
@@ -82,7 +82,7 @@ import Testing
         Velocity(dx: 1, dy: 2)
     )
 
-    let cloned = original.clone()
+    let cloned = world.clone(original)
 
     #expect(cloned != nil)
     #expect(cloned?.id != original.id)
@@ -97,7 +97,7 @@ import Testing
     let world = World()
     let original = world.createEntity(Position(x: 10, y: 20))
 
-    let cloned = original.clone()!
+    let cloned = world.clone(original)!
 
     // Modify original
     original.set(Position(x: 100, y: 200))
@@ -111,7 +111,7 @@ import Testing
     let world = World()
     let original = world.createEntity()
 
-    let cloned = original.clone()
+    let cloned = world.clone(original)
 
     #expect(cloned != nil)
     #expect(cloned?.id != original.id)
@@ -121,9 +121,9 @@ import Testing
 @Test func testCloneNonexistentEntity() {
     let world = World()
     let entity = world.createEntity()
-    entity.destroy()
+    world.destroy(entity)
 
-    let cloned = entity.clone()
+    let cloned = world.clone(entity)
 
     #expect(cloned == nil)
 }
@@ -217,7 +217,7 @@ import Testing
 @Test func testSetComponentToNonexistentEntity() {
     let world = World()
     let entity = world.createEntity()
-    entity.destroy()
+    world.destroy(entity)
 
     // Should not crash - entity no longer exists
     entity.set(Position(x: 0, y: 0))
@@ -487,7 +487,7 @@ import Testing
 
     #expect(entity.exists == true)
 
-    entity.destroy()
+    world.destroy(entity)
     #expect(entity.exists == false)
 }
 

@@ -65,9 +65,9 @@ Query iteration keeps its existing archetype snapshot and lifetime restrictions.
 
 ## Deletion and cloning
 
-`entity.destroy()` removes incoming and outgoing links of every relationship type. Direct children survive as roots, and their descendants retain their parents.
+`world.destroy(entity)` removes incoming and outgoing links of every relationship type. Direct children survive as roots, and their descendants retain their parents.
 
-`entity.destroyRecursively()` removes the entity and its ChildOf descendants. `destroyRecursively(following:)` applies the same operation to another relationship type. Both return the number of deleted entities.
+`world.destroyRecursively(entity)` removes the entity and its ChildOf descendants. `world.destroyRecursively(entity, following:)` applies the same operation to another relationship type. Both return the number of deleted entities.
 
 Recursive deletion captures reachable IDs before removal, visits each entity once, and batches storage invalidation. Links from surviving entities to deleted targets are removed too.
 

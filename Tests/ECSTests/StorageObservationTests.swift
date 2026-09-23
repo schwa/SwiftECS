@@ -89,11 +89,13 @@ private struct ObservationTestSystem: System {
     entity.remove(Health.self)
     #expect(tracker.count == 3)
     #expect(world.query(query).isEmpty)
-    let clone = entity.clone()
+    let clone = world.clone(entity)
     #expect(tracker.count == 4)
-    clone?.destroy()
+    if let clone {
+        world.destroy(clone)
+    }
     #expect(tracker.count == 5)
-    entity.destroy()
+    world.destroy(entity)
     #expect(tracker.count == 6)
     let missing = StorageTracker {
         _ = entity.exists
@@ -123,7 +125,7 @@ private struct ObservationTestSystem: System {
             let tracker = StorageTracker(read)
             let entity = world.createEntity(Health(current: 1))
             #expect(tracker.count == 1)
-            entity.destroy()
+            world.destroy(entity)
             #expect(tracker.count == 2)
         }
     }
@@ -157,12 +159,12 @@ private struct ObservationTestSystem: System {
 @Test func `failed mutations and other worlds do not invalidate storage`() {
     let world = World()
     let entity = world.createEntity()
-    entity.destroy()
+    world.destroy(entity)
     let tracker = StorageTracker { _ = world.entityCount }
     entity.set(Health(current: 1))
     entity.remove(Health.self)
-    entity.destroy()
-    _ = entity.clone()
+    world.destroy(entity)
+    _ = world.clone(entity)
     let other = World()
     let live = other.createEntity()
     live.set(Health(current: 1))
@@ -189,7 +191,7 @@ private struct ObservationTestSystem: System {
         }
         let temporary = world.createEntity(Health(current: 1))
         temporary.remove(Health.self)
-        temporary.destroy()
+        world.destroy(temporary)
         #expect(tracker.count == before)
     })
     try world.update(deltaTime: 1)

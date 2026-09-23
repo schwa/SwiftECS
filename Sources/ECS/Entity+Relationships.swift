@@ -86,20 +86,6 @@ extension Entity {
     public func descendants() -> [Entity] {
         descendants(via: ChildOf.self)
     }
-
-    @discardableResult
-    public func destroyRecursively() -> Int {
-        destroyRecursively(following: ChildOf.self)
-    }
-
-    @discardableResult
-    public func destroyRecursively<R: Relationship>(following type: R.Type) -> Int {
-        guard exists else {
-            return 0
-        }
-        let ids = [id] + descendants(via: type).map(\.id)
-        return world.removeEntities(ids.reversed())
-    }
 }
 
 extension World {

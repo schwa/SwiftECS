@@ -100,7 +100,7 @@ private final class TypedQueryChanges: @unchecked Sendable {
     entity.remove(Health.self)
     #expect(Array(world.typedQuery(Position.self, matching: query)).count == 1)
     #expect(Array(world.typedQuery(Position.self, matching: .none)).isEmpty)
-    entity.destroy()
+    world.destroy(entity)
     #expect(Array(world.typedQuery(Position.self)).isEmpty)
 }
 

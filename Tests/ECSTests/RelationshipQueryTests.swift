@@ -32,7 +32,7 @@ private enum Targets: Relationship {}
         row.set(Health(current: 10))
     }
     #expect(second[Health.self]?.current == 10)
-    firstParent.destroy()
+    world.destroy(firstParent)
     #expect(world.query(query).isEmpty)
     #expect(Array(typed).isEmpty)
 }

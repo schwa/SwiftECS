@@ -151,7 +151,9 @@ final class SurvivalSystem: System {
             }
         }
         for id in expired {
-            world[id]?.destroy()
+            if let entity = world[id] {
+                world.destroy(entity)
+            }
         }
     }
 
@@ -164,7 +166,7 @@ final class SurvivalSystem: System {
             if shot.hostile {
                 if overlaps(body, shotBody) {
                     hurt(&hero)
-                    shotEntity.destroy()
+                    world.destroy(shotEntity)
                 }
             } else {
                 hitEnemy(world: world, enemies: enemies, projectile: shotEntity, hero: &hero)
@@ -186,9 +188,9 @@ final class SurvivalSystem: System {
                 continue
             }
             enemy.health -= shot.damage
-            projectile.destroy()
+            world.destroy(projectile)
             if enemy.health <= 0 {
-                entity.destroy()
+                world.destroy(entity)
                 hero.kills += 1
                 world.createEntity(target, SurvivalComponents.Sprite(emoji: "💎"), SurvivalComponents.Gem())
             } else {
@@ -207,7 +209,7 @@ final class SurvivalSystem: System {
             let distance = simd_length(offset)
             if distance < 26 {
                 hero.experience += 1
-                entity.destroy()
+                world.destroy(entity)
             } else if distance < 130 {
                 body.position += offset / distance * min(distance, 300 * deltaTime)
                 entity.set(body)

@@ -132,7 +132,7 @@ public final class World {
 
     /// Clone an entity, creating a new entity with copies of all components.
     @discardableResult
-    public func cloneEntity(_ id: EntityID) -> Entity? {
+    internal func cloneEntity(_ id: EntityID) -> Entity? {
         guard let location = entityLocations[id],
               let sourceArchetype = archetypes[location.signature] else { return nil }
 

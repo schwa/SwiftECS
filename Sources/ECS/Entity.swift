@@ -56,17 +56,6 @@ public struct Entity: Identifiable {
         world.removeComponent(type, from: id)
     }
 
-    /// Remove this entity from the world.
-    @discardableResult
-    public func destroy() -> Bool {
-        world.removeEntity(id)
-    }
-
-    /// Clone this entity, creating a new entity with copies of all components.
-    public func clone() -> Entity? {
-        world.cloneEntity(id)
-    }
-
     /// Get multiple components as a Composite.
     /// Returns nil if any of the requested components are missing.
     public func get<each T: Component>(_ types: repeat (each T).Type) -> Composite<repeat each T>? {

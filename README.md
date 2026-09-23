@@ -55,9 +55,11 @@ if let components = player.get(Position.self, Velocity.self) {
 let removed = player.remove(Health.self) // Health?
 player[Disabled.self] = nil
 
-let copy = player.clone()              // Entity?
-copy?.destroy()
-empty.destroy()
+let copy = world.clone(player)         // Entity?
+if let copy {
+    world.destroy(copy)
+}
+world.destroy(empty)
 ```
 
 ### Build queries
@@ -119,7 +121,7 @@ Do not create or destroy entities, or add or remove component types, during lazy
 ```swift
 let doomed = world.query(with: Disabled.self)
 for entity in doomed {
-    entity.destroy()
+    world.destroy(entity)
 }
 ```
 
@@ -236,12 +238,14 @@ let descendants = parent.descendants()
 try child.setParent(nil)               // Detach
 try child.setParent(parent)            // Reparent
 
-parent.destroy()                      // Children survive as roots
-child.destroyRecursively()            // Delete child and grandchild
-player.destroyRecursively(following: EquippedBy.self)
+world.destroy(parent)                 // Children survive as roots
+world.destroyRecursively(child)       // Delete child and grandchild
+world.destroyRecursively(player, following: EquippedBy.self)
 ```
 
 Deletion removes all incoming and outgoing links. Cloning copies outgoing links with their original targets, but does not clone descendants.
+
+Lifecycle methods reject dead or foreign-world handles without mutation: `destroy` returns `false`, `clone` returns `nil`, and recursive deletion returns `0`.
 
 ### Query relationships
 

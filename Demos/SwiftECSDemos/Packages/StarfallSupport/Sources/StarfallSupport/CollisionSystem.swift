@@ -16,12 +16,12 @@ struct CollisionSystem: System {
                 case .star: state.score += 10
                 case .meteor: state.lives -= 1
                 }
-                entity.destroy()
+                world.destroy(entity)
             } else if position.y > 1.05 {
                 if object.kind == .star {
                     state.lives -= 1
                 }
-                entity.destroy()
+                world.destroy(entity)
             }
         }
         player.set(state)

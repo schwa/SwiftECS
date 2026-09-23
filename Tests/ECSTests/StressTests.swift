@@ -97,7 +97,7 @@ struct StressTests {
 
         let time = measureTime {
             for entity in entities {
-                entity.destroy()
+                world.destroy(entity)
             }
         }
 
@@ -322,7 +322,7 @@ struct StressTests {
         // Remove half
         let removeTime = measureTime {
             for i in stride(from: 0, to: entities.count, by: 2) {
-                entities[i].destroy()
+                world.destroy(entities[i])
             }
         }
 
