@@ -192,6 +192,8 @@ updated: 2026-09-23T18:01:44Z
 
 World.systemCount reports the registered system count but reads ignored system storage without establishing an observation dependency. Debug views reading only systemCount do not automatically refresh when systems are added or removed. Storage observation does not cover system registration. This was a future consideration in PLAN.md, not part of the completed storage-observation contract.
 
+- `2026-09-23T19:55:27Z`: Related idea #17 evaluates ECS-backed scheduling and its observation contract; system-count observation remains a separate current-API concern.
+
 ---
 
 ## 10: Decide whether pause and resume belong in World
@@ -206,6 +208,8 @@ updated: 2026-09-23T18:01:44Z
 +++
 
 Applications currently own pause state and decide whether to call World.update. There is no agreed reason to move this policy into the ECS. Decide whether pause belongs in World or remains application-owned. Record the rationale and, if library support is warranted, define simulationTime, system execution, and direct-write behavior while paused. This is a design task only; implementation requires a separate decision.
+
+- `2026-09-23T19:55:27Z`: Related idea #17 evaluates selectable pipelines. Consider that design when deciding whether pause is world-wide or application-owned.
 
 ---
 
@@ -312,5 +316,84 @@ Completion criteria: repeatable Release measurements below 16.7 ms for the defin
 - `2026-09-23T19:39:22Z`: Current candidate uses cross-module specialization of typed accessors. Typed-only 100-frame samples now measure about 15 ms/update; mixed comparison reaches 16.5–16.7 ms, so no claim of reliable rendering headroom. Latest preserved trace: ~/Desktop/ECS-Profiles/typed-query-inline-experiment.trace, with benchmark log, summary, provenance, and patch. Older 0ab9af6b trace remains as the previous baseline. #13 and #5 remain open.
 - `2026-09-23T19:44:50Z`: Latest candidate specializes iterator advancement across modules. Longer typed-only samples measure about 13.4–13.5 ms/update for 100K entities, leaving roughly 3 ms before 16.7 ms, not a rendering guarantee. Current profile: ~/Desktop/ECS-Profiles/typed-query-iterator-inline.trace. Notes and methodology updated in Performance.md.
 - `2026-09-23T19:50:50Z`: Current candidate reaches about 10 ms/update for the defined typed-query workload after an inlinable column setter. Back-to-back baseline 13.668 ms vs candidate 9.951 ms. This leaves about 6.7 ms of the 16.7 ms budget, but is not an app rendering measurement. Latest preserved profile is typed-query-column-inline.trace under ~/Desktop/ECS-Profiles/. Broader observation/event workloads remain outstanding.
+
+---
+
+## 15: Explore off-main simulation with isolated render snapshots
+
++++
+status: new
+priority: low
+kind: feature
+labels: idea
+created: 2026-09-23T19:53:23Z
++++
+
+Idea: separate simulation ownership from rendering so ECS updates can run off the main actor without concurrent access to mutable World storage. World is currently unsynchronized; components need not be Sendable, query references retain mutable storage, and observer callbacks execute synchronously.
+
+## Proposed direction (agreed for exploration)
+A simulation actor owns World and receives input as commands. After each tick, it produces an immutable Sendable render snapshot containing only the data required by the renderer. A main-actor model publishes the latest snapshot to SwiftUI. Actor isolation does not imply a dedicated thread.
+
+Investigate snapshot extraction/transfer costs, update cadence, stale-frame handling, command ordering, and observer execution context before committing to an API. Define Sendable boundaries without transferring live entities or query references between actors.
+
+Double-buffering whole worlds is an alternative, not a requirement. It must account for structural changes, reference-type components, query-reference lifetimes, and renderer ownership before reusing buffers. Two buffers alone do not establish safe reuse.
+
+This is a design idea, not an implementation commitment. Preserve the existing single-owner World model unless the investigation establishes a reason to change it.
+
+---
+
+## 16: Explore relationships and traversal in queries
+
++++
+status: new
+priority: low
+kind: task
+labels: idea
+created: 2026-09-23T19:55:27Z
++++
+
+RFC 0001 proposes entity relationships and relationship-aware queries, but the library currently supports only component-signature predicates. There is no agreed relationship model or traversal contract.
+
+Determine the smallest useful scope, including whether ChildOf alone is sufficient. Define cardinality, cycle handling, target deletion, traversal order, and the effects of relationship changes on query caches and observation. Preserve native Swift component support, including non-BitwiseCopyable values.
+
+This is a design investigation, not approval to implement a general graph framework. Source: RFCs/0001-borrowing-ideas-from-flecs.md, sections 2 and 4.
+
+- `2026-09-23T19:55:27Z`: Related: #17 evaluates phases and pipelines built on the relationship model. Its design depends on the scope decided here.
+
+---
+
+## 17: Evaluate ECS-backed phases and selectable system pipelines
+
++++
+status: new
+priority: low
+kind: task
+labels: idea
+created: 2026-09-23T19:55:27Z
++++
+
+RFC 0001 proposes phases as entities, dependency relationships, and query-selected pipelines. Current scheduling uses SystemEntry dependencies and a Swift-side topological sort. It does not expose phase entities or independently selectable pipelines.
+
+Compare the proposed model with extending the current scheduler. Define ordering guarantees, subset execution, runtime pipeline changes, cycle/missing-dependency errors, and observation behavior. A query-based representation does not eliminate ordering or invalidation work.
+
+This design depends on the relationship scope explored in #16. Related: #9 concerns observable system counts; #10 concerns ownership of pause/resume policy. Do not replace the scheduler until the trade-offs and intended use cases are agreed. Source: RFCs/0001-borrowing-ideas-from-flecs.md, section 1.
+
+---
+
+## 18: Explore singleton components backed by ordinary entity storage
+
++++
+status: new
+priority: low
+kind: task
+labels: idea
+created: 2026-09-23T19:55:27Z
++++
+
+RFC 0001 proposes world-level singleton components using ordinary entity/component storage rather than a separate global-state store. There is no agreed API or lifecycle contract.
+
+Define singleton identity and uniqueness, creation and removal, query visibility, entity enumeration, and component-event/Swift Observation behavior. Determine whether all singleton components share one entity or use another identity scheme. Compare the value of a library API with application-owned well-known entities.
+
+This is an exploratory design task, not an implementation commitment. Source: RFCs/0001-borrowing-ideas-from-flecs.md, section 3.
 
 ---
