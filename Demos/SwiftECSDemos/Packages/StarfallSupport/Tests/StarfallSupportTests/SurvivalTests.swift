@@ -116,6 +116,40 @@ import Testing
     #expect(game.world.entityCount == 4)
 }
 
+@MainActor @Test func `projectile ownership drives the HUD and detaches when a shooter dies`() throws {
+    let game = SurvivalSession()
+    game.start()
+    let player = try #require(game.world.query(with: SurvivalComponents.Hero.self).first)
+    let demon = game.world.createEntity(
+        SurvivalComponents.Body(position: SIMD2(800, 350), radius: 17),
+        SurvivalComponents.Enemy(health: 3, speed: 0, shoots: true, cooldown: 0)
+    )
+    let now = Date()
+    game.tick(at: now)
+    game.tick(at: now.addingTimeInterval(0.01))
+    #expect(game.activePlayerShotCount == 1)
+    let playerShots = game.world.query(Query(.related(FiredBy.self, to: player.id)))
+    let demonShots = game.world.query(Query(.related(FiredBy.self, to: demon.id)))
+    #expect(playerShots.count == 1)
+    #expect(demonShots.count == 3)
+    #expect(demonShots.allSatisfy { $0[SurvivalComponents.Shot.self]?.hostile == true })
+    #expect(player.sources(of: FiredBy.self).count == 1)
+    demon.destroy()
+    #expect(demonShots.allSatisfy { $0.exists && $0.targets(of: FiredBy.self).isEmpty })
+    #expect(demonShots.allSatisfy { $0[SurvivalComponents.Shot.self]?.hostile == true })
+    #expect(game.activePlayerShotCount == 1)
+    for projectile in playerShots {
+        var shot = try #require(projectile[SurvivalComponents.Shot.self])
+        shot.lifetime = 0
+        projectile.set(shot)
+    }
+    game.tick(at: now.addingTimeInterval(0.02))
+    #expect(game.activePlayerShotCount == 0)
+    #expect(player.sources(of: FiredBy.self).isEmpty)
+    game.start()
+    #expect(game.activePlayerShotCount == 0)
+}
+
 @Test func `surviving ninety seconds ends the run`() {
     let world = World()
     var hero = SurvivalComponents.Hero()

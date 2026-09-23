@@ -8,7 +8,7 @@ public struct SurvivalView: View {
 
     public var body: some View {
         VStack {
-            SurvivalHUDView(hero: game.hero, visibleEntityCount: game.visibleEntityCount, totalEntityCount: game.world.entityCount)
+            SurvivalHUDView(hero: game.hero, visibleEntityCount: game.visibleEntityCount, totalEntityCount: game.world.entityCount, playerShotCount: game.activePlayerShotCount)
             SurvivalArenaView(game: game)
                 .overlay {
                     if game.hero.needsUpgrade, !game.hero.finished {

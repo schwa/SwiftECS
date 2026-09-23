@@ -265,11 +265,13 @@ Evidence: Tests/ECSTests/TypedQueryCostTests.swift and Experiments/TypedQueryPac
 ## 13: Typed component reads and writes remain costly after iterator overhead is excluded
 
 +++
-status: new
+status: closed
 priority: high
 kind: enhancement
 labels: effort:m
 created: 2026-09-23T18:42:11Z
+updated: 2026-09-23T21:17:09Z
+closed: 2026-09-23T21:17:09Z
 +++
 
 A Release isolation benchmark pre-collects typed rows before timing, avoiding TypedQueryIterator.next and row construction during updates. On 100K entities, reads take a median 6.102 ms/update; equivalent reads plus position arithmetic and writes of Transform and Physics take 22.013 ms/update. No component-event or Swift Observation subscribers are registered. Updates retain normal storage batching.
@@ -286,6 +288,7 @@ Evidence: Tests/ECSTests/TypedQueryCostTests.swift and Experiments/TypedQueryPac
 - `2026-09-23T19:39:22Z`: Further investigation: Column setter 24.175 ms, scoped buffer write 22.681 ms, ContiguousArray 22.742 ms; these variants were removed. Retained candidate: @inlinable typed accessors with required @usableFromInline internals, original Array storage. Isolation read/write median 15.069 ms; retained-row writes 11.626 ms. Longer typed-only profile: 14.987 ms unobserved, 15.003 ms observed. Mixed comparison varied up to 16.7 ms. Metadata remains 40.7% inclusive under the typed-only update filter. Debug/Release tests, demo tests/build, and lint pass. Keep open: improvement leaves little frame headroom and residual metadata costs. See Performance.md and ~/Desktop/ECS-Profiles/typed-query-inline-experiment.trace.
 - `2026-09-23T19:44:50Z`: Iterator specialization experiment: @inlinable next() and row initializer reduce iterator-only median from 2.851 to 0.789 ms. Fresh isolation read/write falls from 15.069 to 12.537 ms; retained writes stay similar. Longer typed-only profile: 13.418 ms/update without observer, 13.496 ms with one. Iterator share now 4.0% inclusive; setter 73.3%, generic metadata 40.7% overlap. Candidate retained; Debug/Release and demo tests/build plus lint pass. Latest trace ~/Desktop/ECS-Profiles/typed-query-iterator-inline.trace with patch against beb20431. Remaining setter work stays open.
 - `2026-09-23T19:50:50Z`: Retested Column.setValue as @inlinable after accessor/iterator specialization. This time it helps: isolation fresh write median 10.319 ms vs preceding 12.537 ms. Back-to-back longer runs: direct array baseline 13.668 ms, column setter 9.951 ms (100K entities, three 100-update samples). Observed candidate 9.971 ms. New profile generic metadata share 28.8% inclusive, down from 40.7%; row setter 72.5%, column setter 54.3% overlap. Retained candidate preserves events/observation; all tests, demo build, and lint pass. Latest trace ~/Desktop/ECS-Profiles/typed-query-column-inline.trace with logs and patch against 1ff4b5db.
+- `2026-09-23T21:17:09Z`: Closing after the user accepted the current performance goal. Cross-module accessor/iterator specialization and the inlinable column setter reduced the defined 100K-entity workload to approximately 10 ms/update. Profiles and measurements are retained in Experiments/TypedQueryPacks/Performance.md. Further optimization is not required for the accepted goal; broader workloads remain under #14/#5.
 
 ---
 
@@ -316,6 +319,7 @@ Completion criteria: repeatable Release measurements below 16.7 ms for the defin
 - `2026-09-23T19:39:22Z`: Current candidate uses cross-module specialization of typed accessors. Typed-only 100-frame samples now measure about 15 ms/update; mixed comparison reaches 16.5–16.7 ms, so no claim of reliable rendering headroom. Latest preserved trace: ~/Desktop/ECS-Profiles/typed-query-inline-experiment.trace, with benchmark log, summary, provenance, and patch. Older 0ab9af6b trace remains as the previous baseline. #13 and #5 remain open.
 - `2026-09-23T19:44:50Z`: Latest candidate specializes iterator advancement across modules. Longer typed-only samples measure about 13.4–13.5 ms/update for 100K entities, leaving roughly 3 ms before 16.7 ms, not a rendering guarantee. Current profile: ~/Desktop/ECS-Profiles/typed-query-iterator-inline.trace. Notes and methodology updated in Performance.md.
 - `2026-09-23T19:50:50Z`: Current candidate reaches about 10 ms/update for the defined typed-query workload after an inlinable column setter. Back-to-back baseline 13.668 ms vs candidate 9.951 ms. This leaves about 6.7 ms of the 16.7 ms budget, but is not an app rendering measurement. Latest preserved profile is typed-query-column-inline.trace under ~/Desktop/ECS-Profiles/. Broader observation/event workloads remain outstanding.
+- `2026-09-23T21:17:09Z`: Relationship-heavy scalability is tracked in #19. The accepted component-update goal is met at approximately 10 ms per 100K entities; remaining broader observation work stays in #5 and substep batching in #4.
 
 ---
 
@@ -345,11 +349,13 @@ This is a design idea, not an implementation commitment. Preserve the existing s
 ## 16: Explore relationships and traversal in queries
 
 +++
-status: new
+status: closed
 priority: low
-kind: task
-labels: idea
+kind: feature
+labels: effort:l
 created: 2026-09-23T19:55:27Z
+updated: 2026-09-23T20:50:18Z
+closed: 2026-09-23T20:50:18Z
 +++
 
 RFC 0001 proposes entity relationships and relationship-aware queries, but the library currently supports only component-signature predicates. There is no agreed relationship model or traversal contract.
@@ -359,6 +365,9 @@ Determine the smallest useful scope, including whether ChildOf alone is sufficie
 This is a design investigation, not approval to implement a general graph framework. Source: RFCs/0001-borrowing-ideas-from-flecs.md, sections 2 and 4.
 
 - `2026-09-23T19:55:27Z`: Related: #17 evaluates phases and pipelines built on the relationship model. Its design depends on the scope decided here.
+- `2026-09-23T20:50:18Z`: User approved general relationship pairs rather than ChildOf-only scope. Default parent deletion must detach children; an explicit recursive deletion operation provides rm -rf behavior. Implemented policies and boundaries are recorded in Experiments/Relationships.md.
+- `2026-09-23T20:50:18Z`: Implemented marker-typed relationships, multi-target defaults, independent exclusive/acyclic policies, ChildOf conveniences, cycle-safe breadth-first traversal, detaching deletion, recursive deletion, and outgoing-link cloning. Added relationship and descendant predicates across ordinary/registered/lazy/fast/typed query paths, with live entity filtering and conservative archetype matching under negation. Relationship reads/writes participate in batched storage observation. 163 core tests pass in Debug and Release, 14 demo tests and macOS build pass, strict lint passes. Component-only benchmark remains about 10.7 ms/100K entities. No payloads, inherited component lookup, or scheduler migration in this scope.
+- `2026-09-23T21:17:09Z`: Follow-up #19 tracks performance of deep/broad hierarchies, graph queries, reparenting, and deletion. Midnight Survivors now exercises FiredBy ownership links and a relationship-query HUD count; demo regression tests cover shooter deletion and projectile expiry.
 
 ---
 
@@ -378,6 +387,8 @@ Compare the proposed model with extending the current scheduler. Define ordering
 
 This design depends on the relationship scope explored in #16. Related: #9 concerns observable system counts; #10 concerns ownership of pause/resume policy. Do not replace the scheduler until the trade-offs and intended use cases are agreed. Source: RFCs/0001-borrowing-ideas-from-flecs.md, section 1.
 
+- `2026-09-23T20:50:18Z`: Relationship foundation from #16 is implemented: generic relation markers support independently exclusive/acyclic policies, direct and descendant predicates, and traversal. General graph traversal is breadth-first first-discovery order, not topological scheduling; pipeline ordering still needs its own design.
+
 ---
 
 ## 18: Explore singleton components backed by ordinary entity storage
@@ -395,5 +406,23 @@ RFC 0001 proposes world-level singleton components using ordinary entity/compone
 Define singleton identity and uniqueness, creation and removal, query visibility, entity enumeration, and component-event/Swift Observation behavior. Determine whether all singleton components share one entity or use another identity scheme. Compare the value of a library API with application-owned well-known entities.
 
 This is an exploratory design task, not an implementation commitment. Source: RFCs/0001-borrowing-ideas-from-flecs.md, section 3.
+
+---
+
+## 19: Relationship-heavy workloads lack performance measurements
+
++++
+status: new
+priority: medium
+kind: task
+labels: effort:m
+created: 2026-09-23T21:17:09Z
++++
+
+The relationship implementation has correctness coverage but no dedicated scale measurements. Descendant predicates traverse links separately for each candidate entity. Acyclic relationship insertion searches the graph before each new link, so deep hierarchy construction can become expensive.
+
+Measure deep trees, broad trees, multi-parent graphs, frequent reparenting, direct and transitive queries, and recursive deletion. Include registered and unregistered queries, live membership changes, and observation. Use opt-in serial Release benchmarks with setup separated from the measured operation where appropriate, and verify results outside timing.
+
+Record scaling and profiles before deciding whether transitive caching or other changes are warranted. Preserve cycle rejection, cache correctness, traversal order, and deletion semantics. Related: #16 introduced relationships; #14 tracks overall performance. Existing component-only benchmarks do not establish relationship performance.
 
 ---

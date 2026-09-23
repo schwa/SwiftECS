@@ -28,6 +28,10 @@ Lazy query sequences retain their selected archetypes. Query references are not 
 
 Structural changes during iteration are unsupported. This includes entity creation, deletion, and component additions or removals from event handlers.
 
+Typed relationships use separate forward/reverse indexes. `ChildOf` enforces one parent and rejects cycles. Ordinary deletion detaches children; explicit recursive deletion removes a subtree.
+
+Relationship queries filter live links after archetype matching. Decisions and examples are in `Experiments/Relationships.md`.
+
 Systems declare dependencies for execution order. `World.update()` advances `simulationTime` before it runs systems.
 
 ## Observation

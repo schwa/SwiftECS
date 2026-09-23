@@ -1,10 +1,11 @@
 public struct TypedQuerySequence<each Value: Component>: Sequence {
     internal let world: World
     internal let storage: [TypedQueryStorage<repeat each Value>]
+    internal let filter: Query?
 
     public func makeIterator() -> TypedQueryIterator<repeat each Value> {
         world.trackStorageAccess()
-        return TypedQueryIterator(world: world, storage: storage)
+        return TypedQueryIterator(world: world, storage: storage, filter: filter)
     }
 }
 
@@ -39,7 +40,7 @@ extension World {
             requiredTypes.isSubset(of: $0.signature.types)
         }
         let storage = archetypes.map { TypedQueryStorage<repeat each Value>(archetype: $0) }
-        return TypedQuerySequence(world: self, storage: storage)
+        return TypedQuerySequence(world: self, storage: storage, filter: query.entityFilter)
     }
     // swiftlint:enable unused_parameter
 }

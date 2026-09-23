@@ -21,7 +21,7 @@ final class SurvivalSystem: System {
         moveHero(body: &body, speed: hero.speed, deltaTime: deltaTime)
         spawn(world: world, elapsed: hero.elapsed, deltaTime: deltaTime)
         moveEnemies(world: world, target: body.position, deltaTime: deltaTime)
-        fire(world: world, body: body, hero: hero, deltaTime: deltaTime)
+        fire(world: world, shooter: player, body: body, hero: hero, deltaTime: deltaTime)
         moveShots(world: world, deltaTime: deltaTime)
         resolveCombat(world: world, hero: &hero, body: body)
         collectGems(world: world, hero: &hero, position: body.position, deltaTime: deltaTime)
@@ -73,7 +73,7 @@ final class SurvivalSystem: System {
     }
 
     private func moveEnemies(world: World, target: SIMD2<Double>, deltaTime: Double) {
-        var launches: [(SIMD2<Double>, SIMD2<Double>)] = []
+        var launches: [(EntityID, SIMD2<Double>)] = []
         for row in world.typedQuery(SurvivalComponents.Body.self, SurvivalComponents.Enemy.self) {
             var (body, enemy) = row.values
             let offset = target - body.position
@@ -86,17 +86,20 @@ final class SurvivalSystem: System {
                 enemy.cooldown = 2.2
                 let aim = atan2(offset.y, offset.x)
                 for spread in [-0.22, 0, 0.22] {
-                    launches.append((body.position, SIMD2(cos(aim + spread), sin(aim + spread)) * 150))
+                    launches.append((row.entityID, SIMD2(cos(aim + spread), sin(aim + spread)) * 150))
                 }
             }
             row.set(body, enemy)
         }
-        for (position, velocity) in launches {
-            createShot(world: world, position: position, velocity: velocity, damage: 1, hostile: true)
+        for (shooterID, velocity) in launches {
+            guard let shooter = world[shooterID], let body = shooter[SurvivalComponents.Body.self] else {
+                continue
+            }
+            createShot(world: world, origin: (shooter, body.position), velocity: velocity, damage: 1, hostile: true)
         }
     }
 
-    private func fire(world: World, body: SurvivalComponents.Body, hero: SurvivalComponents.Hero, deltaTime: Double) {
+    private func fire(world: World, shooter: Entity, body: SurvivalComponents.Body, hero: SurvivalComponents.Hero, deltaTime: Double) {
         fireCooldown -= deltaTime
         guard fireCooldown <= 0 else {
             return
@@ -119,16 +122,21 @@ final class SurvivalSystem: System {
         let count = min(5, 1 + (hero.level - 1) / 2)
         for index in 0..<count {
             let spread = (Double(index) - Double(count - 1) / 2) * 0.14
-            createShot(world: world, position: body.position, velocity: SIMD2(cos(angle + spread), sin(angle + spread)) * 420, damage: hero.damage, hostile: false)
+            createShot(world: world, origin: (shooter, body.position), velocity: SIMD2(cos(angle + spread), sin(angle + spread)) * 420, damage: hero.damage, hostile: false)
         }
     }
 
-    private func createShot(world: World, position: SIMD2<Double>, velocity: SIMD2<Double>, damage: Int, hostile: Bool) {
-        world.createEntity(
-            SurvivalComponents.Body(position: position, radius: hostile ? 9 : 7),
+    private func createShot(world: World, origin: (shooter: Entity, position: SIMD2<Double>), velocity: SIMD2<Double>, damage: Int, hostile: Bool) {
+        let projectile = world.createEntity(
+            SurvivalComponents.Body(position: origin.position, radius: hostile ? 9 : 7),
             SurvivalComponents.Sprite(emoji: hostile ? "🔥" : "✨"),
             SurvivalComponents.Shot(velocity: velocity, damage: damage, hostile: hostile, lifetime: 3)
         )
+        do {
+            try projectile.addRelationship(FiredBy.self, to: origin.shooter)
+        } catch {
+            preconditionFailure("A new projectile must have a live shooter in the same world: \(error)")
+        }
     }
 
     private func moveShots(world: World, deltaTime: Double) {

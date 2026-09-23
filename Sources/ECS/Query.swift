@@ -3,6 +3,9 @@ public indirect enum QueryPredicate: Hashable, Sendable {
     /// Match entities that contain a specific component type.
     case contains(ComponentType)
 
+    case relationship(RelationshipType, EntityID?)
+    case descendant(RelationshipType, EntityID)
+
     /// Match entities that do NOT match the inner predicate.
     case not(QueryPredicate)
 
@@ -146,20 +149,50 @@ extension Query {
 extension QueryPredicate {
     /// Test if a signature matches this predicate.
     func matches(_ signature: ArchetypeSignature) -> Bool {
+        signatureMatch(signature) != .no
+    }
+
+    private enum SignatureMatch {
+        case yes, no, requiresEntity
+
+        var inverted: SignatureMatch {
+            switch self {
+            case .yes: .no
+            case .no: .yes
+            case .requiresEntity: .requiresEntity
+            }
+        }
+    }
+
+    private func signatureMatch(_ signature: ArchetypeSignature) -> SignatureMatch {
         switch self {
         case .all:
-            return true
+            return .yes
         case .none:
-            return false
+            return .no
         case let .contains(componentType):
-            return signature.contains(componentType)
+            return signature.contains(componentType) ? .yes : .no
+        case .relationship, .descendant:
+            return .requiresEntity
         case let .not(inner):
-            return !inner.matches(signature)
+            return inner.signatureMatch(signature).inverted
         case let .and(predicates):
-            return predicates.allSatisfy { $0.matches(signature) }
+            return combinedMatch(predicates, signature: signature, shortCircuit: .no)
         case let .or(predicates):
-            return predicates.contains { $0.matches(signature) }
+            return combinedMatch(predicates, signature: signature, shortCircuit: .yes)
         }
+    }
+
+    private func combinedMatch(_ predicates: [QueryPredicate], signature: ArchetypeSignature, shortCircuit: SignatureMatch) -> SignatureMatch {
+        var requiresEntity = false
+        for predicate in predicates {
+            let result = predicate.signatureMatch(signature)
+            if result == shortCircuit {
+                return shortCircuit
+            }
+            requiresEntity = requiresEntity || result == .requiresEntity
+        }
+        return requiresEntity ? .requiresEntity : shortCircuit.inverted
     }
 }
 
@@ -177,8 +210,9 @@ extension World {
     public func query(_ query: Query) -> [Entity] {
         trackStorageAccess()
         var result: [Entity] = []
+        let filter = query.entityFilter
         for archetype in archetypes.values where query.matches(archetype.signature) {
-            for entityID in archetype.entities {
+            for entityID in archetype.entities where filter?.matchesEntity(entityID, in: self) != false {
                 result.append(Entity(id: entityID, world: self))
             }
         }
@@ -203,10 +237,11 @@ final class RegisteredQueryCache {
 public struct QuerySequence: Sequence {
     let world: World
     let archetypes: [Archetype]
+    let filter: Query?
 
     public func makeIterator() -> QueryIterator {
         world.trackStorageAccess()
-        return QueryIterator(world: world, archetypes: archetypes)
+        return QueryIterator(world: world, archetypes: archetypes, filter: filter)
     }
 }
 
@@ -214,6 +249,7 @@ public struct QuerySequence: Sequence {
 public struct QueryIterator: IteratorProtocol {
     let world: World
     let archetypes: [Archetype]
+    let filter: Query?
     var archetypeIndex: Int = 0
     var entityIndex: Int = 0
 
@@ -224,6 +260,9 @@ public struct QueryIterator: IteratorProtocol {
             if entityIndex < archetype.entities.count {
                 let entity = Entity(id: archetype.entities[entityIndex], world: world)
                 entityIndex += 1
+                if filter?.matchesEntity(entity.id, in: world) == false {
+                    continue
+                }
                 return entity
             }
             archetypeIndex += 1
@@ -275,14 +314,16 @@ public struct FastQueryIterator: IteratorProtocol {
     let world: World
     let archetypes: [Archetype]
     let componentTypes: [ComponentType]
+    let filter: Query?
     var archetypeIndex: Int = 0
     var entityIndex: Int = 0
     var currentColumns: [ComponentType: AnyColumn]?
 
-    init(world: World, archetypes: [Archetype], componentTypes: [ComponentType]) {
+    init(world: World, archetypes: [Archetype], componentTypes: [ComponentType], filter: Query?) {
         self.world = world
         self.archetypes = archetypes
         self.componentTypes = componentTypes
+        self.filter = filter
         advanceToNextValidArchetype()
     }
 
@@ -313,6 +354,10 @@ public struct FastQueryIterator: IteratorProtocol {
             let archetype = archetypes[archetypeIndex]
 
             if entityIndex < archetype.entities.count, let cols = currentColumns {
+                if filter?.matchesEntity(archetype.entities[entityIndex], in: world) == false {
+                    entityIndex += 1
+                    continue
+                }
                 let ref = EntityRef(
                     entityID: archetype.entities[entityIndex],
                     columns: cols,
@@ -336,10 +381,11 @@ public struct FastQuerySequence: Sequence {
     let world: World
     let archetypes: [Archetype]
     let componentTypes: [ComponentType]
+    let filter: Query?
 
     public func makeIterator() -> FastQueryIterator {
         world.trackStorageAccess()
-        return FastQueryIterator(world: world, archetypes: archetypes, componentTypes: componentTypes)
+        return FastQueryIterator(world: world, archetypes: archetypes, componentTypes: componentTypes, filter: filter)
     }
 }
 
@@ -365,7 +411,7 @@ extension World {
     /// Returns a lazy sequence of entities matching the query.
     /// If the query is registered, uses cached archetype matching for better performance.
     public func entities(_ query: Query) -> QuerySequence {
-        QuerySequence(world: self, archetypes: matchingArchetypes(for: query))
+        QuerySequence(world: self, archetypes: matchingArchetypes(for: query), filter: query.entityFilter)
     }
 
     // Pack expansions use types; SwiftLint does not recognize the reference.
@@ -378,7 +424,7 @@ extension World {
     ) -> FastQuerySequence {
         var componentTypes: [ComponentType] = []
         repeat componentTypes.append(ComponentType((each T).self))
-        return FastQuerySequence(world: self, archetypes: matchingArchetypes(for: query), componentTypes: componentTypes)
+        return FastQuerySequence(world: self, archetypes: matchingArchetypes(for: query), componentTypes: componentTypes, filter: query.entityFilter)
     }
 
     // swiftlint:enable unused_parameter

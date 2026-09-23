@@ -2,6 +2,8 @@
 
 Status: Draft
 
+Implementation status: general typed relationships, `ChildOf`, direct relationship predicates, and descendant queries are implemented. Traversal and deletion rules are in [Relationship decisions](../Experiments/Relationships.md). Phases, pipelines, singleton APIs, and inherited component lookup remain proposals.
+
 ## Context
 
 [flecs](https://www.flecs.dev/) ([GitHub](https://github.com/SanderMertens/flecs))

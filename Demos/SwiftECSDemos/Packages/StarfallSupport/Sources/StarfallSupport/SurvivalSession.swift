@@ -22,6 +22,14 @@ final class SurvivalSession {
         player?[SurvivalComponents.Hero.self] ?? SurvivalComponents.Hero()
     }
 
+    var activePlayerShotCount: Int {
+        guard let player else {
+            return 0
+        }
+        let query = Query(.related(FiredBy.self, to: player.id)).with(SurvivalComponents.Shot.self)
+        return world.query(query).count
+    }
+
     var visibleEntityCount: Int {
         world.typedQuery(SurvivalComponents.Body.self, SurvivalComponents.Sprite.self).reduce(into: 0) { count, row in
             let body = row.values.0

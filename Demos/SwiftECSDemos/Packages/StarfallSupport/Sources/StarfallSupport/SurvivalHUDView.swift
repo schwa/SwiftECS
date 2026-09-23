@@ -4,6 +4,7 @@ struct SurvivalHUDView: View {
     let hero: SurvivalComponents.Hero
     let visibleEntityCount: Int
     let totalEntityCount: Int
+    let playerShotCount: Int
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -22,6 +23,9 @@ struct SurvivalHUDView: View {
                 Text("Entities: \(visibleEntityCount)/\(totalEntityCount)")
                     .font(.caption)
                     .accessibilityLabel("\(visibleEntityCount) entities in arena, \(totalEntityCount) total")
+                Text("✨ \(playerShotCount)")
+                    .font(.caption)
+                    .accessibilityLabel("\(playerShotCount) active player shots")
                 ProgressView(value: Double(hero.experience), total: Double(hero.experienceNeeded))
                     .tint(.mint)
                     .accessibilityLabel("Experience")
@@ -33,5 +37,5 @@ struct SurvivalHUDView: View {
 }
 
 #Preview {
-    SurvivalHUDView(hero: SurvivalComponents.Hero(), visibleEntityCount: 42, totalEntityCount: 50).padding()
+    SurvivalHUDView(hero: SurvivalComponents.Hero(), visibleEntityCount: 42, totalEntityCount: 50, playerShotCount: 5).padding()
 }
