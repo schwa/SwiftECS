@@ -1,0 +1,241 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		451594952F64AAE8005F944D /* StarfallSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 451594942F64AAE8005F944D /* StarfallSupport */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		451594472F64A8DC005F944D /* Starfall.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Starfall.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4515947D2F64AAA7005F944D /* Exceptions for "Packages" folder in "Starfall" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				StarfallSupport,
+			);
+			target = 451594462F64A8DC005F944D /* Starfall */;
+		};
+		451594922F64AAB2005F944D /* Exceptions for "Configuration" folder in "Starfall" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Project-Debug.xcconfig",
+				"Project-Release.xcconfig",
+				"Project-Shared.xcconfig",
+				"Starfall-Debug.xcconfig",
+				"Starfall-Release.xcconfig",
+				"Starfall-Shared.xcconfig",
+			);
+			target = 451594462F64A8DC005F944D /* Starfall */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		451594492F64A8DC005F944D /* Starfall */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Starfall;
+			sourceTree = "<group>";
+		};
+		451594742F64AA9A005F944D /* Configuration */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				451594922F64AAB2005F944D /* Exceptions for "Configuration" folder in "Starfall" target */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		4515947C2F64AAA6005F944D /* Packages */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4515947D2F64AAA7005F944D /* Exceptions for "Packages" folder in "Starfall" target */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		451594442F64A8DC005F944D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				451594952F64AAE8005F944D /* StarfallSupport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		4515943E2F64A8DC005F944D = {
+			isa = PBXGroup;
+			children = (
+				451594742F64AA9A005F944D /* Configuration */,
+				4515947C2F64AAA6005F944D /* Packages */,
+				451594492F64A8DC005F944D /* Starfall */,
+				451594482F64A8DC005F944D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		451594482F64A8DC005F944D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				451594472F64A8DC005F944D /* Starfall.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		451594462F64A8DC005F944D /* Starfall */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 451594522F64A8DD005F944D /* Build configuration list for PBXNativeTarget "Starfall" */;
+			buildPhases = (
+				451594432F64A8DC005F944D /* Sources */,
+				451594442F64A8DC005F944D /* Frameworks */,
+				451594452F64A8DC005F944D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				451594492F64A8DC005F944D /* Starfall */,
+				451594742F64AA9A005F944D /* Configuration */,
+				4515947C2F64AAA6005F944D /* Packages */,
+			);
+			name = Starfall;
+			packageProductDependencies = (
+				451594942F64AAE8005F944D /* StarfallSupport */,
+			);
+			productName = Starfall;
+			productReference = 451594472F64A8DC005F944D /* Starfall.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		4515943F2F64A8DC005F944D /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2640;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					451594462F64A8DC005F944D = {
+						CreatedOnToolsVersion = 26.4;
+					};
+				};
+			};
+			buildConfigurationList = 451594422F64A8DC005F944D /* Build configuration list for PBXProject "Starfall" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 4515943E2F64A8DC005F944D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 451594482F64A8DC005F944D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				451594462F64A8DC005F944D /* Starfall */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		451594452F64A8DC005F944D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		451594432F64A8DC005F944D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		451594502F64A8DD005F944D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 451594742F64AA9A005F944D /* Configuration */;
+			baseConfigurationReferenceRelativePath = "Project-Debug.xcconfig";
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		451594512F64A8DD005F944D /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 451594742F64AA9A005F944D /* Configuration */;
+			baseConfigurationReferenceRelativePath = "Project-Release.xcconfig";
+			buildSettings = {
+			};
+			name = Release;
+		};
+		451594532F64A8DD005F944D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 451594742F64AA9A005F944D /* Configuration */;
+			baseConfigurationReferenceRelativePath = "Starfall-Debug.xcconfig";
+			buildSettings = {
+				DEVELOPMENT_TEAM = 6E23EP94PG;
+			};
+			name = Debug;
+		};
+		451594542F64A8DD005F944D /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 451594742F64AA9A005F944D /* Configuration */;
+			baseConfigurationReferenceRelativePath = "Starfall-Release.xcconfig";
+			buildSettings = {
+				DEVELOPMENT_TEAM = 6E23EP94PG;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		451594422F64A8DC005F944D /* Build configuration list for PBXProject "Starfall" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				451594502F64A8DD005F944D /* Debug */,
+				451594512F64A8DD005F944D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		451594522F64A8DD005F944D /* Build configuration list for PBXNativeTarget "Starfall" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				451594532F64A8DD005F944D /* Debug */,
+				451594542F64A8DD005F944D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		451594942F64AAE8005F944D /* StarfallSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = StarfallSupport;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 4515943F2F64A8DC005F944D /* Project object */;
+}
