@@ -16,9 +16,17 @@ Entities with the same component types share an archetype. Each component type h
 
 Component additions and removals move entities between archetypes. Creation with all initial components avoids intermediate archetypes. Empty archetypes remain allocated.
 
-Registered queries cache matching archetypes. New archetypes invalidate the cache. Fast query references still use a dictionary lookup and cast for each component access.
+Registered queries cache matching archetypes. New archetypes invalidate the cache. The older `EntityRef` still uses a dictionary lookup and cast for each component access.
 
-Lazy query sequences retain their selected archetypes. Query references are not safe across structural changes.
+`typedQuery` binds typed columns once per matching archetype. Rows expose a read-only `values` tuple and a variadic `set` method. Component types must be distinct.
+
+The optional `matching` predicate restricts results further and supports registered queries. An empty component pack selects entities without component requirements.
+
+`set` writes every supplied component and emits an event for each, including unchanged values. It emits one storage invalidation outside updates. Performance remains unmeasured.
+
+Lazy query sequences retain their selected archetypes. Query references are not safe across structural changes. The typed API has the same restriction.
+
+Structural changes during iteration are unsupported. This includes entity creation, deletion, and component additions or removals from event handlers.
 
 Systems declare dependencies for execution order. `World.update()` advances `simulationTime` before it runs systems.
 

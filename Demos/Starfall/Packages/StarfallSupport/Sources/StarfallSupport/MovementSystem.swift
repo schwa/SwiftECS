@@ -2,12 +2,10 @@ import ECS
 
 struct MovementSystem: System {
     func update(world: World, deltaTime: Double) {
-        for entity in world.query(with: Position.self, Velocity.self) {
-            guard var position = entity[Position.self], let velocity = entity[Velocity.self] else {
-                continue
-            }
+        for row in world.typedQuery(Position.self, Velocity.self) {
+            var (position, velocity) = row.values
             position.y += velocity.y * deltaTime
-            entity.set(position)
+            row.set(position, velocity)
         }
     }
 }
