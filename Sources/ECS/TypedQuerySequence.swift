@@ -8,7 +8,7 @@ public struct TypedQuerySequence<each Value: Component>: Sequence {
     }
 }
 
-internal struct TypedQueryStorage<each Value: Component> {
+internal final class TypedQueryStorage<each Value: Component> {
     let archetype: Archetype
     let columns: (repeat Column<each Value>)
 

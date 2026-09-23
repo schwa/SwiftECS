@@ -115,6 +115,28 @@ Run the isolation test from the repository root:
 env ECS_RUN_BENCHMARKS=1 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter TypedQueryCostTests
 ```
 
+## After issue #12
+
+Typed rows now hold one shared typed-storage reference instead of their own column tuple. Iterator advancement passes that reference without a pack expansion. The public API is unchanged.
+
+The same isolation test produced these medians:
+
+| Phase | Before | After |
+|---|---:|---:|
+| Iterator plus identity checksum | 31.715 ms | 2.868 ms |
+| Fresh reads | 38.321 ms | 9.198 ms |
+| Fresh reads and writes | 56.309 ms | 24.726 ms |
+| Retained reads | 6.102 ms | 6.193 ms |
+| Retained reads and writes | 22.013 ms | 21.891 ms |
+
+Iterator-only time fell about 91%. The retained-row costs stayed similar. This supports the iterator diagnosis rather than a transfer of cost into reads or writes.
+
+The full comparison under Time Profiler measured 25.250 ms/update without a storage observer and 25.502 ms with one. Entity handles measured 255.067 ms and fast references measured 138.202 ms without observers.
+
+Trace: `/tmp/ecs-issue-12-profile.trace`. With the same stack filter, selected sample weight is 1.621 seconds. Iterator advancement now accounts for 9.7% inclusive, down from 59.9%.
+
+The setter accounts for 67.3% inclusive, including array modification and generic metadata work. These overlapping costs remain under #13. This workload still exceeds the 16.7 ms budget.
+
 ## Reproduce
 
 Run from the repository root:

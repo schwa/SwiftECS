@@ -2,18 +2,18 @@ public struct TypedEntityRef<each Value: Component> {
     public let entityID: EntityID
     private let world: World
     private let index: Int
-    private let columns: (repeat Column<each Value>)
+    private let storage: TypedQueryStorage<repeat each Value>
 
-    internal init(world: World, entityID: EntityID, index: Int, columns: repeat Column<each Value>) {
+    internal init(world: World, entityID: EntityID, index: Int, storage: TypedQueryStorage<repeat each Value>) {
         self.world = world
         self.entityID = entityID
         self.index = index
-        self.columns = (repeat each columns)
+        self.storage = storage
     }
 
     public var values: (repeat each Value) {
         world.trackStorageAccess()
-        return (repeat read(each columns))
+        return (repeat read(each storage.columns))
     }
 
     public func set(_ values: repeat each Value) {
@@ -23,7 +23,7 @@ public struct TypedEntityRef<each Value: Component> {
                 world.storageDidChange()
             }
         }
-        for (column, value) in repeat (each columns, each values) {
+        for (column, value) in repeat (each storage.columns, each values) {
             column.data[index] = value
             changed = true
         }

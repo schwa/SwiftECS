@@ -234,11 +234,13 @@ Reproduce with the opt-in Release comparison in Tests/ECSTests/QueryPerformanceT
 ## 12: Typed iterator advancement spends about 32 ms per 100K rows before component work
 
 +++
-status: new
+status: closed
 priority: high
 kind: enhancement
 labels: effort:m
 created: 2026-09-23T18:42:11Z
+updated: 2026-09-23T18:47:11Z
+closed: 2026-09-23T18:47:11Z
 +++
 
 After #11, the typed-query benchmark still takes about 54 ms/update. Release Time Profiler attributes 59.9% of selected typed-query CPU samples to TypedQueryIterator.next, including per-row generic metadata instantiation, TypedEntityRef construction, and value-witness copy/destruction work. Inclusive percentages overlap.
@@ -250,6 +252,7 @@ The public typed iterator incurs substantial overhead before useful component wo
 Evidence: Tests/ECSTests/TypedQueryCostTests.swift and Experiments/TypedQueryPacks/Performance.md. Local trace: /tmp/ecs-issue-11-profile.trace. Historical lookup optimization #6 is complete; this concerns the newly measured typed-iterator cost.
 
 - `2026-09-23T18:42:11Z`: Related to #13, which isolates remaining component reads/writes after excluding typed iteration. These are separate costs; improvements to one do not establish the cost of the other.
+- `2026-09-23T18:47:11Z`: TypedQueryStorage is now shared reference storage. Each row retains that storage plus its index instead of expanding/copying column packs during next(). Public API unchanged. Iterator-only median fell from 31.715 to 2.868 ms/100K rows; full isolation workload from 56.309 to 24.726 ms. Follow-up profile reduces iterator share from 59.9% to 9.7% inclusive. Retained read/write costs remain similar. Core/demo tests, macOS build, and strict lint pass. Added iterator-copy/index regression coverage. Measurements recorded in Experiments/TypedQueryPacks/Performance.md.
 
 ---
 
@@ -270,5 +273,7 @@ The retained-row read/write workload alone exceeds 16.7 ms, even before renderin
 Identify the remaining read/write costs while preserving component-event delivery, storage invalidation, and correctness. The retained-row workload is only an isolation experiment without structural changes.
 
 Evidence: Tests/ECSTests/TypedQueryCostTests.swift and Experiments/TypedQueryPacks/Performance.md. Related: #12 isolates iterator advancement; #5 covers broader observation measurements. Measurements use three rotated Release samples, warm-up, and setup/result checks outside the timer.
+
+- `2026-09-23T18:47:11Z`: After #12 removes most iterator overhead, fresh read/write median is 24.726 ms and retained read/write is 21.891 ms. New profile: TypedEntityRef.set is 67.3% inclusive, Array.subscript.modify 44.9%, generic metadata lookup 53.7% (overlapping). Trace /tmp/ecs-issue-12-profile.trace. This further isolates the remaining setter/read costs; no evidence yet of whole-array copying.
 
 ---

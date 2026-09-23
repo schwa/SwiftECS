@@ -42,6 +42,31 @@ private final class TypedQueryChanges: @unchecked Sendable {
     #expect(Array(world.typedQuery(Position.self, Velocity.self)).count == 2)
 }
 
+@Test func `copied typed iterators and rows keep independent indices`() throws {
+    let world = World()
+    let first = world.createEntity(Position(x: 1, y: 0))
+    let second = world.createEntity(Position(x: 2, y: 0))
+    var iterator = world.typedQuery(Position.self).makeIterator()
+    let firstResult = iterator.next()
+    let firstRow = try #require(firstResult)
+    var copy = iterator
+    let secondResult = iterator.next()
+    let copiedSecondResult = copy.next()
+    let secondRow = try #require(secondResult)
+    let copiedSecondRow = try #require(copiedSecondResult)
+    #expect(firstRow.entityID == first.id)
+    #expect(secondRow.entityID == second.id)
+    #expect(copiedSecondRow.entityID == second.id)
+    firstRow.set(Position(x: 10, y: 0))
+    copiedSecondRow.set(Position(x: 20, y: 0))
+    #expect(firstRow.values.x == 10)
+    #expect(secondRow.values.x == 20)
+    let end = iterator.next()
+    let copiedEnd = copy.next()
+    #expect(end == nil)
+    #expect(copiedEnd == nil)
+}
+
 @Test func `typed queries support zero one three and four component packs`() throws {
     let world = World()
     let entity = world.createEntity(Position(x: 1, y: 2), Velocity(dx: 3, dy: 4), Health(current: 5), Transform(x: 6, y: 7, z: 8))

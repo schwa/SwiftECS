@@ -15,7 +15,7 @@ public struct TypedQueryIterator<each Value: Component>: IteratorProtocol {
             let batch = storage[archetypeIndex]
             if entityIndex < batch.archetype.entities.count {
                 let entityID = batch.archetype.entities[entityIndex]
-                let reference = TypedEntityRef(world: world, entityID: entityID, index: entityIndex, columns: repeat each batch.columns)
+                let reference = TypedEntityRef(world: world, entityID: entityID, index: entityIndex, storage: batch)
                 entityIndex += 1
                 return reference
             }
