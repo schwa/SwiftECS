@@ -522,10 +522,13 @@ Related: #4 concerns batching across substeps and #5 measures observation overhe
 ## 25: Query evaluation and cache responsibilities are spread across multiple paths
 
 +++
-status: new
+status: closed
 priority: medium
-kind: task
+kind: enhancement
+labels: effort:m
 created: 2026-09-24T01:30:21Z
+updated: 2026-09-24T02:12:39Z
+closed: 2026-09-24T02:12:39Z
 +++
 
 Query.swift, Query+Relationships.swift, typed sequences/iterators, and World cache invalidation jointly implement one query contract. Predicates have separate archetype matching, entity-filter classification, and entity-level evaluation. Snapshot and lazy paths coordinate these pieces independently.
@@ -535,6 +538,9 @@ Adding predicate kinds or changing caching requires updates across these paths. 
 Behavioral coverage must verify boolean combinations, relationship changes, new archetypes, and snapshot/lazy semantics through public query APIs. Compiler feasibility probes serve a different purpose from query behavior tests. No replacement interface has been selected.
 
 Related: #19 measures relationship-query scaling. This issue concerns query ownership and integration risk, not a new caching policy.
+
+- `2026-09-24T02:12:39Z`: Selected and implemented a World-owned QueryEngine. RFC-query-engine.md records the interface, cache ownership, semantics, and test strategy. Public APIs unchanged.
+- `2026-09-24T02:12:39Z`: Centralized registered-query cache state, candidate selection, required-component filtering, snapshots, and predicate evaluation in QueryEngine. One tri-state evaluator handles archetype and live-entity evaluation, removing separate relationship classification/evaluation switches. Cache generations are internal; World signals new archetypes. Replaced the smaller negation matrix with a public-boundary matrix across query paths, graph edits, archetype changes, registration cycles, and required components. Added captured-archetype and world-isolation/observation checks. 177 core tests pass in Debug/Release, 15 demo tests and macOS build pass, strict lint passes. Release medians: baseline 9.835/9.850 ms unobserved/observed, engine 9.974/10.048 ms. Relationship-query scaling remains #19.
 
 ---
 

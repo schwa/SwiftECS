@@ -1,7 +1,7 @@
 public struct TypedQuerySequence<each Value: Component>: Sequence {
     internal let world: World
     internal let storage: [TypedQueryStorage<repeat each Value>]
-    internal let filter: Query?
+    internal let filter: QueryPredicate?
 
     public func makeIterator() -> TypedQueryIterator<repeat each Value> {
         world.trackStorageAccess()
@@ -42,11 +42,9 @@ extension World {
         for type in repeat (each Value).self {
             precondition(requiredTypes.insert(ComponentType(type)).inserted, "Typed queries require distinct component types")
         }
-        let archetypes = matchingArchetypes(for: query).filter {
-            requiredTypes.isSubset(of: $0.signature.types)
-        }
-        let storage = archetypes.map { TypedQueryStorage<repeat each Value>(archetype: $0) }
-        return TypedQuerySequence(world: self, storage: storage, filter: query.entityFilter)
+        let selection = queries.prepare(query, requiring: requiredTypes, in: self)
+        let storage = selection.archetypes.map { TypedQueryStorage<repeat each Value>(archetype: $0) }
+        return TypedQuerySequence(world: self, storage: storage, filter: selection.filter)
     }
     // swiftlint:enable unused_parameter
 }

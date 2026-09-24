@@ -240,6 +240,19 @@ The final unobserved samples range from 9.858 to 9.948 ms. This is a small incre
 
 An intermediate version kept a separate observer registry behind the coordinator and measured about 10.3 ms. The final version removes that forwarding layer. These measurements are benchmarks, not a new Time Profiler capture.
 
+## Query engine refactor (#25)
+
+Query preparation, registered selections, and predicate evaluation now share a World-owned engine. Typed iteration retains its nil-filter component-only path. Public query signatures and lifetime semantics are unchanged.
+
+Typed-only Release medians across three 100-update samples:
+
+| Implementation | Without storage observer | With storage observer |
+|---|---:|---:|
+| Before refactor | 9.835 ms | 9.850 ms |
+| Query engine | 9.974 ms | 10.048 ms |
+
+The measured cost remains approximately 10 ms per 100K-entity update. These are benchmark results, not a fresh Time Profiler capture.
+
 ## Reproduce
 
 Run from the repository root:

@@ -144,79 +144,13 @@ extension Query {
     }
 }
 
-// MARK: - Signature Matching
-
-extension QueryPredicate {
-    /// Test if a signature matches this predicate.
-    func matches(_ signature: ArchetypeSignature) -> Bool {
-        signatureMatch(signature) != .no
-    }
-
-    private enum SignatureMatch {
-        case yes, no, requiresEntity
-
-        var inverted: SignatureMatch {
-            switch self {
-            case .yes: .no
-            case .no: .yes
-            case .requiresEntity: .requiresEntity
-            }
-        }
-    }
-
-    private func signatureMatch(_ signature: ArchetypeSignature) -> SignatureMatch {
-        switch self {
-        case .all:
-            return .yes
-        case .none:
-            return .no
-        case let .contains(componentType):
-            return signature.contains(componentType) ? .yes : .no
-        case .relationship, .descendant:
-            return .requiresEntity
-        case let .not(inner):
-            return inner.signatureMatch(signature).inverted
-        case let .and(predicates):
-            return combinedMatch(predicates, signature: signature, shortCircuit: .no)
-        case let .or(predicates):
-            return combinedMatch(predicates, signature: signature, shortCircuit: .yes)
-        }
-    }
-
-    private func combinedMatch(_ predicates: [QueryPredicate], signature: ArchetypeSignature, shortCircuit: SignatureMatch) -> SignatureMatch {
-        var requiresEntity = false
-        for predicate in predicates {
-            let result = predicate.signatureMatch(signature)
-            if result == shortCircuit {
-                return shortCircuit
-            }
-            requiresEntity = requiresEntity || result == .requiresEntity
-        }
-        return requiresEntity ? .requiresEntity : shortCircuit.inverted
-    }
-}
-
-extension Query {
-    /// Test if a signature matches this query.
-    func matches(_ signature: ArchetypeSignature) -> Bool {
-        predicate.matches(signature)
-    }
-}
-
 // MARK: - World Integration
 
 extension World {
     /// Execute a query and return matching entities.
     public func snapshot(matching query: Query) -> [Entity] {
         trackStorageAccess()
-        var result: [Entity] = []
-        let filter = query.entityFilter
-        for archetype in archetypes.values where query.matches(archetype.signature) {
-            for entityID in archetype.entities where filter?.matchesEntity(entityID, in: self) != false {
-                result.append(Entity(id: entityID, world: self))
-            }
-        }
-        return result
+        return queries.snapshot(query, in: self)
     }
 
     /// Execute a query with component type requirements.
@@ -227,17 +161,11 @@ extension World {
 
 // MARK: - Registered Query Support
 
-/// Internal storage for registered query cache.
-final class RegisteredQueryCache {
-    var matchingArchetypes: [ArchetypeSignature] = []
-    var isDirty: Bool = true
-}
-
 /// A lazy sequence of entities matching a query.
 public struct QuerySequence: Sequence {
     let world: World
     let archetypes: [Archetype]
-    let filter: Query?
+    let filter: QueryPredicate?
 
     public func makeIterator() -> QueryIterator {
         world.trackStorageAccess()
@@ -249,7 +177,7 @@ public struct QuerySequence: Sequence {
 public struct QueryIterator: IteratorProtocol {
     let world: World
     let archetypes: [Archetype]
-    let filter: Query?
+    let filter: QueryPredicate?
     var archetypeIndex: Int = 0
     var entityIndex: Int = 0
 
@@ -260,7 +188,7 @@ public struct QueryIterator: IteratorProtocol {
             if entityIndex < archetype.entities.count {
                 let entity = Entity(id: archetype.entities[entityIndex], world: world)
                 entityIndex += 1
-                if filter?.matchesEntity(entity.id, in: world) == false {
+                if let filter, !world.queries.matches(filter, entityID: entity.id, in: world) {
                     continue
                 }
                 return entity
@@ -276,39 +204,24 @@ extension World {
     /// Register a query for fast repeated iteration.
     /// The world caches which archetypes match, avoiding predicate evaluation on each query.
     public func register(_ query: Query) {
-        if registeredQueries[query] == nil {
-            registeredQueries[query] = RegisteredQueryCache()
-        }
+        queries.register(query)
     }
 
     /// Unregister a previously registered query.
     public func unregister(_ query: Query) {
-        registeredQueries.removeValue(forKey: query)
+        queries.unregister(query)
     }
 
     /// Check if a query is registered.
     public func isRegistered(_ query: Query) -> Bool {
-        registeredQueries[query] != nil
+        queries.isRegistered(query)
     }
 
     /// Returns a lazy sequence of entities matching the query.
     /// If the query is registered, uses cached archetype matching for better performance.
     public func entities(matching query: Query) -> QuerySequence {
-        QuerySequence(world: self, archetypes: matchingArchetypes(for: query), filter: query.entityFilter)
-    }
-
-    /// Get matching archetypes for a query, using cache if registered.
-    internal func matchingArchetypes(for query: Query) -> [Archetype] {
         trackStorageAccess()
-        if let cache = registeredQueries[query] {
-            // Use cached archetype signatures
-            if cache.isDirty {
-                cache.matchingArchetypes = archetypes.keys.filter { query.matches($0) }
-                cache.isDirty = false
-            }
-            return cache.matchingArchetypes.compactMap { archetypes[$0] }
-        }
-        // No cache, filter directly
-        return archetypes.values.filter { query.matches($0.signature) }
+        let selection = queries.prepare(query, requiring: [], in: self)
+        return QuerySequence(world: self, archetypes: selection.archetypes, filter: selection.filter)
     }
 }

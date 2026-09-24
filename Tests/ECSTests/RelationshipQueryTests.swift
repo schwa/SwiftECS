@@ -34,37 +34,6 @@ private enum Targets: Relationship {}
     #expect(Array(typed).isEmpty)
 }
 
-@Test func `relationship negation and mixed boolean expressions retain candidate archetypes`() throws {
-    let world = World()
-    let parent = world.createEntity()
-    let linked = world.createEntity(Health(current: 1))
-    let unlinked = world.createEntity(Health(current: 2))
-    let emptyLinked = world.createEntity()
-    try linked.setParent(parent)
-    try emptyLinked.setParent(parent)
-    let relation = QueryPredicate.related(ChildOf.self, to: parent.id)
-    let health = QueryPredicate.contains(Health.self)
-    let cases: [(QueryPredicate, Set<EntityID>)] = [
-        (relation, [linked.id, emptyLinked.id]),
-        (!relation, [parent.id, unlinked.id]),
-        (health && !relation, [unlinked.id]),
-        (!(health && relation), [parent.id, unlinked.id, emptyLinked.id]),
-        (!(health || relation), [parent.id]),
-        (health || relation, [linked.id, unlinked.id, emptyLinked.id]),
-        (.not(.not(relation)), [linked.id, emptyLinked.id]),
-        (.or([]), []),
-        (.and([]), [parent.id, linked.id, unlinked.id, emptyLinked.id])
-    ]
-    for (predicate, expected) in cases {
-        let query = Query(predicate)
-        world.register(query)
-        #expect(Set(world.snapshot(matching: query).map(\.id)) == expected)
-        #expect(Set(world.entities(matching: query).map(\.id)) == expected)
-        #expect(Set(world.query(matching: query).map(\.entityID)) == expected)
-        #expect(Set(world.query(Health.self, matching: query).map(\.entityID)) == expected.intersection([linked.id, unlinked.id]))
-    }
-}
-
 @Test func `registered relationship queries discover new component archetypes`() throws {
     let world = World()
     let root = world.createEntity()

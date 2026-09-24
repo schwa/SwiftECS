@@ -43,9 +43,8 @@ public final class World {
         }
     }
 
-    // Registered query support
     @ObservationIgnored
-    internal var registeredQueries: [Query: RegisteredQueryCache] = [:]
+    @usableFromInline internal let queries = QueryEngine()
 
     /// The current simulation time (accumulated deltaTime from all updates).
     /// This is observable and updates once per `update()` call.
@@ -263,15 +262,9 @@ public final class World {
         archetypes[signature] = archetype
 
         // Invalidate all registered query caches when a new archetype is created
-        invalidateRegisteredQueryCaches()
+        queries.invalidateArchetypes()
 
         return archetype
-    }
-
-    private func invalidateRegisteredQueryCaches() {
-        for (_, cache) in registeredQueries {
-            cache.isDirty = true
-        }
     }
 
     private func moveEntity<T: Component>(
