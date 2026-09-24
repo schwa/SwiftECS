@@ -19,9 +19,11 @@ public struct ComponentRef<Value: Component> {
             return column.data[index]
         }
         nonmutating set {
-            defer { world.storageDidChange() }
-            column.setValue(newValue, at: index)
-            world.notifyChanged(entityID: entityID, component: newValue)
+            world.mutations.perform({
+                column.setValue(newValue, at: index)
+            }, events: {
+                world.notifyChanged(entityID: entityID, component: newValue)
+            })
         }
     }
 }

@@ -4,7 +4,8 @@ public struct Entity: Identifiable {
     public let id: EntityID
     internal let world: World
 
-    init(id: EntityID, world: World) {
+    @usableFromInline
+    internal init(id: EntityID, world: World) {
         self.id = id
         self.world = world
     }

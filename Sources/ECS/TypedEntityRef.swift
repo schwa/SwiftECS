@@ -25,20 +25,19 @@ public struct TypedEntityRef<each Value: Component> {
 
     @inlinable
     public func set(_ values: repeat each Value) {
-        var changed = false
-        defer {
-            if changed {
-                world.storageDidChange()
+        guard storage.hasComponents else {
+            return
+        }
+        world.mutations.perform({
+            for (column, value) in repeat (each storage.columns, each values) {
+                column.setValue(value, at: index)
             }
-        }
-        for (column, value) in repeat (each storage.columns, each values) {
-            column.setValue(value, at: index)
-            changed = true
-        }
-        // Complete all writes before event handlers can change entity storage.
-        for value in repeat each values {
-            world.notifyChanged(entityID: entityID, component: value)
-        }
+        }, events: {
+            // Complete all writes before event handlers can change entity storage.
+            for value in repeat each values {
+                world.notifyChanged(entityID: entityID, component: value)
+            }
+        })
     }
 
     // Direct array subscripting in a pack expansion fails on Swift 6.4.

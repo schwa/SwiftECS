@@ -16,8 +16,9 @@ extension Entity {
             guard let storage = world.relationships[type], !storage.targets(from: id).isEmpty else {
                 return
             }
-            storage.removeOutgoing(from: id)
-            world.storageDidChange()
+            world.mutations.perform {
+                storage.removeOutgoing(from: id)
+            }
         }
     }
 
@@ -32,22 +33,25 @@ extension Entity {
         if R.isAcyclic, storage.reaches(from: target.id, to: id) {
             throw RelationshipError.cycleDetected(relationshipType)
         }
-        if R.isExclusive {
-            storage.removeOutgoing(from: id)
+        world.mutations.perform {
+            if R.isExclusive {
+                storage.removeOutgoing(from: id)
+            }
+            storage.insert(source: id, target: target.id)
+            world.relationships[relationshipType] = storage
         }
-        storage.insert(source: id, target: target.id)
-        world.relationships[relationshipType] = storage
-        world.storageDidChange()
     }
 
     @discardableResult
     public func removeRelationship<R: Relationship>(_ type: R.Type, to target: Entity) throws -> Bool {
         try world.validateRelationshipEntity(self)
         try world.validateRelationshipEntity(target)
-        guard world.relationships[RelationshipType(type)]?.remove(source: id, target: target.id) == true else {
+        guard let storage = world.relationships[RelationshipType(type)], storage.contains(source: id, target: target.id) else {
             return false
         }
-        world.storageDidChange()
+        world.mutations.perform {
+            storage.remove(source: id, target: target.id)
+        }
         return true
     }
 

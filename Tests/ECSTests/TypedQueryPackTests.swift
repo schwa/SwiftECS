@@ -43,11 +43,15 @@ private struct TypedQueryPackProbe<each Value: Component> {
     }
 
     func set(_ values: repeat each Value) {
-        defer { world.storageDidChange() }
-        for (column, value) in repeat (each columns, each values) {
-            column.data[index] = value
-            world.notifyChanged(entityID: entityID, component: value)
-        }
+        world.mutations.perform({
+            for (column, value) in repeat (each columns, each values) {
+                column.data[index] = value
+            }
+        }, events: {
+            for value in repeat each values {
+                world.notifyChanged(entityID: entityID, component: value)
+            }
+        })
     }
 }
 

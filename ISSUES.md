@@ -497,10 +497,13 @@ World.query returns an entity-array snapshot, World.entities exposes lazy entity
 ## 24: Mutation paths separately coordinate storage writes and observation
 
 +++
-status: new
+status: closed
 priority: medium
-kind: task
+kind: enhancement
+labels: effort:m
 created: 2026-09-24T01:30:21Z
+updated: 2026-09-24T01:57:20Z
+closed: 2026-09-24T01:57:20Z
 +++
 
 World, ComponentRef, and TypedEntityRef each coordinate storage writes, component events, and Swift Observation invalidation. Update batching also lives in World simulation bookkeeping. Understanding mutation semantics requires following several entry points whose responsibilities overlap.
@@ -510,6 +513,9 @@ This creates integration risk when a new write path omits notification, changes 
 Tests currently mix public mutation contracts with direct ObserverRegistry tests. Any architectural change must preserve their subscriber-removal and dispatch coverage at the public boundary, plus coverage across write paths, update batching, and failure handling. Preserve measured cross-module specialization gains. No replacement interface has been selected.
 
 Related: #4 concerns batching across substeps and #5 measures observation overhead. This issue concerns ownership of mutation semantics, not those feature or measurement tasks.
+
+- `2026-09-24T01:57:20Z`: Selected and implemented a World-owned mutation coordinator with inlinable write/event scopes and nested batch scopes. Design recorded in RFC-mutation-scope.md; public API unchanged.
+- `2026-09-24T01:57:20Z`: Centralized storage observation, synchronous component-event dispatch, and batch bookkeeping in MutationCoordinator. All entity/component/typed-row/relationship/lifecycle writers use its mutation scope; World.update and recursive deletion share its batch operation. Removed standalone ObserverRegistry and replaced its direct tests with public World boundary tests. Added ordering, reentrant callback, whole-row-before-events, callback deletion, and lifecycle notification coverage. Existing no-op, failed-write, nested/error batch tests pass. 175 core tests pass in Debug/Release, 15 demo tests and macOS build pass, strict lint is clean. Release typed benchmark: baseline 9.628/9.583 ms unobserved/observed; final 9.919/9.931 ms. Small measured increase, specialization gains preserved. #4 public batching across sequential substeps remains separate.
 
 ---
 

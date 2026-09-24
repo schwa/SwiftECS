@@ -225,6 +225,21 @@ Trace: `~/Desktop/ECS-Profiles/typed-query-column-inline.trace`. Selected typed-
 
 The profile directory contains baseline/candidate logs, summary, and a production patch against `1ff4b5db`. Debug/Release and demo tests, macOS build, and lint pass. No public signature changes.
 
+## Mutation coordinator refactor (#24)
+
+A World-owned coordinator now sequences writes, component events, and storage invalidation. It also owns subscriber storage and nested batch state. Public APIs are unchanged.
+
+The same typed-only Release workload used three 100-update samples:
+
+| Implementation | Without storage observer | With storage observer |
+|---|---:|---:|
+| Before refactor | 9.628 ms | 9.583 ms |
+| Final coordinator | 9.919 ms | 9.931 ms |
+
+The final unobserved samples range from 9.858 to 9.948 ms. This is a small increase over the baseline, while retaining the earlier specialization gains and the current simulation budget.
+
+An intermediate version kept a separate observer registry behind the coordinator and measured about 10.3 ms. The final version removes that forwarding layer. These measurements are benchmarks, not a new Time Profiler capture.
+
 ## Reproduce
 
 Run from the repository root:

@@ -13,10 +13,16 @@ public struct TypedQuerySequence<each Value: Component>: Sequence {
 internal final class TypedQueryStorage<each Value: Component> {
     @usableFromInline let archetype: Archetype
     @usableFromInline let columns: (repeat Column<each Value>)
+    @usableFromInline let hasComponents: Bool
 
     init(archetype: Archetype) {
         self.archetype = archetype
         self.columns = (repeat Self.column((each Value).self, in: archetype))
+        var hasComponents = false
+        for _ in repeat (each Value).self {
+            hasComponents = true
+        }
+        self.hasComponents = hasComponents
     }
 
     private static func column<T: Component>(_ type: T.Type, in archetype: Archetype) -> Column<T> {

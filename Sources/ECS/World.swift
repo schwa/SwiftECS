@@ -23,46 +23,24 @@ public final class World {
     @ObservationIgnored
     private let emptySignature = ArchetypeSignature()
     @ObservationIgnored
-    private let observers = ObserverRegistry()
+    @usableFromInline internal let mutations = MutationCoordinator()
 
-    private var storageRevision: UInt64 = 0
-    @ObservationIgnored private var updateDepth = 0
-    @ObservationIgnored private var storageIsDirty = false
-
-    @usableFromInline
+    @inlinable
     internal func trackStorageAccess() {
-        _ = storageRevision
-    }
-
-    @usableFromInline
-    internal func storageDidChange() {
-        if updateDepth > 0 {
-            storageIsDirty = true
-        } else {
-            storageRevision &+= 1
-        }
-    }
-
-    private func finishStorageUpdate() {
-        updateDepth -= 1
-        guard updateDepth == 0, storageIsDirty else {
-            return
-        }
-        storageIsDirty = false
-        storageRevision &+= 1
+        mutations.access()
     }
 
     @ObservationIgnored
     internal var relationships: [RelationshipType: RelationshipStorage] = [:]
 
     internal func removeEntities<S: Sequence>(_ ids: S) -> Int where S.Element == EntityID {
-        updateDepth += 1
-        defer { finishStorageUpdate() }
-        var removed = 0
-        for id in ids where removeEntity(id) {
-            removed += 1
+        mutations.batch {
+            var removed = 0
+            for id in ids where removeEntity(id) {
+                removed += 1
+            }
+            return removed
         }
-        return removed
     }
 
     // Registered query support
@@ -83,50 +61,48 @@ public final class World {
     /// Create an entity with no components.
     @discardableResult
     public func createEntity() -> Entity {
-        defer { storageDidChange() }
         let id = generateUniqueEntityID()
-
-        let archetype = archetypes[emptySignature]!
-        let index = archetype.addEntity(id)
-        entityLocations[id] = EntityLocation(signature: emptySignature, index: index)
-
+        mutations.perform {
+            let archetype = archetypes[emptySignature]!
+            let index = archetype.addEntity(id)
+            entityLocations[id] = EntityLocation(signature: emptySignature, index: index)
+        }
         return Entity(id: id, world: self)
     }
 
     /// Create an entity with components.
     @discardableResult
     public func createEntity<each T: Component>(_ components: repeat each T) -> Entity {
-        defer { storageDidChange() }
         let id = generateUniqueEntityID()
-
         var typeIDs = Set<ComponentType>()
         for typeID in repeat ComponentType((each T).self) {
             typeIDs.insert(typeID)
         }
-
         let signature = ArchetypeSignature(typeIDs)
-        let archetype = getOrCreateArchetype(signature)
-        let index = archetype.addEntity(id)
-        repeat archetype.setComponent(each components, at: index)
-        entityLocations[id] = EntityLocation(signature: signature, index: index)
-
+        mutations.perform {
+            let archetype = getOrCreateArchetype(signature)
+            let index = archetype.addEntity(id)
+            repeat archetype.setComponent(each components, at: index)
+            entityLocations[id] = EntityLocation(signature: signature, index: index)
+        }
         return Entity(id: id, world: self)
     }
 
     /// Remove an entity.
     @discardableResult
     internal func removeEntity(_ id: EntityID) -> Bool {
-        guard let location = entityLocations.removeValue(forKey: id) else { return false }
-        guard let archetype = archetypes[location.signature] else { return false }
-
-        defer { storageDidChange() }
-        for storage in relationships.values {
-            storage.removeEntity(id)
+        guard let location = entityLocations[id], let archetype = archetypes[location.signature] else {
+            return false
         }
-        if let movedEntity = archetype.removeEntity(at: location.index) {
-            entityLocations[movedEntity]?.index = location.index
+        mutations.perform {
+            entityLocations.removeValue(forKey: id)
+            for storage in relationships.values {
+                storage.removeEntity(id)
+            }
+            if let movedEntity = archetype.removeEntity(at: location.index) {
+                entityLocations[movedEntity]?.index = location.index
+            }
         }
-
         return true
     }
 
@@ -136,16 +112,16 @@ public final class World {
         guard let location = entityLocations[id],
               let sourceArchetype = archetypes[location.signature] else { return nil }
 
-        defer { storageDidChange() }
         let newID = generateUniqueEntityID()
-        let targetArchetype = getOrCreateArchetype(location.signature)
-
-        let newIndex = targetArchetype.addEntity(newID)
-        sourceArchetype.copyComponents(at: location.index, to: targetArchetype, targetIndex: newIndex)
-        entityLocations[newID] = EntityLocation(signature: location.signature, index: newIndex)
-        for storage in relationships.values {
-            for target in storage.targets(from: id) {
-                storage.insert(source: newID, target: target)
+        mutations.perform {
+            let targetArchetype = getOrCreateArchetype(location.signature)
+            let newIndex = targetArchetype.addEntity(newID)
+            sourceArchetype.copyComponents(at: location.index, to: targetArchetype, targetIndex: newIndex)
+            entityLocations[newID] = EntityLocation(signature: location.signature, index: newIndex)
+            for storage in relationships.values {
+                for target in storage.targets(from: id) {
+                    storage.insert(source: newID, target: target)
+                }
             }
         }
 
@@ -195,44 +171,45 @@ public final class World {
         _ type: T.Type,
         handler: @escaping (ComponentEvent<T>) -> Void
     ) -> ObservationToken {
-        observers.observe(type, handler: handler)
+        mutations.observe(type, handler: handler)
     }
 
     /// Unregister an observer.
     public func removeObserver(_ token: ObservationToken) {
-        observers.removeObserver(token)
+        mutations.removeObserver(token)
     }
 
     /// Notify observers of a component change.
-    @usableFromInline
+    @inlinable
     internal func notifyChanged<T: Component>(entityID: EntityID, component: T) {
-        observers.notifyChanged(entity: Entity(id: entityID, world: self), component: component)
+        mutations.changed(entity: Entity(id: entityID, world: self), component: component)
     }
 
     // MARK: - Component Access (Internal)
 
     internal func addComponent<T: Component>(_ component: T, to entityID: EntityID) {
-        guard let location = entityLocations[entityID] else { return }
-        defer { storageDidChange() }
-        let typeID = ComponentType(T.self)
-
-        let isNewComponent = !location.signature.contains(typeID)
-
-        if !isNewComponent {
-            // Update existing component
-            if let archetype = archetypes[location.signature] {
-                archetype.setComponent(component, at: location.index)
-            }
-            // Notify observers of change
-            observers.notifyChanged(entity: Entity(id: entityID, world: self), component: component)
+        guard let location = entityLocations[entityID], let archetype = archetypes[location.signature] else {
             return
         }
-
-        let newSignature = location.signature.adding(typeID)
-        moveEntity(entityID, from: location, to: newSignature, addingComponent: component)
-
-        // Notify observers of addition
-        observers.notifyAdded(entity: Entity(id: entityID, world: self), component: component)
+        let typeID = ComponentType(T.self)
+        let isNewComponent = !location.signature.contains(typeID)
+        mutations.perform({
+            if isNewComponent {
+                let newSignature = location.signature.adding(typeID)
+                moveEntity(entityID, from: location, to: newSignature, addingComponent: component)
+            } else {
+                // Update existing component
+                archetype.setComponent(component, at: location.index)
+            }
+        }, events: {
+            if isNewComponent {
+                // Notify observers of addition
+                mutations.added(entity: Entity(id: entityID, world: self), component: component)
+            } else {
+                // Notify observers of change
+                mutations.changed(entity: Entity(id: entityID, world: self), component: component)
+            }
+        })
     }
 
     internal func component<T: Component>(_ type: T.Type, for entityID: EntityID) -> T? {
@@ -256,17 +233,16 @@ public final class World {
         let typeID = ComponentType(T.self)
 
         guard location.signature.contains(typeID) else { return nil }
-        defer { storageDidChange() }
-
-        let value = archetypes[location.signature]?.getComponent(type, at: location.index)
-
-        let newSignature = location.signature.removing(typeID)
-        moveEntity(entityID, from: location, to: newSignature, removingType: typeID)
-
-        // Notify observers of removal
-        if let value {
-            observers.notifyRemoved(entity: Entity(id: entityID, world: self), component: value)
+        guard let value = archetypes[location.signature]?.getComponent(type, at: location.index) else {
+            return nil
         }
+        mutations.perform({
+            let newSignature = location.signature.removing(typeID)
+            moveEntity(entityID, from: location, to: newSignature, removingType: typeID)
+        }, events: {
+            // Notify observers of removal
+            mutations.removed(entity: Entity(id: entityID, world: self), component: value)
+        })
 
         return value
     }
@@ -376,17 +352,17 @@ public final class World {
     /// Update all systems in dependency order.
     /// - Throws: `SystemError` if dependencies cannot be resolved.
     public func update(deltaTime: Double) throws {
-        updateDepth += 1
-        defer { finishStorageUpdate() }
-        if systemOrderDirty {
-            try rebuildSystemOrder()
-        }
+        try mutations.batch {
+            if systemOrderDirty {
+                try rebuildSystemOrder()
+            }
 
-        // Advance time BEFORE systems run, so simulationTime represents "now"
-        simulationTime += deltaTime
+            // Advance time BEFORE systems run, so simulationTime represents "now"
+            simulationTime += deltaTime
 
-        for systemID in systemOrder {
-            systems[systemID]!.system.update(world: self, deltaTime: deltaTime)
+            for systemID in systemOrder {
+                systems[systemID]!.system.update(world: self, deltaTime: deltaTime)
+            }
         }
     }
 
