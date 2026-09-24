@@ -1,6 +1,6 @@
-import ECS
 import Foundation
 import simd
+import SwiftECS
 
 final class SurvivalSystem: System {
     static let arena = SIMD2<Double>(1_000, 700)

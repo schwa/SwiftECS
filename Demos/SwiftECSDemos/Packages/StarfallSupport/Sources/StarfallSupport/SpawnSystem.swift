@@ -1,4 +1,4 @@
-import ECS
+import SwiftECS
 
 final class SpawnSystem: System {
     private var remaining = 0.3

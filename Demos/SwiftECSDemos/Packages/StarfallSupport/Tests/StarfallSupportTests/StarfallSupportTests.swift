@@ -1,7 +1,7 @@
-import ECS
 import Foundation
 import Observation
 @testable import StarfallSupport
+import SwiftECS
 import Testing
 
 @Test func `movement uses delta time`() throws {

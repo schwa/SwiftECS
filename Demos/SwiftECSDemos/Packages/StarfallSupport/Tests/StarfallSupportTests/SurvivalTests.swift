@@ -1,6 +1,6 @@
-import ECS
 import Foundation
 @testable import StarfallSupport
+import SwiftECS
 import Testing
 
 @MainActor @Test func `survival steering is clamped and pause freezes the world`() throws {

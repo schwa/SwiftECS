@@ -1,4 +1,4 @@
-import ECS
+import SwiftECS
 
 struct MovementSystem: System {
     func update(world: World, deltaTime: Double) {

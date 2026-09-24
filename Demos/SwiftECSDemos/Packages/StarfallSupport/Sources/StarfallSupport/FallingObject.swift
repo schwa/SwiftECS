@@ -1,4 +1,4 @@
-import ECS
+import SwiftECS
 
 struct FallingObject: Component {
     enum Kind {

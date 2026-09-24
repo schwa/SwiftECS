@@ -1,4 +1,4 @@
-import ECS
+import SwiftECS
 import Testing
 
 @Test func `observer removal preserves other subscribers and allows registration again`() {

@@ -1,4 +1,4 @@
-import ECS
+import SwiftECS
 import Testing
 
 // MARK: - Additional Test Components

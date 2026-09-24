@@ -1,4 +1,4 @@
-import ECS
+import SwiftECS
 
 struct CollisionSystem: System {
     func update(world: World, deltaTime _: Double) {

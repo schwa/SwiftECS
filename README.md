@@ -1,11 +1,11 @@
-# ECS
+# SwiftECS
 
 ## Usage
 
 ### Components and entities
 
 ```swift
-import ECS
+import SwiftECS
 
 struct Position: Component {
     var x: Double

@@ -1,4 +1,4 @@
-import ECS
+import SwiftECS
 import Testing
 
 @Test func `snapshots freeze membership while lazy queries see matching rows at iteration`() throws {

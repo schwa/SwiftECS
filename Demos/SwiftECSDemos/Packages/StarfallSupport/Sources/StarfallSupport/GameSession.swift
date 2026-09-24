@@ -1,6 +1,6 @@
-import ECS
 import Foundation
 import Observation
+import SwiftECS
 
 @MainActor @Observable
 final class GameSession {

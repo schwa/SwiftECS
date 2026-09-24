@@ -1,5 +1,5 @@
-import ECS
 import Observation
+import SwiftECS
 import Testing
 
 // The test and observation callback execute synchronously on one thread.

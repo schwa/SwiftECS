@@ -1,6 +1,6 @@
-import ECS
 import Foundation
 import Observation
+import SwiftECS
 import Testing
 
 private enum QueryAccess: CaseIterable {

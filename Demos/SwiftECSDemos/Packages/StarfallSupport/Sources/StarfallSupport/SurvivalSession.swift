@@ -1,7 +1,7 @@
-import ECS
 import Foundation
 import Observation
 import simd
+import SwiftECS
 
 @MainActor @Observable
 final class SurvivalSession {

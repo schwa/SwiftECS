@@ -1,4 +1,4 @@
-import ECS
+import SwiftECS
 
 struct Player: Component {
     var score = 0

@@ -1,4 +1,4 @@
-@testable import ECS
+@testable import SwiftECS
 import Testing
 
 // MARK: - Entity Tests

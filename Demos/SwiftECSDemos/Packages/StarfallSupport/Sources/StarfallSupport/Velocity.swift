@@ -1,4 +1,4 @@
-import ECS
+import SwiftECS
 
 struct Velocity: Component {
     var y: Double

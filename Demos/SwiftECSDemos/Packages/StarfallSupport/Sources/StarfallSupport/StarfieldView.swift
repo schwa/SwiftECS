@@ -1,4 +1,4 @@
-import ECS
+import SwiftECS
 import SwiftUI
 
 struct StarfieldView: View {

@@ -54,7 +54,7 @@ Neither probe produces the historical `signal 11 in emitPackExpansionIntoPack` e
 
 ## ECS checks
 
-`Tests/ECSTests/TypedQueryPackTests.swift` uses the real internal columns. The tests cover:
+`Tests/SwiftECSTests/TypedQueryPackTests.swift` uses the real internal columns. The tests cover:
 
 - Typed column binding through a generic factory.
 - Reads with one, two, three, and four components.
@@ -65,8 +65,8 @@ Neither probe produces the historical `signal 11 in emitPackExpansionIntoPack` e
 Both configurations pass:
 
 ```sh
-xcb test "$PWD/Package.swift/ECS" -- --filter TypedQueryPackTests
-xcb test "$PWD/Package.swift/ECS" -c Release -- --filter TypedQueryPackTests
+xcb test "$PWD/Package.swift/SwiftECS" -- --filter TypedQueryPackTests
+xcb test "$PWD/Package.swift/SwiftECS" -c Release -- --filter TypedQueryPackTests
 ```
 
 The prototype preserves the storage-observation hooks. It does not establish a complete iterator design, structural-mutation safety, or compile-time membership checks for component-type subscripts.

@@ -1,5 +1,5 @@
-import ECS
 import Observation
+import SwiftECS
 import Testing
 
 private enum MutationAccess: CaseIterable {

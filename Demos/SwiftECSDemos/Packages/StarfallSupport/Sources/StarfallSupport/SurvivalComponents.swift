@@ -1,5 +1,5 @@
-import ECS
 import simd
+import SwiftECS
 
 enum SurvivalComponents {
     struct Body: Component {

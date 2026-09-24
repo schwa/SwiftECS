@@ -1,4 +1,4 @@
-import ECS
+import SwiftECS
 import Testing
 
 private final class RegistrationSystem: System {

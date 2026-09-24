@@ -1,5 +1,5 @@
-@testable import ECS
 import Foundation
+@testable import SwiftECS
 import Testing
 
 // Helper function to measure execution time

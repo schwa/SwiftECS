@@ -3,12 +3,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "ECS",
+    name: "SwiftECS",
     platforms: [.macOS(.v14)],
     products: [
         .library(
-            name: "ECS",
-            targets: ["ECS"])
+            name: "SwiftECS",
+            targets: ["SwiftECS"])
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0"),
@@ -16,12 +16,12 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "ECS",
+            name: "SwiftECS",
             dependencies: [
                 .product(name: "Collections", package: "swift-collections")
             ]),
         .testTarget(
-            name: "ECSTests",
-            dependencies: ["ECS"])
+            name: "SwiftECSTests",
+            dependencies: ["SwiftECS"])
     ]
 )

@@ -116,7 +116,7 @@ The existing profile places generic metadata work beneath iterator advancement a
 Run the isolation test from the repository root:
 
 ```sh
-env ECS_RUN_BENCHMARKS=1 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter TypedQueryCostTests
+env ECS_RUN_BENCHMARKS=1 xcb test "$PWD/Package.swift/SwiftECS" -c Release -- --filter TypedQueryCostTests
 ```
 
 ## After issue #12
@@ -184,7 +184,7 @@ Inclusive costs still overlap: specialized setter 59.3%, generic metadata lookup
 The benchmark now accepts optional `ECS_BENCHMARK_ACCESS` and `ECS_BENCHMARK_FRAMES` overrides. Defaults remain all access paths and ten measured updates.
 
 ```sh
-env ECS_RUN_BENCHMARKS=1 ECS_BENCHMARK_ACCESS=typed ECS_BENCHMARK_FRAMES=100 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter QueryPerformanceTests
+env ECS_RUN_BENCHMARKS=1 ECS_BENCHMARK_ACCESS=typed ECS_BENCHMARK_FRAMES=100 xcb test "$PWD/Package.swift/SwiftECS" -c Release -- --filter QueryPerformanceTests
 ```
 
 ## Iterator specialization
@@ -258,7 +258,7 @@ The measured cost remains approximately 10 ms per 100K-entity update. These are 
 Run from the repository root:
 
 ```sh
-env ECS_RUN_BENCHMARKS=1 xcb test "$PWD/Package.swift/ECS" -c Release -- --filter QueryPerformanceTests
+env ECS_RUN_BENCHMARKS=1 xcb test "$PWD/Package.swift/SwiftECS" -c Release -- --filter QueryPerformanceTests
 ```
 
 The comparison is separate from the stress suite and skips by default. Issue #5 still covers broader observation and SwiftUI measurements.

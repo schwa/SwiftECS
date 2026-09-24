@@ -13,13 +13,13 @@ let package = Package(
             targets: ["StarfallSupport"]
         )
     ],
-    dependencies: [.package(path: "../../../..")],
+    dependencies: [.package(name: "SwiftECS", path: "../../../..")],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "StarfallSupport",
-            dependencies: [.product(name: "ECS", package: "ECS")]
+            dependencies: [.product(name: "SwiftECS", package: "SwiftECS")]
         ),
         .testTarget(
             name: "StarfallSupportTests",

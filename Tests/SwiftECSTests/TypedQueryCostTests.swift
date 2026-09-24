@@ -1,5 +1,5 @@
-import ECS
 import Foundation
+import SwiftECS
 import Testing
 
 private enum TypedQueryPhase: CaseIterable {
