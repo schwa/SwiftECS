@@ -181,7 +181,7 @@ try world.addSystem(RegenerationSystem(), id: "regeneration", dependencies: ["mo
 try world.update(deltaTime: 1.0 / 60)
 
 let elapsed = world.simulationTime
-let order = world.systemExecutionOrder
+let order = try world.systemExecutionOrder
 let systemCount = world.systemCount
 world.removeAllSystems()
 
@@ -190,6 +190,33 @@ let movementID = SystemID.of(MovementSystem.self)
 ```
 
 System lifecycle hooks have empty defaults. Registration always throws on duplicate IDs. `update` advances simulation time before it runs systems and throws for missing dependencies or cycles.
+
+### Phases and pipelines
+
+Systems and phases are entities. `DependsOn` relationships order them, and pipelines select systems through queries.
+
+```swift
+struct Gameplay: Component {}
+
+let physics = try world.createPhase("Physics")
+let recovery = try world.createPhase("Recovery", after: [physics])
+try world.addSystem(MovementSystem(), id: "move", phase: physics).set(Gameplay())
+try world.addSystem(RegenerationSystem(), id: "recover", phase: recovery).set(Gameplay())
+
+let gameplay = world.createEntity(Pipeline(Query(with: Gameplay.self)))
+try world.run(gameplay, deltaTime: 1.0 / 60)
+world.defaultPipeline = Pipeline(Query(with: Gameplay.self))
+try world.update(deltaTime: 1.0 / 60)
+```
+
+`run` does not advance simulation time. `update` runs `defaultPipeline` and advances time after validation.
+Each run captures its schedule before execution. Runtime changes affect the next run.
+Explicit system dependencies outside the selection throw an error. Phase dependencies never select additional systems.
+Ready systems run in registration order.
+
+System entities appear in normal queries and entity counts. `systemCount` counts registered systems only.
+`systemExecutionOrder` now requires `try` because invalid schedules throw instead of returning stale results.
+See [Phases and pipelines](Experiments/PhasesAndPipelines.md) for lifecycle, observation, and deletion rules.
 
 ### Link entities
 

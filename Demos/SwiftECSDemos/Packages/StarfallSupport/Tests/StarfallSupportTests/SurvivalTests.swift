@@ -70,7 +70,8 @@ import Testing
     game.start()
     #expect(game.hero.health == 5)
     #expect(game.hero.level == 1)
-    #expect(game.world.entityCount == 1)
+    #expect(game.world.entityCount == 3)
+    #expect(game.world.systemCount == 1)
 }
 
 @Test func `demons fire three hostile shots and expired shots disappear`() {
@@ -113,7 +114,7 @@ import Testing
     game.world.createEntity(SurvivalComponents.Body(position: SIMD2(-50, 100), radius: 10), SurvivalComponents.Sprite(emoji: "🔥"))
     game.world.createEntity(SurvivalComponents.Body(position: SIMD2(100, 100), radius: 10))
     #expect(game.visibleEntityCount == 2)
-    #expect(game.world.entityCount == 4)
+    #expect(game.world.entityCount == 6)
 }
 
 @MainActor @Test func `projectile ownership drives the HUD and detaches when a shooter dies`() throws {

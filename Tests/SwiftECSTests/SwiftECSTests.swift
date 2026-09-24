@@ -402,8 +402,8 @@ import Testing
     let world = World()
     try world.addSystem(InitializableMovementSystem())
 
-    // Just verify no crash - system should have been initialized
-    #expect(world.entityCount == 0)
+    #expect(world.entityCount == 2)
+    #expect(world.systemCount == 1)
 }
 
 @Test func testCleanupSystem() throws {
@@ -784,9 +784,9 @@ import Testing
 
     let stats = world.stats
 
-    #expect(stats.entityCount == 3)
-    #expect(stats.archetypeCount == 4)  // empty + Position + Position,Velocity + Velocity
-    #expect(stats.componentTypeCount == 2)  // Position, Velocity
+    #expect(stats.entityCount == 5)
+    #expect(stats.archetypeCount == 6)
+    #expect(stats.componentTypeCount == 5)
     #expect(stats.systemCount == 1)
 }
 
@@ -1027,7 +1027,7 @@ final class SharedOrder: @unchecked Sendable {
     try world.addSystem(OrderTrackingSystem(name: "A", order: order), id: "A")
     try world.addSystem(OrderTrackingSystem(name: "B", order: order), id: "B", dependencies: ["A"])
 
-    let executionOrder = world.systemExecutionOrder
+    let executionOrder = try world.systemExecutionOrder
     #expect(executionOrder == ["A", "B", "C"])
 }
 
@@ -1036,7 +1036,7 @@ final class SharedOrder: @unchecked Sendable {
 
     try world.addSystem(MovementSystem())
 
-    let executionOrder = world.systemExecutionOrder
+    let executionOrder = try world.systemExecutionOrder
     #expect(executionOrder.contains("MovementSystem"))
 }
 

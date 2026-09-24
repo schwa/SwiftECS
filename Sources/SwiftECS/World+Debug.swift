@@ -42,7 +42,7 @@ extension World {
 
     /// Number of registered systems.
     public var systemCount: Int {
-        systems.count
+        snapshot(with: SystemDescriptor.self).filter { $0[SystemDescriptor.self]?.isRegistered == true }.count
     }
 
     /// Get all component types for an entity.

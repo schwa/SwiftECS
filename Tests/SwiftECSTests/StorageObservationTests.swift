@@ -199,6 +199,8 @@ private struct ObservationTestSystem: System {
         try world.destroy(temporary)
         #expect(tracker.count == before)
     })
+    #expect(tracker.count == 1)
+    tracker.count = 0
     try world.update(deltaTime: 1)
     #expect(tracker.count == 1)
     #expect(entity[Position.self]?.x == 9_999)
@@ -234,9 +236,11 @@ private struct ObservationTestSystem: System {
         }
         #expect(tracker.count == 0)
     })
+    #expect(tracker.count == 1)
+    tracker.count = 0
     try world.update(deltaTime: 1)
     #expect(tracker.count == 1)
-    #expect(world.entityCount == 2)
+    #expect(world.entityCount == 4)
 }
 
 @Test func `failed nested update preserves pending invalidation and future writes`() throws {
@@ -253,6 +257,8 @@ private struct ObservationTestSystem: System {
         }
         #expect(tracker.count == 0)
     })
+    #expect(tracker.count == 1)
+    tracker.count = 0
     try world.update(deltaTime: 1)
     #expect(tracker.count == 1)
     #expect(throws: SystemError.self) { try world.update(deltaTime: 1) }
@@ -260,6 +266,7 @@ private struct ObservationTestSystem: System {
     world.createEntity()
     #expect(tracker.count == 2)
     world.removeAllSystems()
+    #expect(tracker.count == 3)
     try world.update(deltaTime: 1)
-    #expect(tracker.count == 2)
+    #expect(tracker.count == 3)
 }

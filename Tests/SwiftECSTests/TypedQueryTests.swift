@@ -144,8 +144,8 @@ private struct TypedMovementSystem: System {
     var velocityEvents = 0
     let positionToken = world.observe(Position.self) { _ in positionEvents += 1 }
     let velocityToken = world.observe(Velocity.self) { _ in velocityEvents += 1 }
-    let changes = TypedQueryChanges { _ = world.query(Position.self) }
     try world.addSystem(TypedMovementSystem())
+    let changes = TypedQueryChanges { _ = world.query(Position.self) }
     try world.update(deltaTime: 1)
     #expect(positionEvents == 1_000)
     #expect(velocityEvents == 1_000)

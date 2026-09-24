@@ -373,11 +373,13 @@ This is a design investigation, not approval to implement a general graph framew
 ## 17: Evaluate ECS-backed phases and selectable system pipelines
 
 +++
-status: new
+status: closed
 priority: low
 kind: task
 labels: idea
 created: 2026-09-23T19:55:27Z
+updated: 2026-09-24T19:55:30Z
+closed: 2026-09-24T19:55:30Z
 +++
 
 RFC 0001 proposes phases as entities, dependency relationships, and query-selected pipelines. Current scheduling uses SystemEntry dependencies and a Swift-side topological sort. It does not expose phase entities or independently selectable pipelines.
@@ -387,6 +389,8 @@ Compare the proposed model with extending the current scheduler. Define ordering
 This design depends on the relationship scope explored in #16. Related: #9 concerns observable system counts; #10 concerns ownership of pause/resume policy. Do not replace the scheduler until the trade-offs and intended use cases are agreed. Source: RFCs/0001-borrowing-ideas-from-flecs.md, section 1.
 
 - `2026-09-23T20:50:18Z`: Relationship foundation from #16 is implemented: generic relation markers support independently exclusive/acyclic policies, direct and descendant predicates, and traversal. General graph traversal is breadth-first first-discovery order, not topological scheduling; pipeline ordering still needs its own design.
+- `2026-09-24T19:37:27Z`: Evaluation written to Experiments/PhasesAndPipelines.md. Key finding: relationship traversal is BFS first-discovery, not topological, so a query/phase model does NOT eliminate the topo-sort — it only relocates where DependsOn edges are stored. Recommendation: keep Kahn's sort as the ordering primitive; if selectable pipelines become a real need, add a subset predicate on top and optionally derive dependencies from a DependsOn relation feeding the same sort. Do not replace the scheduler. Blocked on #9/#10 policy decisions.
+- `2026-09-24T19:55:30Z`: Implemented the agreed RFC model, superseding the earlier evaluation recommendation. Phases and systems are entities; DependsOn and InPhase relationships define ordering; Pipeline queries select systems. Runs validate a fresh topological schedule and retain an execution snapshot, with deferred cleanup and existing nested mutation batching. Added runtime selection, explicit subset errors, before/after sugar, observable metadata, and documented lifecycle/time semantics. Package and demo builds pass; 191 package tests and 15 demo-support tests pass; SwiftLint is clean. Changes remain uncommitted.
 
 ---
 

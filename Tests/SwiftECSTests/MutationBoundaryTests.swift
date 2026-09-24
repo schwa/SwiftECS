@@ -91,6 +91,8 @@ private func `reentrant component callbacks preserve synchronous ordering and up
     }
     if batched {
         try world.addSystem(MutationSystem { entity.set(Position(x: 1, y: 2)) })
+        #expect(log.entries == ["storage"])
+        log.entries.removeAll()
         try world.update(deltaTime: 1)
         #expect(log.entries == ["position-start", "health", "position-end", "storage"])
     } else {

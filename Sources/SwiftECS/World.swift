@@ -1,21 +1,14 @@
-import Collections
 import Observation
-
-/// Metadata for a registered system.
-struct SystemEntry {
-    let system: System
-    let dependencies: [SystemID]
-}
 
 /// Container for entities, components, and systems.
 @Observable
 public final class World {
     @ObservationIgnored
-    internal var systems: OrderedDictionary<SystemID, SystemEntry> = [:]
+    internal var nextSystemRegistrationOrder: UInt64 = 0
     @ObservationIgnored
-    internal var systemOrder: [SystemID] = []  // Topologically sorted system IDs
+    internal var pipelineExecutionDepth = 0
     @ObservationIgnored
-    private var systemOrderDirty: Bool = false
+    internal var pendingSystemCleanup: [any System] = []
     @ObservationIgnored
     internal var archetypes: [ArchetypeSignature: Archetype] = [:]
     @ObservationIgnored
@@ -49,6 +42,8 @@ public final class World {
     /// The current simulation time (accumulated deltaTime from all updates).
     /// This is observable and updates once per `update()` call.
     public private(set) var simulationTime: Double = 0.0
+
+    public var defaultPipeline = Pipeline()
 
     /// Create an empty world.
     public init() {
@@ -93,6 +88,7 @@ public final class World {
         guard let location = entityLocations[id], let archetype = archetypes[location.signature] else {
             return false
         }
+        let implementation = component(SystemDescriptor.self, for: id)?.implementation
         mutations.perform {
             entityLocations.removeValue(forKey: id)
             for storage in relationships.values {
@@ -102,13 +98,20 @@ public final class World {
                 entityLocations[movedEntity]?.index = location.index
             }
         }
+        if let implementation {
+            if pipelineExecutionDepth > 0 {
+                pendingSystemCleanup.append(implementation)
+            } else {
+                implementation.cleanup(world: self)
+            }
+        }
         return true
     }
 
     /// Clone an entity, creating a new entity with copies of all components.
     @discardableResult
     internal func cloneEntity(_ id: EntityID) -> Entity? {
-        guard let location = entityLocations[id],
+        guard component(SystemDescriptor.self, for: id) == nil, let location = entityLocations[id],
               let sourceArchetype = archetypes[location.signature] else { return nil }
 
         let newID = generateUniqueEntityID()
@@ -308,116 +311,40 @@ public final class World {
 
     // MARK: - System Management
 
-    /// Add a system with an optional ID and dependencies.
-    /// - Parameters:
-    ///   - system: The system to add.
-    ///   - id: Optional ID for the system. Defaults to the type name.
-    ///   - dependencies: IDs of systems that must run before this one.
-    /// - Throws: `SystemError.duplicateID` if a system with this ID already exists.
-    public func addSystem(
-        _ system: System,
-        id: SystemID? = nil,
-        dependencies: [SystemID] = []
-    ) throws {
-        let systemID = id ?? SystemID(String(describing: type(of: system)))
-
-        if systems[systemID] != nil {
-            throw SystemError.duplicateID(systemID)
-        }
-
-        let entry = SystemEntry(system: system, dependencies: dependencies)
-        systems[systemID] = entry
-        systemOrderDirty = true
-
-        system.initialize(world: self)
-    }
-
-    /// Remove all systems.
-    public func removeAllSystems() {
-        for (_, entry) in systems {
-            entry.system.cleanup(world: self)
-        }
-        systems.removeAll()
-        systemOrder.removeAll()
-        systemOrderDirty = false
-    }
-
     /// Update all systems in dependency order.
     /// - Throws: `SystemError` if dependencies cannot be resolved.
     public func update(deltaTime: Double) throws {
-        try mutations.batch {
-            if systemOrderDirty {
-                try rebuildSystemOrder()
-            }
-
-            // Advance time BEFORE systems run, so simulationTime represents "now"
-            simulationTime += deltaTime
-
-            for systemID in systemOrder {
-                systems[systemID]!.system.update(world: self, deltaTime: deltaTime)
-            }
-        }
+        try execute(defaultPipeline, deltaTime: deltaTime, advancesTime: true)
     }
 
-    /// Rebuild the system execution order using topological sort.
-    private func rebuildSystemOrder() throws {
-        let systemIDs = Array(systems.keys)
-        let idToIndex = Dictionary(uniqueKeysWithValues: systemIDs.enumerated().map { ($1, $0) })
-
-        // Build adjacency list and in-degree count
-        var inDegree = [Int](repeating: 0, count: systems.count)
-        var dependents: [[Int]] = Array(repeating: [], count: systems.count)
-
-        for (index, systemID) in systemIDs.enumerated() {
-            let entry = systems[systemID]!
-            for dep in entry.dependencies {
-                guard let depIndex = idToIndex[dep] else {
-                    throw SystemError.dependencyNotFound(system: systemID, dependency: dep)
-                }
-                dependents[depIndex].append(index)
-                inDegree[index] += 1
-            }
-        }
-
-        // Kahn's algorithm for topological sort
-        var queue: [Int] = []
-        for (index, degree) in inDegree.enumerated() where degree == 0 {
-            queue.append(index)
-        }
-
-        var sorted: [Int] = []
-        var queueIndex = 0
-
-        while queueIndex < queue.count {
-            let current = queue[queueIndex]
-            queueIndex += 1
-            sorted.append(current)
-
-            for dependent in dependents[current] {
-                inDegree[dependent] -= 1
-                if inDegree[dependent] == 0 {
-                    queue.append(dependent)
+    internal func execute(_ pipeline: Pipeline, deltaTime: Double, advancesTime: Bool) throws {
+        let schedule = try resolve(pipeline)
+        mutations.batch {
+            pipelineExecutionDepth += 1
+            defer {
+                pipelineExecutionDepth -= 1
+                if pipelineExecutionDepth == 0 {
+                    let cleanup = pendingSystemCleanup
+                    pendingSystemCleanup.removeAll()
+                    for system in cleanup {
+                        system.cleanup(world: self)
+                    }
                 }
             }
+            // Advance time BEFORE systems run, so simulationTime represents "now"
+            if advancesTime {
+                simulationTime += deltaTime
+            }
+            for descriptor in schedule {
+                descriptor.implementation?.update(world: self, deltaTime: deltaTime)
+            }
         }
-
-        // Check for cycle
-        if sorted.count != systems.count {
-            // Find systems involved in cycle
-            let cycleIndices = inDegree.enumerated().filter { $0.element > 0 }.map(\.offset)
-            let cycleIDs = cycleIndices.map { systemIDs[$0] }
-            throw SystemError.cyclicDependency(cycleIDs)
-        }
-
-        systemOrder = sorted.map { systemIDs[$0] }
-        systemOrderDirty = false
     }
 
     /// Get the current system execution order.
     public var systemExecutionOrder: [SystemID] {
-        if systemOrderDirty {
-            try? rebuildSystemOrder()
+        get throws {
+            try executionOrder(for: defaultPipeline)
         }
-        return systemOrder
     }
 }

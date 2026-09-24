@@ -62,8 +62,8 @@ private struct SelectiveMovementSystem: System {
     var velocityEvents = 0
     let positionToken = world.observe(Position.self) { _ in positionEvents += 1 }
     let velocityToken = world.observe(Velocity.self) { _ in velocityEvents += 1 }
-    let change = ComponentRefChange { _ = world.entityCount }
     try world.addSystem(SelectiveMovementSystem())
+    let change = ComponentRefChange { _ = world.entityCount }
     try world.update(deltaTime: 1)
     #expect(positionEvents == 10)
     #expect(velocityEvents == 0)

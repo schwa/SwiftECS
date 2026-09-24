@@ -2,7 +2,7 @@
 
 Status: Draft
 
-Implementation status: general typed relationships, `ChildOf`, direct relationship predicates, and descendant queries are implemented. Traversal and deletion rules are in [Relationship decisions](../Experiments/Relationships.md). Phases, pipelines, singleton APIs, and inherited component lookup remain proposals.
+Implementation status: general typed relationships, `ChildOf`, direct relationship predicates, descendant queries, phases, and query-selected pipelines are implemented. Traversal and deletion rules are in [Relationship decisions](../Experiments/Relationships.md). Scheduling semantics are in [Phases and pipelines](../Experiments/PhasesAndPipelines.md). Singleton APIs and inherited component lookup remain proposals.
 
 ## Context
 
@@ -37,14 +37,14 @@ is modeled *inside* the ECS, using the same machinery as everything else:
   pipeline swapping, and running one pipeline independently (e.g. REST/stats
   services separate from gameplay) essentially for free.
 
-Contrast with our current design: an explicit `SystemEntry.dependencies`
-list plus a Swift-side topological sort (`systemOrder`). Simple and direct,
-but ordering lives outside the data model and custom pipelines are extra
-work.
+The original scheduler used an explicit `SystemEntry.dependencies` list and a
+cached Swift-side topological sort. The implementation now stores dependencies
+as ECS relationships and selects system entities through pipeline queries.
 
-**Proposal:** model phases as entities and dependencies as a relationship,
-then resolve order via a query rather than a hand-written topo-sort. Keep a
-simple `before:`/`after:` sugar on top for per-system ordering.
+**Implemented:** phases are entities, dependencies are relationships, and
+pipelines select system entities through queries. `before:` and `after:` provide
+per-system ordering. A separate topological pass resolves the combined graph.
+Query selection and breadth-first relationship traversal do not replace that pass.
 
 ### 2. Relationships / pairs
 
