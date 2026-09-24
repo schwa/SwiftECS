@@ -1,13 +1,13 @@
+import StarfallSupport
+import SurvivalSupport
 import SwiftUI
 
-public struct DemoPickerView: View {
+struct DemoPickerView: View {
     private enum Demo: Hashable {
         case starfall, survivors
     }
 
-    public init() {}
-
-    public var body: some View {
+    var body: some View {
         NavigationStack {
             VStack {
                 Text("ECS Arcade").font(.largeTitle.bold())

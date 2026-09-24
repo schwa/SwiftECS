@@ -1,5 +1,5 @@
 import Foundation
-@testable import StarfallSupport
+@testable import SurvivalSupport
 import SwiftECS
 import Testing
 

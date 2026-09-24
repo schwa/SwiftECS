@@ -4,13 +4,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "StarfallSupport",
+    name: "DemoSupport",
     platforms: [.macOS(.v26), .iOS(.v26), .visionOS(.v26)],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
             name: "StarfallSupport",
             targets: ["StarfallSupport"]
+        ),
+        .library(
+            name: "SurvivalSupport",
+            targets: ["SurvivalSupport"]
         )
     ],
     dependencies: [.package(name: "SwiftECS", path: "../../../..")],
@@ -21,9 +25,17 @@ let package = Package(
             name: "StarfallSupport",
             dependencies: [.product(name: "SwiftECS", package: "SwiftECS")]
         ),
+        .target(
+            name: "SurvivalSupport",
+            dependencies: [.product(name: "SwiftECS", package: "SwiftECS")]
+        ),
         .testTarget(
             name: "StarfallSupportTests",
             dependencies: ["StarfallSupport"]
+        ),
+        .testTarget(
+            name: "SurvivalSupportTests",
+            dependencies: ["SurvivalSupport"]
         )
     ],
     swiftLanguageModes: [.v6]
