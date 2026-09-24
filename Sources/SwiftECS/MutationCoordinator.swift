@@ -10,6 +10,11 @@ internal final class MutationCoordinator: Observable {
     private var handlers: [ObjectIdentifier: [UInt64: AnyObserverHandler]] = [:]
 
     @usableFromInline
+    var hasObservers: Bool {
+        !handlers.isEmpty
+    }
+
+    @usableFromInline
     func access() {
         registrar.access(self, keyPath: \.revision)
     }

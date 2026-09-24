@@ -184,6 +184,7 @@ public final class World {
     /// Notify observers of a component change.
     @inlinable
     internal func notifyChanged<T: Component>(entityID: EntityID, component: T) {
+        guard mutations.hasObservers else { return }
         mutations.changed(entity: Entity(id: entityID, world: self), component: component)
     }
 

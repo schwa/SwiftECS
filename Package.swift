@@ -20,6 +20,9 @@ let package = Package(
             dependencies: [
                 .product(name: "Collections", package: "swift-collections")
             ]),
+        .executableTarget(
+            name: "Benchmark",
+            dependencies: ["SwiftECS"]),
         .testTarget(
             name: "SwiftECSTests",
             dependencies: ["SwiftECS"])

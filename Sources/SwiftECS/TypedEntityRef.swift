@@ -34,6 +34,7 @@ public struct TypedEntityRef<each Value: Component> {
             }
         }, events: {
             // Complete all writes before event handlers can change entity storage.
+            guard world.mutations.hasObservers else { return }
             for value in repeat each values {
                 world.notifyChanged(entityID: entityID, component: value)
             }
@@ -42,6 +43,7 @@ public struct TypedEntityRef<each Value: Component> {
 
     // Direct array subscripting in a pack expansion fails on Swift 6.4.
     @inlinable
+    @inline(__always)
     internal func read<T: Component>(_ column: Column<T>) -> T {
         column.data[index]
     }

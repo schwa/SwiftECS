@@ -44,9 +44,10 @@ protocol AnyColumn: AnyObject {
 /// Typed column storage for one component type.
 @usableFromInline
 final class Column<T: Component>: AnyColumn {
-    @usableFromInline var data: [T] = []
+    @usableFromInline var data: ContiguousArray<T> = []
 
     @inlinable
+    @inline(__always)
     func setValue(_ value: T, at index: Int) {
         data[index] = value
     }
