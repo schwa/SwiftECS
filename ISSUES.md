@@ -295,31 +295,30 @@ Evidence: Tests/ECSTests/TypedQueryCostTests.swift and Experiments/TypedQueryPac
 ## 14: Track ECS performance against the 60 Hz simulation budget
 
 +++
-status: open
+status: closed
 priority: high
 kind: task
 labels: effort:l
 created: 2026-09-23T19:28:16Z
-updated: 2026-09-23T19:29:01Z
+updated: 2026-09-24T01:04:03Z
+closed: 2026-09-24T01:04:03Z
 +++
 
-Umbrella issue for the remaining ECS performance work. The current 100K-entity Release workload takes approximately 25 ms per update, exceeding the 16.7 ms budget for 60 Hz before rendering. This is a synthetic simulation workload, not a measured Starfall frame time.
+Umbrella issue coordinating ECS performance work against a 16.7 ms budget for 60 updates per second. The defined workload is 100,000 entities in one archetype, each reading and writing two components per update. This is a synthetic simulation workload, not a measured app frame time.
 
-Current evidence: Experiments/TypedQueryPacks/Performance.md. The latest Time Profiler capture matches production code at 0ab9af6b; later write-helper experiments were reverted. Durable local trace: ~/Desktop/ECS-Profiles/typed-query-0ab9af6b.trace, with benchmark output, stack summary, and provenance notes alongside it. The capture includes all processes and must be reviewed before sharing.
+Outcome: the accepted component-update goal is met. The latest Release typed-query workload measures approximately 10.2 ms per update (median, 100-update samples, with and without a storage observer). Progress: about 111 ms, then 54, 25, 15, 13.4, and 10 ms across successive changes.
 
-Remaining work:
-- #13: typed component reads/writes. Current profile is dominated by setter work, array modification, and generic metadata. The plain and non-inlined write-helper experiments did not help.
-- #5: broader observation overhead and actual SwiftUI work, including multiple observing views.
-- #4: sequential simulation substeps each produce storage invalidation.
+Completed work: #6 typed access; #11 removed debug type-name construction from observer dispatch; #12 shared typed-query storage; and cross-module specialization of accessors, iteration, and an inlinable column setter. Correctness tests pass in Debug and Release; component-event delivery and batched observation are preserved.
 
-Completed milestones: #6 introduced and measured typed access; #11 removed debug-name construction from observer dispatch; #12 removed most per-row iterator construction overhead. Comparable workload medians progressed from about 111 ms to 54 ms to 25 ms.
+Measurements, methodology, and provenance are in Experiments/TypedQueryPacks/Performance.md, with retained traces and a patch under ~/Desktop/ECS-Profiles/. Traces include unrelated processes and need review before sharing. Numbers are hardware- and toolchain-specific and do not include app rendering headroom.
 
-Completion criteria: repeatable Release measurements below 16.7 ms for the defined 100K-entity workload, with rendering headroom reported rather than implied; characterization of observation and component-event costs; correctness tests still passing; retained profiles and measurement notes identifying the tested revision, toolchain, hardware, workload, and limitations. Timing improvements must not silently omit event delivery or observation. This issue coordinates the related work rather than duplicating its implementation scope.
+Remaining focused work continues separately: #5 broader observation and SwiftUI cost, #4 substep invalidation batching, and #19 relationship-heavy workloads. Closing this umbrella now that the component-update target is met; those issues track the rest.
 
 - `2026-09-23T19:39:22Z`: Current candidate uses cross-module specialization of typed accessors. Typed-only 100-frame samples now measure about 15 ms/update; mixed comparison reaches 16.5–16.7 ms, so no claim of reliable rendering headroom. Latest preserved trace: ~/Desktop/ECS-Profiles/typed-query-inline-experiment.trace, with benchmark log, summary, provenance, and patch. Older 0ab9af6b trace remains as the previous baseline. #13 and #5 remain open.
 - `2026-09-23T19:44:50Z`: Latest candidate specializes iterator advancement across modules. Longer typed-only samples measure about 13.4–13.5 ms/update for 100K entities, leaving roughly 3 ms before 16.7 ms, not a rendering guarantee. Current profile: ~/Desktop/ECS-Profiles/typed-query-iterator-inline.trace. Notes and methodology updated in Performance.md.
 - `2026-09-23T19:50:50Z`: Current candidate reaches about 10 ms/update for the defined typed-query workload after an inlinable column setter. Back-to-back baseline 13.668 ms vs candidate 9.951 ms. This leaves about 6.7 ms of the 16.7 ms budget, but is not an app rendering measurement. Latest preserved profile is typed-query-column-inline.trace under ~/Desktop/ECS-Profiles/. Broader observation/event workloads remain outstanding.
 - `2026-09-23T21:17:09Z`: Relationship-heavy scalability is tracked in #19. The accepted component-update goal is met at approximately 10 ms per 100K entities; remaining broader observation work stays in #5 and substep batching in #4.
+- `2026-09-24T01:04:03Z`: Component-update goal met: about 10.2 ms per update for the defined 100K-entity workload in Release, below the 16.7 ms budget. Correctness, component events, and batched observation preserved. Retained profiles, patch, and methodology under ~/Desktop/ECS-Profiles and Experiments/TypedQueryPacks/Performance.md. Remaining performance work continues in #5, #4, and #19; this is not a claim of app rendering headroom.
 
 ---
 
@@ -492,5 +491,62 @@ closed: 2026-09-23T23:01:41Z
 World.query returns an entity-array snapshot, World.entities exposes lazy entity and fast-reference sequences, and World.typedQuery exposes typed row sequences. These overlapping names do not make the default path or the snapshot-versus-lazy distinction clear. Callers must inspect overloads and return types to understand component access, allocation, and lifetime differences. Review naming and organization while retaining the useful capabilities of each path.
 
 - `2026-09-23T23:01:41Z`: Renamed typedQuery to query as the default typed lazy API. Entity-array snapshots use snapshot(matching:) or snapshot(with:); lazy handles use entities(matching:); the older untyped fast path uses references. Removed old spellings and migrated library tests, benchmarks, demos, and README. Added tests distinguishing fixed snapshot membership from live lazy iteration and documenting that snapshot handles do not freeze component values. All 170 core tests and 15 demo tests pass, Debug/Release and macOS build pass, strict lint is clean. Typed benchmark remains approximately 10.2 ms/100K entities.
+
+---
+
+## 24: Mutation paths separately coordinate storage writes and observation
+
++++
+status: new
+priority: medium
+kind: task
+created: 2026-09-24T01:30:21Z
++++
+
+World, ComponentRef, and TypedEntityRef each coordinate storage writes, component events, and Swift Observation invalidation. Update batching also lives in World simulation bookkeeping. Understanding mutation semantics requires following several entry points whose responsibilities overlap.
+
+This creates integration risk when a new write path omits notification, changes event ordering, or interacts with reentrant callbacks. Dependencies are entirely in-process.
+
+Tests currently mix public mutation contracts with direct ObserverRegistry tests. Any architectural change must preserve their subscriber-removal and dispatch coverage at the public boundary, plus coverage across write paths, update batching, and failure handling. Preserve measured cross-module specialization gains. No replacement interface has been selected.
+
+Related: #4 concerns batching across substeps and #5 measures observation overhead. This issue concerns ownership of mutation semantics, not those feature or measurement tasks.
+
+---
+
+## 25: Query evaluation and cache responsibilities are spread across multiple paths
+
++++
+status: new
+priority: medium
+kind: task
+created: 2026-09-24T01:30:21Z
++++
+
+Query.swift, Query+Relationships.swift, typed sequences/iterators, and World cache invalidation jointly implement one query contract. Predicates have separate archetype matching, entity-filter classification, and entity-level evaluation. Snapshot and lazy paths coordinate these pieces independently.
+
+Adding predicate kinds or changing caching requires updates across these paths. Missing one can cause incorrect negation, stale membership, or disagreement between query APIs. Dependencies are entirely in-process.
+
+Behavioral coverage must verify boolean combinations, relationship changes, new archetypes, and snapshot/lazy semantics through public query APIs. Compiler feasibility probes serve a different purpose from query behavior tests. No replacement interface has been selected.
+
+Related: #19 measures relationship-query scaling. This issue concerns query ownership and integration risk, not a new caching policy.
+
+---
+
+## 26: Relationship policies and lifecycle cleanup have split ownership
+
++++
+status: new
+priority: medium
+kind: task
+created: 2026-09-24T01:30:21Z
++++
+
+Entity+Relationships enforces cardinality, cycles, and entity validity; RelationshipStorage owns forward/reverse indexes; World cloning and deletion copy or remove links; query predicates read that storage directly. One relationship lifecycle spans these layers.
+
+Correctness depends on every path preserving graph policies, index consistency, cloning/deletion semantics, and observation. Those responsibilities have no single internal owner. Dependencies are entirely in-process.
+
+Existing public relationship tests provide useful boundary coverage. Preserve reparenting, clone behavior, detaching and recursive deletion, rejected mutations, traversal ordering, and observation while considering a deeper boundary. No replacement interface has been selected.
+
+Related: #8 concerns archetype reclamation, #17 explores graph-backed scheduling, and #19 measures relationship workloads. This issue concerns ownership of the existing graph contract.
 
 ---
