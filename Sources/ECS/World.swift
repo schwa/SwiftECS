@@ -203,7 +203,7 @@ public final class World {
         observers.removeObserver(token)
     }
 
-    /// Notify observers of a component change (used by EntityRef).
+    /// Notify observers of a component change.
     @usableFromInline
     internal func notifyChanged<T: Component>(entityID: EntityID, component: T) {
         observers.notifyChanged(entity: Entity(id: entityID, world: self), component: component)

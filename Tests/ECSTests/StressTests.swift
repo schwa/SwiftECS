@@ -211,7 +211,7 @@ struct StressTests {
         print("   Average per frame: \(String(format: "%.2f", time / 60.0))ms")
     }
 
-    @Test func stressTestFastPhysicsUpdate_100K() {
+    @Test func stressTestComponentReferencePhysicsUpdate_100K() {
         let world = World()
 
         for i in 0..<100_000 {
@@ -227,15 +227,16 @@ struct StressTests {
 
         let time = measureTime {
             for _ in 0..<60 {
-                for ref in world.references(query, Transform.self, Physics.self) {
-                    ref[Transform.self].x += ref[Physics.self].velocityX * deltaTime
-                    ref[Transform.self].y += ref[Physics.self].velocityY * deltaTime
-                    ref[Transform.self].z += ref[Physics.self].velocityZ * deltaTime
+                for row in world.query(Transform.self, Physics.self, matching: query) {
+                    let (transform, physics) = row.components
+                    transform.value.x += physics.value.velocityX * deltaTime
+                    transform.value.y += physics.value.velocityY * deltaTime
+                    transform.value.z += physics.value.velocityZ * deltaTime
                 }
             }
         }
 
-        print("⏱ 60 FAST physics updates on 100000 entities in \(String(format: "%.2f", time))ms")
+        print("⏱ 60 component-reference physics updates on 100000 entities in \(String(format: "%.2f", time))ms")
         print("   Average per frame: \(String(format: "%.2f", time / 60.0))ms")
     }
 

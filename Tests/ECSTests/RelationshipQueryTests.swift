@@ -13,20 +13,17 @@ private enum Targets: Relationship {}
     let query = Query(.contains(Health.self) && .related(ChildOf.self, to: firstParent.id))
     world.register(query)
     let lazy = world.entities(matching: query)
-    let fast = world.references(query, Health.self)
     let typed = world.query(Health.self, matching: query)
     #expect(world.snapshot(matching: query).isEmpty)
     try first.setParent(firstParent)
     try second.setParent(secondParent)
     #expect(world.snapshot(matching: query).map(\.id) == [first.id])
     #expect(Array(lazy).map(\.id) == [first.id])
-    #expect(Array(fast).map(\.entityID) == [first.id])
     #expect(Array(typed).map(\.entityID) == [first.id])
     try first.setParent(secondParent)
     try second.setParent(firstParent)
     #expect(world.snapshot(matching: query).map(\.id) == [second.id])
     #expect(Array(lazy).map(\.id) == [second.id])
-    #expect(Array(fast).map(\.entityID) == [second.id])
     #expect(Array(typed).map(\.entityID) == [second.id])
     for row in typed {
         row.set(Health(current: 10))
@@ -64,7 +61,7 @@ private enum Targets: Relationship {}
         #expect(Set(world.snapshot(matching: query).map(\.id)) == expected)
         #expect(Set(world.entities(matching: query).map(\.id)) == expected)
         #expect(Set(world.query(matching: query).map(\.entityID)) == expected)
-        #expect(Set(world.references(query, Health.self).map(\.entityID)) == expected.intersection([linked.id, unlinked.id]))
+        #expect(Set(world.query(Health.self, matching: query).map(\.entityID)) == expected.intersection([linked.id, unlinked.id]))
     }
 }
 
@@ -148,7 +145,6 @@ private struct ReparentSystem: System {
     let reads: [() -> Void] = [
         { _ = world.snapshot(matching: query) },
         { _ = world.entities(matching: query) },
-        { _ = world.references(query, Health.self) },
         { _ = world.query(Health.self, matching: query) }
     ]
     for read in reads {

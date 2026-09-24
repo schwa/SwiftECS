@@ -41,9 +41,9 @@ private struct ObservationTestSystem: System {
     let entity = world.createEntity(Position(x: 1, y: 2))
     let query = Query(with: Position.self)
     world.register(query)
-    let reference = try #require(world.references(query, Position.self).first { _ in true })
+    let reference = try #require(world.query(Position.self, matching: query).first { _ in true })
     let sequence = world.entities(matching: query)
-    let fastSequence = world.references(query, Position.self)
+    let typedSequence = world.query(Position.self, matching: query)
     let reads: [() -> Void] = [
         { _ = entity[Position.self] },
         { _ = entity[Health.self] },
@@ -58,10 +58,10 @@ private struct ObservationTestSystem: System {
         { _ = world.snapshot(matching: query) },
         { _ = world.snapshot(with: Position.self) },
         { _ = world.entities(matching: query) },
-        { _ = world.references(query, Position.self) },
+        { _ = world.query(Position.self, matching: query) },
         { _ = Array(sequence) },
-        { _ = Array(fastSequence) },
-        { _ = reference[Position.self] },
+        { _ = Array(typedSequence) },
+        { _ = reference.values },
         { _ = entity.get(Position.self) },
         { _ = world.stats },
         { _ = world.dumpString() },
@@ -83,7 +83,7 @@ private struct ObservationTestSystem: System {
     let tracker = StorageTracker {
         #expect(world.snapshot(matching: query).isEmpty || world.entityCount > 0)
         _ = world.entities(matching: query)
-        _ = world.references(query, Health.self)
+        _ = world.query(Health.self, matching: query)
     }
     let entity = world.createEntity()
     #expect(tracker.count == 1)
@@ -121,9 +121,9 @@ private struct ObservationTestSystem: System {
             { _ = world.snapshot(matching: query) },
             { _ = world.snapshot(with: Health.self) },
             { _ = world.entities(matching: query) },
-            { _ = world.references(query, Health.self) },
+            { _ = world.query(Health.self, matching: query) },
             { _ = Array(world.entities(matching: query)) },
-            { _ = Array(world.references(query, Health.self)) }
+            { _ = Array(world.query(Health.self, matching: query)) }
         ]
         for read in reads {
             let tracker = StorageTracker(read)
@@ -138,7 +138,7 @@ private struct ObservationTestSystem: System {
 @Test func `empty retained iterators register access even when exhausted`() {
     let world = World()
     var ordinary = world.entities(matching: .all).makeIterator()
-    var fast = world.references(.all, Health.self).makeIterator()
+    var fast = world.query(Health.self, matching: .all).makeIterator()
     let ordinaryTracker = StorageTracker { _ = ordinary.next() }
     let fastTracker = StorageTracker { _ = fast.next() }
     world.createEntity(Health(current: 1))
@@ -146,17 +146,18 @@ private struct ObservationTestSystem: System {
     #expect(fastTracker.count == 1)
 }
 
-@Test func `fast reference writes notify and preserve component events`() throws {
+@Test func `component reference writes notify and preserve component events`() throws {
     let world = World()
     world.createEntity(Position(x: 0, y: 0))
-    let reference = try #require(world.references(Query(with: Position.self), Position.self).first { _ in true })
-    let tracker = StorageTracker { _ = reference[Position.self] }
+    let row = try #require(world.query(Position.self).first { _ in true })
+    let reference = row.components
+    let tracker = StorageTracker { _ = reference.value }
     var events = 0
     let token = world.observe(Position.self) { _ in events += 1 }
-    reference[Position.self] = Position(x: 10, y: 20)
+    reference.value = Position(x: 10, y: 20)
     #expect(tracker.count == 1)
     #expect(events == 1)
-    #expect(reference[Position.self].x == 10)
+    #expect(reference.value.x == 10)
     world.removeObserver(token)
 }
 
@@ -183,14 +184,14 @@ private struct ObservationTestSystem: System {
     let world = World()
     let entity = world.createEntity(Position(x: 0, y: 0))
     let tracker = StorageTracker { _ = entity[Position.self] }
-    let reference = try #require(world.references(Query(with: Position.self), Position.self).first { _ in true })
+    let reference = try #require(world.query(Position.self).first { _ in true }).components
     try world.addSystem(ObservationTestSystem { world in
         let before = tracker.count
         for index in 0..<10_000 {
             if index.isMultiple(of: 2) {
                 entity.set(Position(x: Double(index), y: 0))
             } else {
-                reference[Position.self] = Position(x: Double(index), y: 0)
+                reference.value = Position(x: Double(index), y: 0)
             }
         }
         let temporary = world.createEntity(Health(current: 1))

@@ -114,15 +114,9 @@ for row in world.query(Position.self, Velocity.self) {
 for entity in world.entities(matching: active) {
     let position = entity[Position.self]
 }
-
-for reference in world.references(active, Position.self, Velocity.self) {
-    var position = reference[Position.self]
-    position.x += reference[Velocity.self].x * deltaTime
-    reference[Position.self] = position
-}
 ```
 
-`entities(matching:)` lazily returns handles. `references` is the older untyped fast-reference path. `snapshot` returns an array of handles with fixed membership, not frozen component values.
+`entities(matching:)` lazily returns handles. `snapshot` returns an array of handles with fixed membership, not frozen component values.
 
 Do not create or destroy entities, or add or remove component types, during lazy or typed iteration. Collect handles first:
 

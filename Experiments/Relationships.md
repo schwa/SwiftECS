@@ -53,7 +53,7 @@ let healthyChildren = children.with(Health.self)
 let roots = Query(!QueryPredicate.related(ChildOf.self))
 ```
 
-Ordinary, lazy, fast, and typed queries support these predicates and their boolean combinations. Query targets are world-local entity IDs. Descendant predicates exclude the root.
+Snapshot, lazy, and typed queries support these predicates and their boolean combinations. Query targets are world-local entity IDs. Descendant predicates exclude the root.
 
 Registered queries cache candidate archetypes, not relationship matches. Relationship terms remain unresolved during archetype filtering, including under negation. Iteration checks live links per entity.
 

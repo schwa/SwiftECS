@@ -4,7 +4,7 @@ import Observation
 import Testing
 
 private enum QueryAccess: CaseIterable {
-    case entity, fast, typed
+    case entity, typed
 }
 
 private struct QueryBenchmarkSystem: System {
@@ -22,16 +22,6 @@ private struct QueryBenchmarkSystem: System {
                 transform.y += physics.velocityY * deltaTime
                 transform.z += physics.velocityZ * deltaTime
                 entity.set(transform, physics)
-            }
-        case .fast:
-            for reference in world.references(query, Transform.self, Physics.self) {
-                var transform = reference[Transform.self]
-                let physics = reference[Physics.self]
-                transform.x += physics.velocityX * deltaTime
-                transform.y += physics.velocityY * deltaTime
-                transform.z += physics.velocityZ * deltaTime
-                reference[Transform.self] = transform
-                reference[Physics.self] = physics
             }
         case .typed:
             for row in world.query(Transform.self, Physics.self, matching: query) {

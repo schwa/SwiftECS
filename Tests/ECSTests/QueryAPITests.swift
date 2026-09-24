@@ -8,14 +8,12 @@ import Testing
     let snapshot = world.snapshot(matching: predicate)
     let handles = world.entities(matching: predicate)
     let rows = world.query(Health.self, matching: predicate)
-    let references = world.references(predicate, Health.self)
     let second = world.createEntity(Health(current: 2))
     first.set(Health(current: 3))
     #expect(snapshot.map(\.id) == [first.id])
     #expect(snapshot.first?[Health.self]?.current == 3)
     #expect(Set(handles.map(\.id)) == [first.id, second.id])
     #expect(Set(rows.map(\.entityID)) == [first.id, second.id])
-    #expect(Set(references.map(\.entityID)) == [first.id, second.id])
     for entity in snapshot {
         try world.destroy(entity)
     }
