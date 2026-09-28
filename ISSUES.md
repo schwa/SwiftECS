@@ -637,3 +637,151 @@ This issue covers sequential Flecs-style synchronization points, not parallel sy
 - `2026-09-28T17:45:51Z`: Added automatic pipeline-owned command merging, an afterEachSystem comparison policy, and run statistics. Covered nested runs, reentrant observers, partial flush failures, callback failures, cleanup, and empty selections. Both demos use typed command capabilities. Debug/Release package tests, 15 demo tests, lint, and the macOS demo build pass. Release benchmark: 32 to 1 merges/frame for 4096 commands; median 4.06 ms automatic versus 3.99 ms per-system, with no runtime speedup claimed.
 
 ---
+
+## 30: Systems lack an enforceable parallel-execution eligibility contract
+
++++
+status: new
+priority: medium
+kind: feature
+labels: systems, concurrency
+created: 2026-09-28T19:35:16Z
++++
+
+System callbacks and lifecycle hooks can capture arbitrary mutable state. Component only marks data, and the current value-semantics contract does not establish Sendable safety. Read/write declarations describe ECS access, not captured state or executor isolation.
+
+Expected: parallel eligibility has an explicit, compiler-checked contract covering callback captures, component payloads, command payloads, and scoped query access. Actor-isolated and otherwise serial-only systems remain usable without unsafe transfer. Concurrent invocation of the same stateful system, including registration in multiple worlds, must have defined behavior.
+
+The contract must distinguish safe task transfer from exclusive access to live ECS storage. Blanket unchecked Sendable conformances must not substitute for ownership guarantees. Compile-failure coverage must reject unsupported captures and payloads.
+
+This concerns concurrent systems within a world. Off-main simulation ownership and render snapshots remain tracked separately in #15.
+
+---
+
+## 31: Nonconflicting component access still reaches shared mutable world state
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: storage, concurrency
+depends: 30
+created: 2026-09-28T19:35:28Z
++++
+
+Systems with disjoint component declarations still use shared World state, query machinery, and mutation bookkeeping. SystemComponent also falls back to world lookups after a structural revision. A false result from SystemAccess.conflicts is therefore not proof that concurrent callbacks are race-free.
+
+Expected: eligible systems can read shared components and write disjoint component storage concurrently without racing query preparation, arrays, world dictionaries, revision tracking, or shared bookkeeping. Binding, storage lifetime, and exclusive-write ownership must remain valid for the complete execution interval.
+
+Structural changes, world reuse, and external world access must not invalidate storage while a callback is active. Concurrent update/run calls on the same world need an explicit supported or rejected contract. Raw Entity, World, and query-reference APIs must not become implicitly thread-safe.
+
+Coverage must include different components on the same entities, different archetypes, read/read sharing, conflicting writes, and structural access attempts during execution.
+
+---
+
+## 32: Observers and storage invalidation have no parallel-execution contract
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: observation, concurrency
+depends: 30
+created: 2026-09-28T19:35:39Z
++++
+
+Component observers run synchronously and can access or mutate arbitrary world state. MutationCoordinator maintains shared batching and notification state. Sequential synchronization currently treats observers conservatively, but that does not define safe behavior when several system callbacks execute concurrently.
+
+Expected: observer delivery and storage invalidation have explicit isolation, ordering, and visibility guarantees. Existing synchronous observer behavior must remain supported through a safe serial path unless callers explicitly choose different semantics. Observable publication must not race worker writes or expose partially completed execution.
+
+Reentrant observers, nested runs, observer registration/removal, and callback-triggered structural changes need defined behavior while parallel work exists. Tests must verify notification counts, event ordering, executor expectations, and safe rejection or serialization of unsupported reentrancy.
+
+Render-snapshot publication is separate work in #15; this issue covers the existing ECS observation APIs.
+
+---
+
+## 33: Deferred commands and entity reservations are unsafe for concurrent producers
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: systems, commands, concurrency
+depends: 30
+created: 2026-09-28T19:35:50Z
++++
+
+Each callback has a command array, but creation also mutates World.reservedCommandIDs. Deferred operations capture payloads in non-Sendable closures, and PipelineExecution consumes batches in sequential callback order. These assumptions do not support concurrent producers.
+
+Expected: parallel-eligible callbacks can enqueue commands and reserve unique entity identities without shared-state races. Command payload ownership and transfer must satisfy the parallel eligibility contract. Structural application remains exclusive to callback execution.
+
+Merge order must follow a defined logical system order, not task completion order, while preserving order within each callback. Relationships and component edits targeting newly created entities must work across compatible batches. Scheduling variability must not change the logical result for deterministic callbacks, apart from independently generated random identifiers.
+
+Success, cancellation, callback failure, and partial merge failure must release reservations and discard the correct uncommitted commands. No buffer or scoped handle may outlive its permitted execution interval.
+
+---
+
+## 34: Pipelines cannot execute independent eligible systems concurrently
+
++++
+status: new
+priority: medium
+kind: feature
+labels: systems, pipelines, concurrency
+depends: 30, 31, 32, 33
+created: 2026-09-28T19:36:03Z
++++
+
+PipelineExecution runs every callback serially. Access metadata and sequential merge points exist, but there is no supported parallel execution mode or completion boundary for a group of concurrent callbacks.
+
+Expected: independent parallel-eligible systems can overlap while serial-only systems remain supported. Scheduling must respect component conflicts, complete query dependencies, command effects, phases, explicit dependencies, and captured schedules. The sequential reference order must resolve otherwise unordered conflicts without inventing producer/consumer semantics. Ready nonconflicting systems may overlap without weakening required ordering.
+
+All callbacks using storage must finish before a structural merge, cleanup, or storage reuse. Concurrency must be bounded. Manual runs, nested runs, and simultaneous calls on a world need defined behavior rather than accidental reentrancy.
+
+Cancellation and one or more callback failures must have explicit semantics for joining active work, selecting reported errors, retaining immediate writes, committing successful command batches, and releasing scopes. The run must not return while work still accesses its world.
+
+Existing synchronous serial execution remains supported. This issue covers parallel systems, not subdivision of one system query.
+
+---
+
+## 35: Parallel execution lacks race validation and scaling measurements
+
++++
+status: new
+priority: medium
+kind: task
+labels: testing, performance, concurrency
+depends: 34
+created: 2026-09-28T19:36:14Z
++++
+
+The existing tests and synchronization benchmark validate sequential execution. They do not establish race freedom, actual callback overlap, bounded concurrency, serial equivalence, or useful scaling for parallel systems.
+
+Expected: strict Swift concurrency checks and compile-failure fixtures enforce eligibility boundaries. Thread Sanitizer stress coverage exercises storage access, command reservations, observers, cancellation, multiple failures, nested execution, and cleanup. Deterministic synchronization in tests must demonstrate overlap for independent systems and exclusion for conflicting systems without relying on sleeps.
+
+Serial and parallel executions must produce equivalent logical results for deterministic workloads across repeated scheduling variations and worker counts. Parallel-capable demo scenarios must retain their behavior, including serial-only fallbacks.
+
+Measurements must compare the serial baseline with several concurrency limits and workload sizes. Include compute-heavy, memory-bound, highly conflicting, and command-heavy cases; report runtime, scheduling overhead, merge counts, and small-workload regressions. Record the hardware and build configuration, and do not infer a speedup from overlap alone.
+
+---
+
+## 36: A single large system query cannot use parallel entity iteration
+
++++
+status: new
+priority: low
+kind: feature
+labels: systems,queries,concurrency
+depends: 34,35
+created: 2026-09-28T19:36:25Z
++++
+
+Parallel execution of independent systems cannot accelerate a workload dominated by one large query. SystemRows currently exposes a sequential iterator, and its access contract grants component-type access rather than disjoint row ownership.
+
+Expected: a separately eligible per-entity callback can process disjoint portions of one query concurrently without duplicate or omitted entities, overlapping writable rows, escaped references, or races in shared array storage. Stateful callbacks, cross-entity access, and reductions need explicit supported or rejected contracts.
+
+Command ordering, filtering, cancellation, errors, and completion before structural merges must remain defined across partitions. Validation must cover uneven archetype sizes, empty matches, component sharing, deterministic results, and partitioning overhead.
+
+This is a later follow-up to validated parallel-system execution, not a requirement for its first release.
+
+---
