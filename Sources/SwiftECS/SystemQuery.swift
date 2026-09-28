@@ -10,6 +10,8 @@ public struct SystemQuery<each Term: SystemTerm>: SystemInput {
     public var binding: SystemBinding<SystemRows<repeat each Term>> {
         var access = SystemAccess()
         repeat Self.record(each terms, in: &access)
+        let matching = Query(with: repeat (each Term).ComponentValue.self).and(filter)
+        access.queries.insert(QueryDependencies(query: matching))
         return SystemBinding(access: access, validate: {
             var types: Set<ComponentType> = []
             for type in repeat (each Term).ComponentValue.self {

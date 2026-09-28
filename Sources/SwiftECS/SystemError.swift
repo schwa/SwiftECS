@@ -14,6 +14,7 @@ public enum SystemError: Error, Equatable {
     case invalidPipeline(EntityID)
     case referenceComponent(ComponentType)
     case duplicateTerm(ComponentType)
+    case missingCommandEntity(EntityID)
 }
 
 // MARK: - CustomStringConvertible
@@ -21,6 +22,8 @@ public enum SystemError: Error, Equatable {
 extension SystemError: CustomStringConvertible {
     public var description: String {
         switch self {
+        case .missingCommandEntity(let id):
+            return "Command target \(id) no longer exists"
         case .referenceComponent(let type):
             return "System components must have value semantics; \(type) is a class"
         case .duplicateTerm(let type):

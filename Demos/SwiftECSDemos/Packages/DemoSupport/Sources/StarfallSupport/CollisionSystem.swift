@@ -3,7 +3,7 @@ import SwiftECS
 func collisionSystem() -> System {
     let players = SystemQuery(Write<Player>(), Read<Position>())
     let objects = SystemQuery(Read<FallingObject>(), Read<Position>())
-    return System("collision").run(players, objects, Commands()) { _, players, objects, commands in
+    return System("collision").run(players, objects, DestroyEntities()) { _, players, objects, commands in
         guard let player = players.first(where: { _ in true }) else {
             return
         }

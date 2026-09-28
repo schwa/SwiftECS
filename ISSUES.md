@@ -570,11 +570,13 @@ Related: #8 concerns archetype reclamation, #17 explores graph-backed scheduling
 ## 27: Structural command access is too coarse for selective synchronization
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
 labels: systems, synchronization
 created: 2026-09-28T17:21:00Z
+updated: 2026-09-28T17:45:51Z
+closed: 2026-09-28T17:45:51Z
 +++
 
 Commands() currently reports only SystemAccess.changesStructure. Every command-capable system therefore conflicts with every other system, regardless of the commands it can issue.
@@ -583,16 +585,20 @@ The metadata cannot distinguish entity creation or destruction from component-sp
 
 Expected: structural effects are explicit and enforceable through the typed command API. Metadata must describe all permitted effects, including relationship cleanup caused by destruction. Unknown or unrestricted effects must remain conservative rather than allow a required synchronization point to be omitted.
 
+- `2026-09-28T17:45:51Z`: Added typed creation, component-edit, relationship-edit, and destruction capabilities with derived command-effect metadata. Unrestricted commands and destruction remain conservative. Runtime tests and external-client compile-failure checks verify the capability boundaries.
+
 ---
 
 ## 28: System access metadata omits query-matching dependencies
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
 labels: systems, queries, synchronization
 created: 2026-09-28T17:21:09Z
+updated: 2026-09-28T17:45:51Z
+closed: 2026-09-28T17:45:51Z
 +++
 
 SystemQuery records its typed Read and Write terms in SystemAccess, but matching predicates are absent from that metadata. Filters can depend on component presence or absence, relationship edges, and descendant traversal without reading component values.
@@ -601,17 +607,21 @@ For example, a system that reads Position while excluding Disabled depends on Di
 
 Expected: dependency metadata accounts for all conditions that can change query membership, including compound predicates and relationship traversal. These dependencies must remain distinguishable from component-value access. Coverage must demonstrate that relevant structural changes cannot be missed when deciding whether synchronization is required.
 
+- `2026-09-28T17:45:51Z`: Added complete query dependencies, including exclusions, compound predicates, creation-signature matching, and relationship traversal. System bindings are frozen at definition time so execution cannot drift from its metadata. Dependency and binding-stability tests pass.
+
 ---
 
 ## 29: Pipelines flush deferred commands after every system regardless of dependencies
 
 +++
-status: new
+status: closed
 priority: medium
 kind: feature
-labels: systems,pipelines,synchronization
-depends: 27,28
+labels: systems, pipelines, synchronization
+depends: 27, 28
 created: 2026-09-28T17:21:21Z
+updated: 2026-09-28T17:45:51Z
+closed: 2026-09-28T17:45:51Z
 +++
 
 Each System execution owns its command buffer and flushes it immediately after its callback. This provides conservative synchronization but prevents commands from remaining pending across unrelated systems. Pipelines have no dependency-aware synchronization plan.
@@ -623,5 +633,7 @@ Existing phases, explicit dependencies, registration-order tie breaking, and cap
 Visibility and failure behavior must be explicit and tested for pipeline completion, empty selections, manual runs, nested runs, callback errors, and command-flush errors. Regression coverage must include creation followed by matching queries, exclusions, relationship traversal, and unrelated systems between a producer and consumer. Measurements must report merge counts and runtime against the current per-system flush behavior.
 
 This issue covers sequential Flecs-style synchronization points, not parallel system execution.
+
+- `2026-09-28T17:45:51Z`: Added automatic pipeline-owned command merging, an afterEachSystem comparison policy, and run statistics. Covered nested runs, reentrant observers, partial flush failures, callback failures, cleanup, and empty selections. Both demos use typed command capabilities. Debug/Release package tests, 15 demo tests, lint, and the macOS demo build pass. Release benchmark: 32 to 1 merges/frame for 4096 commands; median 4.06 ms automatic versus 3.99 ms per-system, with no runtime speedup claimed.
 
 ---

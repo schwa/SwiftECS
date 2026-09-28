@@ -5,7 +5,7 @@ final class SpawnSystem {
     private var count = 0
 
     var system: System {
-        System("spawn").run(Commands()) { [self] context, commands in
+        System("spawn").run(CreateEntities(Position.self, Velocity.self, FallingObject.self)) { [self] context, commands in
             remaining -= context.deltaTime
             guard remaining <= 0 else {
                 return

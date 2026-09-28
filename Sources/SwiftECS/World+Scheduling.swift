@@ -61,10 +61,9 @@ extension World {
     }
 
     public func run(_ system: System, deltaTime: Double) throws {
+        try synchronizeBeforeRun()
         try system.validate()
-        try mutations.batch {
-            try system.execute(self, deltaTime)
-        }
+        try executeSystems([system], deltaTime: deltaTime, advancesTime: false, synchronization: .automatic)
     }
 
     public func run(_ pipeline: Pipeline, deltaTime: Double) throws {
@@ -72,6 +71,7 @@ extension World {
     }
 
     public func run(_ pipeline: Entity, deltaTime: Double) throws {
+        try synchronizeBeforeRun()
         try validateRelationshipEntity(pipeline)
         guard let configuration = pipeline[Pipeline.self] else {
             throw SystemError.invalidPipeline(pipeline.id)

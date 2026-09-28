@@ -10,6 +10,12 @@ public final class World {
     @ObservationIgnored
     internal var pendingSystemCleanup: [System] = []
     @ObservationIgnored
+    internal var executions: [PipelineExecution] = []
+    @ObservationIgnored
+    internal var reservedCommandIDs: Set<EntityID> = []
+    @ObservationIgnored
+    public internal(set) var lastRunStatistics = PipelineRunStatistics()
+    @ObservationIgnored
     internal var archetypes: [ArchetypeSignature: Archetype] = [:]
     @ObservationIgnored
     internal var structuralRevision: UInt64 = 0
@@ -332,10 +338,25 @@ public final class World {
     }
 
     internal func execute(_ pipeline: Pipeline, deltaTime: Double, advancesTime: Bool) throws {
+        try synchronizeBeforeRun()
         let schedule = try resolve(pipeline)
+        try executeSystems(schedule.compactMap(\.implementation), deltaTime: deltaTime, advancesTime: advancesTime, synchronization: pipeline.synchronization)
+    }
+
+    internal func synchronizeBeforeRun() throws {
+        for execution in executions {
+            try execution.flush(in: self)
+        }
+    }
+
+    internal func executeSystems(_ systems: [System], deltaTime: Double, advancesTime: Bool, synchronization: PipelineSynchronization) throws {
+        let execution = PipelineExecution()
         try mutations.batch {
             pipelineExecutionDepth += 1
+            executions.append(execution)
             defer {
+                execution.discard(in: self)
+                executions.removeLast()
                 pipelineExecutionDepth -= 1
                 if pipelineExecutionDepth == 0 {
                     let cleanup = pendingSystemCleanup
@@ -344,14 +365,13 @@ public final class World {
                         system.cleanup()
                     }
                 }
+                lastRunStatistics = execution.statistics
             }
             // Advance time BEFORE systems run, so simulationTime represents "now"
             if advancesTime {
                 simulationTime += deltaTime
             }
-            for descriptor in schedule {
-                try descriptor.implementation?.execute(self, deltaTime)
-            }
+            try execution.run(systems, in: self, deltaTime: deltaTime, synchronization: synchronization)
         }
     }
 

@@ -11,10 +11,4 @@ internal final class SystemScope {
     func checkActive() {
         precondition(isActive, "System inputs are only valid during their callback")
     }
-
-    func flush() throws {
-        for command in commands {
-            try command(world)
-        }
-    }
 }

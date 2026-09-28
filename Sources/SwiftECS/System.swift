@@ -4,7 +4,7 @@ public struct System {
     internal var validate: () throws -> Void = {}
     internal var initialize: () -> Void = {}
     internal var cleanup: () -> Void = {}
-    internal var execute: (World, Double) throws -> Void = { _, _ in }
+    internal var execute: (World, Double) throws -> SystemCommandBatch = { _, _ in SystemCommandBatch() }
 
     public init(_ id: SystemID) {
         self.id = id
@@ -16,23 +16,29 @@ public struct System {
 
     public func run<each Input: SystemInput>(_ inputs: repeat each Input, body: @escaping (SystemContext, repeat (each Input).Value) throws -> Void) -> System {
         var system = self
+        let bindings = (repeat (each inputs).binding)
         var access = SystemAccess()
-        repeat access.merge((each inputs).binding.access)
+        repeat access.merge((each bindings).access)
         system.access = access
         system.validate = {
-            repeat try (each inputs).binding.validate()
+            repeat try (each bindings).validate()
         }
+        let effects = access.commandEffects
         system.execute = { world, deltaTime in
             let scope = SystemScope(world: world)
+            var transferred = false
             defer {
                 scope.isActive = false
+                if !transferred {
+                    world.reservedCommandIDs.subtract(scope.reservedIDs)
+                }
                 scope.commands.removeAll()
                 scope.reservedIDs.removeAll()
             }
             let context = SystemContext(deltaTime: deltaTime, simulationTime: world.simulationTime)
-            try body(context, repeat (each inputs).binding.resolve(scope))
-            scope.isActive = false
-            try scope.flush()
+            try body(context, repeat (each bindings).resolve(scope))
+            transferred = true
+            return SystemCommandBatch(commands: scope.commands, effects: effects, reservedIDs: scope.reservedIDs)
         }
         return system
     }

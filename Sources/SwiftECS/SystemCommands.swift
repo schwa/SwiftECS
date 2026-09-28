@@ -10,10 +10,11 @@ public struct SystemCommands {
             }
         }
         var id = EntityID()
-        while scope.world.entityExists(id) || scope.reservedIDs.contains(id) {
+        while scope.world.entityExists(id) || scope.world.reservedCommandIDs.contains(id) {
             id = EntityID()
         }
         scope.reservedIDs.insert(id)
+        scope.world.reservedCommandIDs.insert(id)
         scope.commands.append { world in
             world.createEntity(id: id, repeat each components)
         }
@@ -24,6 +25,26 @@ public struct SystemCommands {
         scope.checkActive()
         scope.commands.append { world in
             world.removeEntity(id)
+        }
+    }
+
+    public func set<Value: Component>(_ value: Value, on id: EntityID) throws {
+        scope.checkActive()
+        guard !(Value.self is AnyObject.Type) else {
+            throw SystemError.referenceComponent(ComponentType(Value.self))
+        }
+        scope.commands.append { world in
+            guard world.entityExists(id) else {
+                throw SystemError.missingCommandEntity(id)
+            }
+            world.addComponent(value, to: id)
+        }
+    }
+
+    public func remove<Value: Component>(_ type: Value.Type, from id: EntityID) {
+        scope.checkActive()
+        scope.commands.append { world in
+            world.removeComponent(type, from: id)
         }
     }
 

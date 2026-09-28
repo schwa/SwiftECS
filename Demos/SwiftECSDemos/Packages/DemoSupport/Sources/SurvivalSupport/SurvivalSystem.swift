@@ -50,7 +50,7 @@ final class SurvivalSystem {
     }
 
     private var spawning: System {
-        System("survival.spawning").run(SystemQuery(Read<Hero>()), Commands()) { [self] context, players, commands in
+        System("survival.spawning").run(SystemQuery(Read<Hero>()), CreateEntities(Body.self, SurvivalComponents.Sprite.self, Enemy.self)) { [self] context, players, commands in
             guard isRunningStep, let player = players.first(where: { _ in true }) else {
                 return
             }
@@ -81,7 +81,7 @@ final class SurvivalSystem {
     private var enemies: System {
         let players = SystemQuery(Read<Body>(), matching: Query(with: Hero.self))
         let enemies = SystemQuery(Write<Body>(), Write<Enemy>())
-        return System("survival.enemies").run(players, enemies, Commands()) { [self] context, players, enemies, commands in
+        return System("survival.enemies").run(players, enemies, CreateEntities(Body.self, SurvivalComponents.Sprite.self, Shot.self), EditRelationship<FiredBy>()) { [self] context, players, enemies, creator, ownership in
             guard isRunningStep, let player = players.first(where: { _ in true }) else {
                 return
             }
@@ -99,7 +99,7 @@ final class SurvivalSystem {
                     enemy.cooldown = 2.2
                     let aim = atan2(offset.y, offset.x)
                     for spread in [-0.22, 0, 0.22] {
-                        try createShot(commands: commands, origin: (row.entityID, body.position), velocity: SIMD2(cos(aim + spread), sin(aim + spread)) * 150, damage: 1, hostile: true)
+                        try createShot(commands: (creator, ownership), origin: (row.entityID, body.position), velocity: SIMD2(cos(aim + spread), sin(aim + spread)) * 150, damage: 1, hostile: true)
                     }
                 }
                 bodyReference.value = body
@@ -111,7 +111,7 @@ final class SurvivalSystem {
     private var firing: System {
         let players = SystemQuery(Read<Hero>(), Read<Body>())
         let enemies = SystemQuery(Read<Body>(), matching: Query(with: Enemy.self))
-        return System("survival.firing").run(players, enemies, Commands()) { [self] context, players, enemies, commands in
+        return System("survival.firing").run(players, enemies, CreateEntities(Body.self, SurvivalComponents.Sprite.self, Shot.self), EditRelationship<FiredBy>()) { [self] context, players, enemies, creator, ownership in
             guard isRunningStep, let player = players.first(where: { _ in true }) else {
                 return
             }
@@ -138,13 +138,13 @@ final class SurvivalSystem {
             let count = min(5, 1 + (hero.level - 1) / 2)
             for index in 0..<count {
                 let spread = (Double(index) - Double(count - 1) / 2) * 0.14
-                try createShot(commands: commands, origin: (player.entityID, body.position), velocity: SIMD2(cos(angle + spread), sin(angle + spread)) * 420, damage: hero.damage, hostile: false)
+                try createShot(commands: (creator, ownership), origin: (player.entityID, body.position), velocity: SIMD2(cos(angle + spread), sin(angle + spread)) * 420, damage: hero.damage, hostile: false)
             }
         }
     }
 
     private var shots: System {
-        System("survival.shots").run(SystemQuery(Write<Body>(), Write<Shot>()), Commands()) { [self] context, shots, commands in
+        System("survival.shots").run(SystemQuery(Write<Body>(), Write<Shot>()), DestroyEntities()) { [self] context, shots, commands in
             guard isRunningStep else {
                 return
             }
@@ -167,7 +167,7 @@ final class SurvivalSystem {
         let players = SystemQuery(Write<Hero>(), Read<Body>())
         let enemies = SystemQuery(Write<Enemy>(), Read<Body>())
         let shots = SystemQuery(Read<Shot>(), Read<Body>())
-        return System("survival.combat").run(players, enemies, shots, Commands()) { [self] _, players, enemies, shots, commands in
+        return System("survival.combat").run(players, enemies, shots, CreateEntities(Body.self, SurvivalComponents.Sprite.self, SurvivalComponents.Gem.self), DestroyEntities()) { [self] _, players, enemies, shots, creator, commands in
             guard isRunningStep, let player = players.first(where: { _ in true }) else {
                 return
             }
@@ -194,7 +194,7 @@ final class SurvivalSystem {
                             defeated.insert(row.entityID)
                             commands.destroy(row.entityID)
                             hero.kills += 1
-                            try commands.create(target, SurvivalComponents.Sprite(emoji: "💎"), SurvivalComponents.Gem())
+                            try creator.create(target, SurvivalComponents.Sprite(emoji: "💎"), SurvivalComponents.Gem())
                         } else {
                             enemyReference.value = enemy
                         }
@@ -214,7 +214,7 @@ final class SurvivalSystem {
     private var gems: System {
         let players = SystemQuery(Write<Hero>(), Read<Body>())
         let gems = SystemQuery(Write<Body>(), matching: Query(with: SurvivalComponents.Gem.self))
-        return System("survival.gems").run(players, gems, Commands()) { [self] context, players, gems, commands in
+        return System("survival.gems").run(players, gems, DestroyEntities()) { [self] context, players, gems, commands in
             guard isRunningStep, let player = players.first(where: { _ in true }) else {
                 return
             }
@@ -267,13 +267,13 @@ final class SurvivalSystem {
         body.position = simd_clamp(body.position, SIMD2(repeating: body.radius), Self.arena - SIMD2(repeating: body.radius))
     }
 
-    private func createShot(commands: SystemCommands, origin: (shooter: EntityID, position: SIMD2<Double>), velocity: SIMD2<Double>, damage: Int, hostile: Bool) throws {
-        let projectile = try commands.create(
+    private func createShot(commands: (creator: EntityCreator<Body, SurvivalComponents.Sprite, Shot>, ownership: RelationshipCommands<FiredBy>), origin: (shooter: EntityID, position: SIMD2<Double>), velocity: SIMD2<Double>, damage: Int, hostile: Bool) throws {
+        let projectile = try commands.creator.create(
             Body(position: origin.position, radius: hostile ? 9 : 7),
             SurvivalComponents.Sprite(emoji: hostile ? "🔥" : "✨"),
             Shot(velocity: velocity, damage: damage, hostile: hostile, lifetime: 3)
         )
-        commands.addRelationship(FiredBy.self, from: projectile, to: origin.shooter)
+        commands.ownership.add(from: projectile, to: origin.shooter)
     }
 
     private func hurt(_ hero: inout Hero) {
