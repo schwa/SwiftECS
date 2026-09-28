@@ -24,16 +24,8 @@ private final class StorageTracker: @unchecked Sendable {
     }
 }
 
-private struct ObservationTestSystem: System {
-    let action: (World) throws -> Void
-
-    func update(world: World, deltaTime _: Double) {
-        do {
-            try action(world)
-        } catch {
-            Issue.record(error)
-        }
-    }
+private func observationTestSystem(_ action: @escaping () throws -> Void) -> System {
+    System("ObservationTestSystem").run { _ in try action() }
 }
 
 @Test func `every storage read observes component writes`() throws {
@@ -185,7 +177,7 @@ private struct ObservationTestSystem: System {
     let entity = world.createEntity(Position(x: 0, y: 0))
     let tracker = StorageTracker { _ = entity[Position.self] }
     let reference = try #require(world.query(Position.self).first { _ in true }).components
-    try world.addSystem(ObservationTestSystem { world in
+    try world.addSystem(observationTestSystem {
         let before = tracker.count
         for index in 0..<10_000 {
             if index.isMultiple(of: 2) {
@@ -223,7 +215,7 @@ private struct ObservationTestSystem: System {
     let world = World()
     let tracker = StorageTracker { _ = world.entityCount }
     var nested = false
-    try world.addSystem(ObservationTestSystem { world in
+    try world.addSystem(observationTestSystem {
         world.createEntity()
         if !nested {
             nested = true
@@ -246,10 +238,10 @@ private struct ObservationTestSystem: System {
 @Test func `failed nested update preserves pending invalidation and future writes`() throws {
     let world = World()
     let tracker = StorageTracker { _ = world.entityCount }
-    try world.addSystem(ObservationTestSystem { world in
+    try world.addSystem(observationTestSystem {
         world.createEntity()
         do {
-            try world.addSystem(ObservationTestSystem { _ in }, id: "broken", dependencies: ["missing"])
+            try world.addSystem(observationTestSystem {}, id: "broken", dependencies: ["missing"])
             try world.update(deltaTime: 0)
             Issue.record("Expected missing dependency failure")
         } catch {

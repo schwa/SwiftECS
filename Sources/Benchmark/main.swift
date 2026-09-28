@@ -13,17 +13,13 @@ struct Physics: Component {
     var velocityZ: Double
 }
 
-struct MovementSystem: System {
-    let query: Query
-
-    func update(world: World, deltaTime: Double) {
-        for row in world.query(Transform.self, Physics.self, matching: query) {
-            var (transform, physics) = row.values
-            transform.x += physics.velocityX * deltaTime
-            transform.y += physics.velocityY * deltaTime
-            transform.z += physics.velocityZ * deltaTime
-            row.set(transform, physics)
-        }
+func movementSystem(matching query: Query) -> System {
+    System("MovementSystem").query(Write<Transform>(), Read<Physics>(), matching: query).each { context, transform, physics in
+        var value = transform.value
+        value.x += physics.velocityX * context.deltaTime
+        value.y += physics.velocityY * context.deltaTime
+        value.z += physics.velocityZ * context.deltaTime
+        transform.value = value
     }
 }
 
@@ -43,7 +39,7 @@ struct MovementSystem: System {
     }
     let query = Query(with: Transform.self, Physics.self)
     world.register(query)
-    try world.addSystem(MovementSystem(query: query))
+    try world.addSystem(movementSystem(matching: query))
     for _ in 0..<warmupFrames {
         try world.update(deltaTime: deltaTime)
     }

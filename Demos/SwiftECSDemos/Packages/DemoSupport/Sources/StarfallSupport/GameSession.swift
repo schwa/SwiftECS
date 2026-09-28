@@ -17,9 +17,9 @@ final class GameSession {
         world = World()
         player = world.createEntity(Position(x: 0.5, y: 0.9), Player())
         do {
-            try world.addSystem(SpawnSystem(), id: "spawn")
-            try world.addSystem(MovementSystem(), id: "movement", dependencies: ["spawn"])
-            try world.addSystem(CollisionSystem(), id: "collision", dependencies: ["movement"])
+            try world.addSystem(SpawnSystem().system)
+            try world.addSystem(movementSystem(), after: ["spawn"])
+            try world.addSystem(collisionSystem(), after: ["movement"])
             score = 0
             lives = 3
             failure = nil

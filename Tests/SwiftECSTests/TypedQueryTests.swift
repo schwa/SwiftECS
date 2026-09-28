@@ -125,13 +125,11 @@ private final class TypedQueryChanges: @unchecked Sendable {
     }
 }
 
-private struct TypedMovementSystem: System {
-    func update(world: World, deltaTime: Double) {
-        for row in world.query(Position.self, Velocity.self) {
-            var (position, velocity) = row.values
-            position.x += velocity.dx * deltaTime
-            row.set(position, velocity)
-        }
+private func typedMovementSystem() -> System {
+    System("TypedMovementSystem").query(Write<Position>(), Write<Velocity>()).each { context, position, velocity in
+        position.value.x += velocity.value.dx * context.deltaTime
+        let unchanged = velocity.value
+        velocity.value = unchanged
     }
 }
 
@@ -144,7 +142,7 @@ private struct TypedMovementSystem: System {
     var velocityEvents = 0
     let positionToken = world.observe(Position.self) { _ in positionEvents += 1 }
     let velocityToken = world.observe(Velocity.self) { _ in velocityEvents += 1 }
-    try world.addSystem(TypedMovementSystem())
+    try world.addSystem(typedMovementSystem())
     let changes = TypedQueryChanges { _ = world.query(Position.self) }
     try world.update(deltaTime: 1)
     #expect(positionEvents == 1_000)

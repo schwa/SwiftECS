@@ -146,50 +146,84 @@ world.unregister(active)
 
 ### Run systems
 
+A system combines typed queries with a callback, following the [Flecs systems model](https://www.flecs.dev/flecs/md_docs_2Systems.html).
+
 ```swift
-struct MovementSystem: System {
-    func update(world: World, deltaTime: Double) {
-        for row in world.query(Position.self, Velocity.self) {
-            var (position, velocity) = row.values
-            position.x += velocity.x * deltaTime
-            position.y += velocity.y * deltaTime
-            row.set(position, velocity)
-        }
-    }
-}
-
-struct RegenerationSystem: System {
-    static let query = Query(with: Health.self)
-
-    func initialize(world: World) {
-        world.register(Self.query)
+let movement = System("movement")
+    .query(Write<Position>(), Read<Velocity>(), matching: Query.all.without(Disabled.self))
+    .each { context, position, velocity in
+        var value = position.value
+        value.x += velocity.x * context.deltaTime
+        value.y += velocity.y * context.deltaTime
+        position.value = value
     }
 
-    func update(world: World, deltaTime: Double) {
-        for row in world.query(Health.self, matching: Self.query) {
-            row.set(Health(current: min(100, row.values.current + 1)))
-        }
+let regeneration = System("regeneration")
+    .query(Write<Health>())
+    .each { _, health in
+        health.value.current = min(100, health.value.current + 1)
     }
 
-    func cleanup(world: World) {
-        world.unregister(Self.query)
-    }
-}
-
-try world.addSystem(MovementSystem(), id: "movement")
-try world.addSystem(RegenerationSystem(), id: "regeneration", dependencies: ["movement"])
+try world.addSystem(movement)
+try world.addSystem(regeneration, after: [movement.id])
 try world.update(deltaTime: 1.0 / 60)
 
-let elapsed = world.simulationTime
+let access = movement.access
 let order = try world.systemExecutionOrder
-let systemCount = world.systemCount
+try world.run(movement, deltaTime: 1.0 / 60)
 world.removeAllSystems()
-
-try world.addSystem(MovementSystem())      // Uses the type name as its ID
-let movementID = SystemID.of(MovementSystem.self)
 ```
 
-System lifecycle hooks have empty defaults. Registration always throws on duplicate IDs. `update` advances simulation time before it runs systems and throws for missing dependencies or cycles.
+`Read<T>` supplies a value. `Write<T>` supplies a writable reference to an existing component.
+Query terms determine matching, callback types, and access metadata. Duplicate component types within one query throw during registration.
+Callbacks receive time information, not a `World` or unrestricted `Entity` handle.
+
+System components must have value semantics. Registration rejects direct class components.
+Nested references must also behave as values. Swift cannot prove deep immutability.
+Callbacks must not capture world or entity handles to bypass their declared access.
+The API is an access contract, not a sandbox for arbitrary Swift closures.
+
+`access.reads` includes writable components because `Write<T>` permits reads and writes.
+`access.conflicts(with:)` reports conflicts but does not infer execution order or enable parallel execution.
+Phases and explicit dependencies still determine order.
+
+### Multiple queries and deferred commands
+
+```swift
+let health = SystemQuery(Read<Health>())
+let positions = SystemQuery(Write<Position>())
+let expire = System("expire").run(health, positions, Commands()) { _, health, positions, commands in
+    for row in health where row.fields.current <= 0 {
+        commands.destroy(row.entityID)
+    }
+    for row in positions {
+        row.fields.value.y += 1
+    }
+    let parent = try commands.create(Position(x: 0, y: 0))
+    let child = try commands.create(Position(x: 1, y: 1))
+    commands.addRelationship(ChildOf.self, from: child, to: parent)
+}
+```
+
+Each query has independent matching. `row.fields` contains the declared outputs in term order, and `row.entityID` identifies the entity.
+A single term produces one field rather than a tuple.
+`.query(...).run` receives all matching rows once. `.each` invokes its callback for each matching row.
+`System("clock").run { context in ... }` runs once without a query, even in an empty world.
+
+`Commands()` explicitly grants creation, destruction, and relationship changes. Its metadata sets `changesStructure`, which conflicts with every system.
+Commands accept entity IDs, never unrestricted handles. New IDs can serve as relationship endpoints in later commands.
+Commands flush in order after a successful callback, before the next system. New entities do not enter the current callback's queries.
+Destruction of an absent entity is a no-op. Relationship commands validate their endpoints and constraints when they flush.
+
+Rows have fixed membership for one callback. Iteration reads the current component values and skips entities with missing required components.
+Write handles and row sequences expire when the callback returns. Retaining them does not extend their lifetime.
+Writes publish component events immediately and batch storage observation through the existing mutation scope.
+If a callback throws, its pending commands are discarded. Earlier component writes remain.
+If a command throws during the flush, earlier commands remain applied and later commands do not run.
+
+Lifecycle hooks use `.onInitialize { ... }` and `.onCleanup { ... }` for captured system state, without world access.
+Registration throws on duplicate IDs. Manual `world.run(system, deltaTime:)` validates inputs but does not register the system or call lifecycle hooks.
+`update` advances simulation time before execution and throws for invalid schedules or callback errors.
 
 ### Phases and pipelines
 
@@ -200,8 +234,8 @@ struct Gameplay: Component {}
 
 let physics = try world.createPhase("Physics")
 let recovery = try world.createPhase("Recovery", after: [physics])
-try world.addSystem(MovementSystem(), id: "move", phase: physics).set(Gameplay())
-try world.addSystem(RegenerationSystem(), id: "recover", phase: recovery).set(Gameplay())
+try world.addSystem(movement, id: "move", phase: physics).set(Gameplay())
+try world.addSystem(regeneration, id: "recover", phase: recovery).set(Gameplay())
 
 let gameplay = world.createEntity(Pipeline(Query(with: Gameplay.self)))
 try world.run(gameplay, deltaTime: 1.0 / 60)

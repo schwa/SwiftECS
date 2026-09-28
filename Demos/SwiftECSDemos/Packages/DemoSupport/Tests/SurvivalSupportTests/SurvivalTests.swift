@@ -31,16 +31,17 @@ import Testing
     let enemy = world.createEntity(SurvivalComponents.Body(position: SIMD2(600, 350), radius: 17), SurvivalComponents.Enemy(health: 1, speed: 0, shoots: false, cooldown: 10))
     world.createEntity(SurvivalComponents.Body(position: SIMD2(600, 350), radius: 7), SurvivalComponents.Shot(velocity: .zero, damage: 1, hostile: false, lifetime: 1))
     let system = SurvivalSystem()
-    system.update(world: world, deltaTime: 0.01)
+    try system.install(in: world)
+    try world.update(deltaTime: 0.01)
     #expect(!enemy.exists)
     #expect(player[SurvivalComponents.Hero.self]?.kills == 1)
     #expect(world.snapshot(with: SurvivalComponents.Gem.self).count == 1)
     for _ in 0..<3 {
         world.createEntity(SurvivalComponents.Body(position: SIMD2(500, 350), radius: 17), SurvivalComponents.Enemy(health: 10, speed: 0, shoots: false, cooldown: 10))
     }
-    system.update(world: world, deltaTime: 0.01)
+    try world.update(deltaTime: 0.01)
     #expect(player[SurvivalComponents.Hero.self]?.health == 4)
-    system.update(world: world, deltaTime: 0.01)
+    try world.update(deltaTime: 0.01)
     #expect(player[SurvivalComponents.Hero.self]?.health == 4)
 }
 
@@ -70,16 +71,17 @@ import Testing
     game.start()
     #expect(game.hero.health == 5)
     #expect(game.hero.level == 1)
-    #expect(game.world.entityCount == 3)
-    #expect(game.world.systemCount == 1)
+    #expect(game.world.entityCount == 10)
+    #expect(game.world.systemCount == 8)
 }
 
-@Test func `demons fire three hostile shots and expired shots disappear`() {
+@Test func `demons fire three hostile shots and expired shots disappear`() throws {
     let world = World()
     world.createEntity(SurvivalComponents.Hero(), SurvivalComponents.Body(position: SIMD2(500, 350), radius: 18))
     world.createEntity(SurvivalComponents.Body(position: SIMD2(800, 350), radius: 17), SurvivalComponents.Enemy(health: 3, speed: 0, shoots: true, cooldown: 0))
     let expired = world.createEntity(SurvivalComponents.Body(position: SIMD2(100, 100), radius: 7), SurvivalComponents.Shot(velocity: .zero, damage: 1, hostile: false, lifetime: 0.001))
-    SurvivalSystem().update(world: world, deltaTime: 0.01)
+    try SurvivalSystem().install(in: world)
+    try world.update(deltaTime: 0.01)
     let hostile = world.snapshot(with: SurvivalComponents.Shot.self).filter { $0[SurvivalComponents.Shot.self]?.hostile == true }
     #expect(hostile.count == 3)
     #expect(!expired.exists)
@@ -114,7 +116,7 @@ import Testing
     game.world.createEntity(SurvivalComponents.Body(position: SIMD2(-50, 100), radius: 10), SurvivalComponents.Sprite(emoji: "🔥"))
     game.world.createEntity(SurvivalComponents.Body(position: SIMD2(100, 100), radius: 10))
     #expect(game.visibleEntityCount == 2)
-    #expect(game.world.entityCount == 6)
+    #expect(game.world.entityCount == 13)
 }
 
 @MainActor @Test func `projectile ownership drives the HUD and detaches when a shooter dies`() throws {
@@ -151,12 +153,13 @@ import Testing
     #expect(game.activePlayerShotCount == 0)
 }
 
-@Test func `surviving ninety seconds ends the run`() {
+@Test func `surviving ninety seconds ends the run`() throws {
     let world = World()
     var hero = SurvivalComponents.Hero()
     hero.elapsed = 89.99
     let player = world.createEntity(hero, SurvivalComponents.Body(position: SIMD2(500, 350), radius: 18))
-    SurvivalSystem().update(world: world, deltaTime: 0.02)
+    try SurvivalSystem().install(in: world)
+    try world.update(deltaTime: 0.02)
     #expect(player[SurvivalComponents.Hero.self]?.elapsed == 90)
     #expect(player[SurvivalComponents.Hero.self]?.finished == true)
 }

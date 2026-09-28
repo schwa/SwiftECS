@@ -9,19 +9,15 @@ private final class PipelineLog {
     var entries: [String] = []
 }
 
-private struct PipelineTestSystem: System {
-    let name: String
-    let log: PipelineLog
-    var action: (World) -> Void = { _ in }
-
-    func update(world: World, deltaTime _: Double) {
-        log.entries.append(name)
-        action(world)
-    }
-
-    func cleanup(world _: World) {
-        log.entries.append("cleanup-\(name)")
-    }
+private func pipelineTestSystem(name: String, log: PipelineLog, action: @escaping () -> Void = {}) -> System {
+    System(SystemID(name))
+        .run { _ in
+            log.entries.append(name)
+            action()
+        }
+        .onCleanup {
+            log.entries.append("cleanup-\(name)")
+        }
 }
 
 @Test func `phase DAG orders all selected systems across unequal paths`() throws {
@@ -32,11 +28,11 @@ private struct PipelineTestSystem: System {
     let middle = try world.createPhase("middle", after: [root])
     let right = try world.createPhase("right", after: [middle])
     let end = try world.createPhase("end", after: [left, right])
-    try world.addSystem(PipelineTestSystem(name: "end", log: log), id: "end", phase: end)
-    try world.addSystem(PipelineTestSystem(name: "right", log: log), id: "right", phase: right)
-    try world.addSystem(PipelineTestSystem(name: "left", log: log), id: "left", phase: left)
-    try world.addSystem(PipelineTestSystem(name: "root", log: log), id: "root", phase: root)
-    try world.addSystem(PipelineTestSystem(name: "root2", log: log), id: "root2", phase: root)
+    try world.addSystem(pipelineTestSystem(name: "end", log: log), id: "end", phase: end)
+    try world.addSystem(pipelineTestSystem(name: "right", log: log), id: "right", phase: right)
+    try world.addSystem(pipelineTestSystem(name: "left", log: log), id: "left", phase: left)
+    try world.addSystem(pipelineTestSystem(name: "root", log: log), id: "root", phase: root)
+    try world.addSystem(pipelineTestSystem(name: "root2", log: log), id: "root2", phase: root)
     try world.update(deltaTime: 1)
     #expect(log.entries == ["root", "root2", "right", "left", "end"])
 }
@@ -44,9 +40,9 @@ private struct PipelineTestSystem: System {
 @Test func `ready systems use registration order rather than query storage order`() throws {
     let world = World()
     let log = PipelineLog()
-    let first = try world.addSystem(PipelineTestSystem(name: "first", log: log), id: "first", after: ["second"])
-    try world.addSystem(PipelineTestSystem(name: "second", log: log), id: "second")
-    try world.addSystem(PipelineTestSystem(name: "third", log: log), id: "third")
+    let first = try world.addSystem(pipelineTestSystem(name: "first", log: log), id: "first", after: ["second"])
+    try world.addSystem(pipelineTestSystem(name: "second", log: log), id: "second")
+    try world.addSystem(pipelineTestSystem(name: "third", log: log), id: "third")
     first.set(Gameplay())
     #expect(try world.systemExecutionOrder == ["second", "first", "third"])
     #expect(first.targets(of: DependsOn.self).first?[SystemDescriptor.self]?.id == "second")
@@ -57,8 +53,8 @@ private struct PipelineTestSystem: System {
     let log = PipelineLog()
     let early = try world.createPhase("early")
     let late = try world.createPhase("late", after: [early])
-    try world.addSystem(PipelineTestSystem(name: "game", log: log), id: "game", phase: early).set(Gameplay())
-    try world.addSystem(PipelineTestSystem(name: "service", log: log), id: "service", phase: late).set(Service())
+    try world.addSystem(pipelineTestSystem(name: "game", log: log), id: "game", phase: early).set(Gameplay())
+    try world.addSystem(pipelineTestSystem(name: "service", log: log), id: "service", phase: late).set(Service())
     world.createEntity(Service())
     let pipeline = world.createEntity(Pipeline(Query(with: Service.self)))
     try world.run(pipeline, deltaTime: 1)
@@ -76,8 +72,8 @@ private struct PipelineTestSystem: System {
 @Test func `excluded explicit dependencies fail before execution or time advances`() throws {
     let world = World()
     let log = PipelineLog()
-    try world.addSystem(PipelineTestSystem(name: "first", log: log), id: "first")
-    try world.addSystem(PipelineTestSystem(name: "second", log: log), id: "second", dependencies: ["first"]).set(Gameplay())
+    try world.addSystem(pipelineTestSystem(name: "first", log: log), id: "first")
+    try world.addSystem(pipelineTestSystem(name: "second", log: log), id: "second", dependencies: ["first"]).set(Gameplay())
     world.defaultPipeline = Pipeline(Query(with: Gameplay.self))
     #expect(throws: SystemError.excludedDependency(system: "second", dependency: "first")) {
         try world.update(deltaTime: 1)
@@ -91,8 +87,8 @@ private struct PipelineTestSystem: System {
     let log = PipelineLog()
     let early = try world.createPhase("early")
     let late = try world.createPhase("late", after: [early])
-    try world.addSystem(PipelineTestSystem(name: "first", log: log), id: "first", phase: early, after: ["second"])
-    try world.addSystem(PipelineTestSystem(name: "second", log: log), id: "second", phase: late)
+    try world.addSystem(pipelineTestSystem(name: "first", log: log), id: "first", phase: early, after: ["second"])
+    try world.addSystem(pipelineTestSystem(name: "second", log: log), id: "second", phase: late)
     #expect(throws: SystemError.cyclicDependency(["first", "second"])) {
         try world.update(deltaTime: 1)
     }
@@ -105,7 +101,7 @@ private struct PipelineTestSystem: System {
     let first = try world.createPhase("first")
     let second = try world.createPhase("second", after: [first])
     try first.addRelationship(DependsOn.self, to: second)
-    try world.addSystem(PipelineTestSystem(name: "system", log: log), phase: second)
+    try world.addSystem(pipelineTestSystem(name: "system", log: log), phase: second)
     #expect(throws: SystemError.phaseCycle(second.id)) { try world.update(deltaTime: 1) }
     #expect(log.entries.isEmpty)
     try first.removeRelationship(DependsOn.self, to: second)
@@ -118,8 +114,8 @@ private struct PipelineTestSystem: System {
     let log = PipelineLog()
     let first = try world.createPhase("first")
     let second = try world.createPhase("second")
-    try world.addSystem(PipelineTestSystem(name: "A", log: log), id: "A", phase: first)
-    let system = try world.addSystem(PipelineTestSystem(name: "B", log: log), id: "B", phase: second)
+    try world.addSystem(pipelineTestSystem(name: "A", log: log), id: "A", phase: first)
+    let system = try world.addSystem(pipelineTestSystem(name: "B", log: log), id: "B", phase: second)
     #expect(try world.systemExecutionOrder == ["A", "B"])
     try first.addRelationship(DependsOn.self, to: second)
     #expect(try world.systemExecutionOrder == ["B", "A"])
@@ -131,11 +127,11 @@ private struct PipelineTestSystem: System {
     let world = World()
     let log = PipelineLog()
     var target: Entity?
-    let first = PipelineTestSystem(name: "A", log: log) { _ in
+    let first = pipelineTestSystem(name: "A", log: log) {
         target?.remove(Gameplay.self)
     }
     try world.addSystem(first, id: "A").set(Gameplay())
-    target = try world.addSystem(PipelineTestSystem(name: "B", log: log), id: "B").set(Gameplay())
+    target = try world.addSystem(pipelineTestSystem(name: "B", log: log), id: "B").set(Gameplay())
     let pipeline = Pipeline(Query(with: Gameplay.self))
     world.register(pipeline.query.with(SystemDescriptor.self))
     try world.run(pipeline, deltaTime: 1)
@@ -146,13 +142,13 @@ private struct PipelineTestSystem: System {
 @Test func `removal during execution retains the snapshot and defers cleanup`() throws {
     let world = World()
     let log = PipelineLog()
-    let first = PipelineTestSystem(name: "A", log: log) { world in
+    let first = pipelineTestSystem(name: "A", log: log) {
         world.removeAllSystems()
         #expect(world.systemCount == 0)
         #expect(log.entries == ["A"])
     }
     try world.addSystem(first, id: "A")
-    try world.addSystem(PipelineTestSystem(name: "B", log: log), id: "B")
+    try world.addSystem(pipelineTestSystem(name: "B", log: log), id: "B")
     try world.update(deltaTime: 1)
     #expect(Array(log.entries.prefix(2)) == ["A", "B"])
     #expect(Set(log.entries.suffix(2)) == ["cleanup-A", "cleanup-B"])
@@ -164,11 +160,11 @@ private struct PipelineTestSystem: System {
     let world = World()
     let log = PipelineLog()
     var registered = false
-    let first = PipelineTestSystem(name: "A", log: log) { world in
+    let first = pipelineTestSystem(name: "A", log: log) {
         if !registered {
             registered = true
             do {
-                try world.addSystem(PipelineTestSystem(name: "B", log: log), id: "B")
+                try world.addSystem(pipelineTestSystem(name: "B", log: log), id: "B")
             } catch {
                 Issue.record(error)
             }
@@ -185,7 +181,7 @@ private struct PipelineTestSystem: System {
     let world = World()
     let log = PipelineLog()
     let phase = try world.createPhase("phase")
-    let system = try world.addSystem(PipelineTestSystem(name: "A", log: log), id: "A", phase: phase)
+    let system = try world.addSystem(pipelineTestSystem(name: "A", log: log), id: "A", phase: phase)
     phase.remove(Phase.self)
     #expect(throws: SystemError.invalidPhase(phase.id)) { try world.update(deltaTime: 1) }
     try world.destroy(phase)
@@ -200,7 +196,7 @@ private struct PipelineTestSystem: System {
     let log = PipelineLog()
     let phase = try other.createPhase("foreign")
     #expect(throws: RelationshipError.differentWorlds) {
-        try world.addSystem(PipelineTestSystem(name: "A", log: log), phase: phase)
+        try world.addSystem(pipelineTestSystem(name: "A", log: log), phase: phase)
     }
     #expect(world.entityCount == 0)
     #expect(throws: RelationshipError.differentWorlds) {
@@ -213,12 +209,12 @@ private struct PipelineTestSystem: System {
 @Test func `before sugar and unresolved references use ECS relationships`() throws {
     let world = World()
     let log = PipelineLog()
-    let first = try world.addSystem(PipelineTestSystem(name: "A", log: log), id: "A", before: ["B"])
+    let first = try world.addSystem(pipelineTestSystem(name: "A", log: log), id: "A", before: ["B"])
     let reference = try #require(world.systemEntity(for: "B"))
     #expect(reference[SystemDescriptor.self]?.isRegistered == false)
     #expect(reference.hasRelationship(DependsOn.self, to: first))
     #expect(world.systemCount == 1)
-    let second = try world.addSystem(PipelineTestSystem(name: "B", log: log), id: "B")
+    let second = try world.addSystem(pipelineTestSystem(name: "B", log: log), id: "B")
     #expect(reference.id == second.id)
     #expect(try world.systemExecutionOrder == ["A", "B"])
 }
@@ -248,7 +244,7 @@ private final class ScheduleChanges: @unchecked Sendable {
     let world = World()
     let log = PipelineLog()
     let changes = ScheduleChanges { _ = world.systemCount }
-    let system = try world.addSystem(PipelineTestSystem(name: "A", log: log), id: "A")
+    let system = try world.addSystem(pipelineTestSystem(name: "A", log: log), id: "A")
     #expect(changes.count == 1)
     let phase = try world.createPhase("new")
     #expect(changes.count == 2)

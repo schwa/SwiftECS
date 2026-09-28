@@ -12,6 +12,8 @@ public enum SystemError: Error, Equatable {
     case invalidPhase(EntityID)
     case phaseCycle(EntityID)
     case invalidPipeline(EntityID)
+    case referenceComponent(ComponentType)
+    case duplicateTerm(ComponentType)
 }
 
 // MARK: - CustomStringConvertible
@@ -19,6 +21,10 @@ public enum SystemError: Error, Equatable {
 extension SystemError: CustomStringConvertible {
     public var description: String {
         switch self {
+        case .referenceComponent(let type):
+            return "System components must have value semantics; \(type) is a class"
+        case .duplicateTerm(let type):
+            return "System query contains duplicate component \(type)"
         case .duplicateID(let id):
             return "System with ID '\(id)' already exists"
         case let .dependencyNotFound(system, dependency):

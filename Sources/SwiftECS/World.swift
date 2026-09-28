@@ -8,9 +8,11 @@ public final class World {
     @ObservationIgnored
     internal var pipelineExecutionDepth = 0
     @ObservationIgnored
-    internal var pendingSystemCleanup: [any System] = []
+    internal var pendingSystemCleanup: [System] = []
     @ObservationIgnored
     internal var archetypes: [ArchetypeSignature: Archetype] = [:]
+    @ObservationIgnored
+    internal var structuralRevision: UInt64 = 0
     @ObservationIgnored
     internal var entityLocations: [EntityID: EntityLocation] = [:]
     @ObservationIgnored
@@ -60,6 +62,7 @@ public final class World {
             let archetype = archetypes[emptySignature]!
             let index = archetype.addEntity(id)
             entityLocations[id] = EntityLocation(signature: emptySignature, index: index)
+            structuralRevision &+= 1
         }
         return Entity(id: id, world: self)
     }
@@ -67,7 +70,12 @@ public final class World {
     /// Create an entity with components.
     @discardableResult
     public func createEntity<each T: Component>(_ components: repeat each T) -> Entity {
-        let id = generateUniqueEntityID()
+        createEntity(id: generateUniqueEntityID(), repeat each components)
+    }
+
+    @discardableResult
+    internal func createEntity<each T: Component>(id: EntityID, _ components: repeat each T) -> Entity {
+        precondition(entityLocations[id] == nil, "Entity ID already exists")
         var typeIDs = Set<ComponentType>()
         for typeID in repeat ComponentType((each T).self) {
             typeIDs.insert(typeID)
@@ -78,6 +86,7 @@ public final class World {
             let index = archetype.addEntity(id)
             repeat archetype.setComponent(each components, at: index)
             entityLocations[id] = EntityLocation(signature: signature, index: index)
+            structuralRevision &+= 1
         }
         return Entity(id: id, world: self)
     }
@@ -91,6 +100,7 @@ public final class World {
         let implementation = component(SystemDescriptor.self, for: id)?.implementation
         mutations.perform {
             entityLocations.removeValue(forKey: id)
+            structuralRevision &+= 1
             for storage in relationships.values {
                 storage.removeEntity(id)
             }
@@ -102,7 +112,7 @@ public final class World {
             if pipelineExecutionDepth > 0 {
                 pendingSystemCleanup.append(implementation)
             } else {
-                implementation.cleanup(world: self)
+                implementation.cleanup()
             }
         }
         return true
@@ -120,6 +130,7 @@ public final class World {
             let newIndex = targetArchetype.addEntity(newID)
             sourceArchetype.copyComponents(at: location.index, to: targetArchetype, targetIndex: newIndex)
             entityLocations[newID] = EntityLocation(signature: location.signature, index: newIndex)
+            structuralRevision &+= 1
             for storage in relationships.values {
                 for target in storage.targets(from: id) {
                     storage.insert(source: newID, target: target)
@@ -289,6 +300,7 @@ public final class World {
         }
 
         entityLocations[entityID] = EntityLocation(signature: newSignature, index: newIndex)
+        structuralRevision &+= 1
     }
 
     private func moveEntity(
@@ -308,6 +320,7 @@ public final class World {
         }
 
         entityLocations[entityID] = EntityLocation(signature: newSignature, index: newIndex)
+        structuralRevision &+= 1
     }
 
     // MARK: - System Management
@@ -320,7 +333,7 @@ public final class World {
 
     internal func execute(_ pipeline: Pipeline, deltaTime: Double, advancesTime: Bool) throws {
         let schedule = try resolve(pipeline)
-        mutations.batch {
+        try mutations.batch {
             pipelineExecutionDepth += 1
             defer {
                 pipelineExecutionDepth -= 1
@@ -328,7 +341,7 @@ public final class World {
                     let cleanup = pendingSystemCleanup
                     pendingSystemCleanup.removeAll()
                     for system in cleanup {
-                        system.cleanup(world: self)
+                        system.cleanup()
                     }
                 }
             }
@@ -337,7 +350,7 @@ public final class World {
                 simulationTime += deltaTime
             }
             for descriptor in schedule {
-                descriptor.implementation?.update(world: self, deltaTime: deltaTime)
+                try descriptor.implementation?.execute(self, deltaTime)
             }
         }
     }

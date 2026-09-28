@@ -1,13 +1,13 @@
 import Foundation
 import Observation
-import SwiftECS
+@testable import SwiftECS
 import Testing
 
 private enum QueryAccess: CaseIterable {
     case entity, typed
 }
 
-private struct QueryBenchmarkSystem: System {
+private struct QueryBenchmarkProbe {
     let access: QueryAccess
     let query: Query
 
@@ -83,14 +83,14 @@ struct QueryPerformanceTests {
                     }
                     let query = Query(with: Transform.self, Physics.self)
                     world.register(query)
-                    try world.addSystem(QueryBenchmarkSystem(access: access, query: query))
+                    let probe = QueryBenchmarkProbe(access: access, query: query)
                     let observation = observed ? BenchmarkObservation(world: world) : nil
                     for _ in 0..<warmupFrames {
-                        try world.update(deltaTime: deltaTime)
+                        world.mutations.batch { probe.update(world: world, deltaTime: deltaTime) }
                     }
-                    let duration = try clock.measure {
+                    let duration = clock.measure {
                         for _ in 0..<measuredFrames {
-                            try world.update(deltaTime: deltaTime)
+                            world.mutations.batch { probe.update(world: world, deltaTime: deltaTime) }
                         }
                     }
                     let seconds = Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18

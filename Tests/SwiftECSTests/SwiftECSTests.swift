@@ -369,7 +369,7 @@ import Testing
         Velocity(dx: 10, dy: 5)
     )
 
-    try world.addSystem(MovementSystem())
+    try world.addSystem(movementSystem())
     try world.update(deltaTime: 1.0)
 
     #expect(entity[Position.self]?.x == 10)
@@ -388,7 +388,7 @@ import Testing
         Velocity(dx: -5, dy: -10)
     )
 
-    try world.addSystem(MovementSystem())
+    try world.addSystem(movementSystem())
     try world.update(deltaTime: 2.0)
 
     #expect(entity1[Position.self]?.x == 20)
@@ -400,7 +400,7 @@ import Testing
 
 @Test func testInitializableSystem() throws {
     let world = World()
-    try world.addSystem(InitializableMovementSystem())
+    try world.addSystem(initializableMovementSystem())
 
     #expect(world.entityCount == 2)
     #expect(world.systemCount == 1)
@@ -408,7 +408,7 @@ import Testing
 
 @Test func testCleanupSystem() throws {
     let world = World()
-    try world.addSystem(CleanupMovementSystem())
+    try world.addSystem(cleanupMovementSystem())
     world.removeAllSystems()
 
     // Verify systems were removed
@@ -780,7 +780,7 @@ import Testing
     world.createEntity(Position(x: 1, y: 1), Velocity(dx: 1, dy: 1))
     world.createEntity(Velocity(dx: 2, dy: 2))
 
-    try world.addSystem(MovementSystem())
+    try world.addSystem(movementSystem())
 
     let stats = world.stats
 
@@ -911,17 +911,14 @@ import Testing
 }
 
 @Test func testSystemIDFromType() {
-    let id = SystemID.of(MovementSystem.self)
-    #expect(id.value == "MovementSystem")
+    let id = SystemID.of(Position.self)
+    #expect(id.value == "Position")
 }
 
 // MARK: - System Dependency Tests
 
-struct OrderTrackingSystem: System {
-    let name: String
-    let order: SharedOrder
-
-    func update(world _: World, deltaTime _: Double) {
+func orderTrackingSystem(name: String, order: SharedOrder) -> System {
+    System(SystemID(name)).run { _ in
         order.append(name)
     }
 }
@@ -936,9 +933,9 @@ final class SharedOrder: @unchecked Sendable {
     let world = World()
     let order = SharedOrder()
 
-    try world.addSystem(OrderTrackingSystem(name: "A", order: order), id: "A")
-    try world.addSystem(OrderTrackingSystem(name: "B", order: order), id: "B")
-    try world.addSystem(OrderTrackingSystem(name: "C", order: order), id: "C")
+    try world.addSystem(orderTrackingSystem(name: "A", order: order), id: "A")
+    try world.addSystem(orderTrackingSystem(name: "B", order: order), id: "B")
+    try world.addSystem(orderTrackingSystem(name: "C", order: order), id: "C")
 
     try world.update(deltaTime: 1.0)
 
@@ -951,9 +948,9 @@ final class SharedOrder: @unchecked Sendable {
     let order = SharedOrder()
 
     // C depends on B, B depends on A
-    try world.addSystem(OrderTrackingSystem(name: "C", order: order), id: "C", dependencies: ["B"])
-    try world.addSystem(OrderTrackingSystem(name: "A", order: order), id: "A")
-    try world.addSystem(OrderTrackingSystem(name: "B", order: order), id: "B", dependencies: ["A"])
+    try world.addSystem(orderTrackingSystem(name: "C", order: order), id: "C", dependencies: ["B"])
+    try world.addSystem(orderTrackingSystem(name: "A", order: order), id: "A")
+    try world.addSystem(orderTrackingSystem(name: "B", order: order), id: "B", dependencies: ["A"])
 
     try world.update(deltaTime: 1.0)
 
@@ -966,10 +963,10 @@ final class SharedOrder: @unchecked Sendable {
     let order = SharedOrder()
 
     // D depends on both B and C
-    try world.addSystem(OrderTrackingSystem(name: "D", order: order), id: "D", dependencies: ["B", "C"])
-    try world.addSystem(OrderTrackingSystem(name: "A", order: order), id: "A")
-    try world.addSystem(OrderTrackingSystem(name: "B", order: order), id: "B", dependencies: ["A"])
-    try world.addSystem(OrderTrackingSystem(name: "C", order: order), id: "C", dependencies: ["A"])
+    try world.addSystem(orderTrackingSystem(name: "D", order: order), id: "D", dependencies: ["B", "C"])
+    try world.addSystem(orderTrackingSystem(name: "A", order: order), id: "A")
+    try world.addSystem(orderTrackingSystem(name: "B", order: order), id: "B", dependencies: ["A"])
+    try world.addSystem(orderTrackingSystem(name: "C", order: order), id: "C", dependencies: ["A"])
 
     try world.update(deltaTime: 1.0)
 
@@ -983,10 +980,10 @@ final class SharedOrder: @unchecked Sendable {
     let world = World()
     let order = SharedOrder()
 
-    try world.addSystem(OrderTrackingSystem(name: "A", order: order), id: "physics")
+    try world.addSystem(orderTrackingSystem(name: "A", order: order), id: "physics")
 
     #expect(throws: SystemError.duplicateID("physics")) {
-        try world.addSystem(OrderTrackingSystem(name: "B", order: order), id: "physics")
+        try world.addSystem(orderTrackingSystem(name: "B", order: order), id: "physics")
     }
 }
 
@@ -994,7 +991,7 @@ final class SharedOrder: @unchecked Sendable {
     let world = World()
     let order = SharedOrder()
 
-    try world.addSystem(OrderTrackingSystem(name: "A", order: order), id: "A", dependencies: ["nonexistent"])
+    try world.addSystem(orderTrackingSystem(name: "A", order: order), id: "A", dependencies: ["nonexistent"])
 
     #expect(throws: SystemError.dependencyNotFound(system: "A", dependency: "nonexistent")) {
         try world.update(deltaTime: 1.0)
@@ -1005,8 +1002,8 @@ final class SharedOrder: @unchecked Sendable {
     let world = World()
     let order = SharedOrder()
 
-    try world.addSystem(OrderTrackingSystem(name: "A", order: order), id: "A", dependencies: ["B"])
-    try world.addSystem(OrderTrackingSystem(name: "B", order: order), id: "B", dependencies: ["A"])
+    try world.addSystem(orderTrackingSystem(name: "A", order: order), id: "A", dependencies: ["B"])
+    try world.addSystem(orderTrackingSystem(name: "B", order: order), id: "B", dependencies: ["A"])
 
     #expect {
         try world.update(deltaTime: 1.0)
@@ -1023,9 +1020,9 @@ final class SharedOrder: @unchecked Sendable {
     let world = World()
     let order = SharedOrder()
 
-    try world.addSystem(OrderTrackingSystem(name: "C", order: order), id: "C", dependencies: ["B"])
-    try world.addSystem(OrderTrackingSystem(name: "A", order: order), id: "A")
-    try world.addSystem(OrderTrackingSystem(name: "B", order: order), id: "B", dependencies: ["A"])
+    try world.addSystem(orderTrackingSystem(name: "C", order: order), id: "C", dependencies: ["B"])
+    try world.addSystem(orderTrackingSystem(name: "A", order: order), id: "A")
+    try world.addSystem(orderTrackingSystem(name: "B", order: order), id: "B", dependencies: ["A"])
 
     let executionOrder = try world.systemExecutionOrder
     #expect(executionOrder == ["A", "B", "C"])
@@ -1034,7 +1031,7 @@ final class SharedOrder: @unchecked Sendable {
 @Test func testSystemDefaultID() throws {
     let world = World()
 
-    try world.addSystem(MovementSystem())
+    try world.addSystem(movementSystem())
 
     let executionOrder = try world.systemExecutionOrder
     #expect(executionOrder.contains("MovementSystem"))

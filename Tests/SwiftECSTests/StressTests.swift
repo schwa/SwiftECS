@@ -250,7 +250,7 @@ struct StressTests {
             )
         }
 
-        try world.addSystem(MovementSystem())
+        try world.addSystem(movementSystem())
 
         let time = try measureTime {
             for _ in 0..<60 {

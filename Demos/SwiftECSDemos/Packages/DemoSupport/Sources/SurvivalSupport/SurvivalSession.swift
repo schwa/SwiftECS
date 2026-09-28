@@ -44,7 +44,7 @@ final class SurvivalSession {
         world = World()
         system = SurvivalSystem()
         do {
-            try world.addSystem(system)
+            try system.install(in: world)
         } catch {
             failure = error.localizedDescription
             started = false

@@ -18,8 +18,9 @@ extension World {
     }
 
     @discardableResult
-    public func addSystem(_ system: any System, id: SystemID? = nil, dependencies: [SystemID] = [], phase: Entity? = nil, before: [SystemID] = [], after: [SystemID] = []) throws -> Entity {
-        let systemID = id ?? SystemID(String(describing: type(of: system)))
+    public func addSystem(_ system: System, id: SystemID? = nil, dependencies: [SystemID] = [], phase: Entity? = nil, before: [SystemID] = [], after: [SystemID] = []) throws -> Entity {
+        try system.validate()
+        let systemID = id ?? system.id
         if systemEntity(for: systemID)?[SystemDescriptor.self]?.isRegistered == true {
             throw SystemError.duplicateID(systemID)
         }
@@ -44,7 +45,7 @@ extension World {
             let order = nextSystemRegistrationOrder
             nextSystemRegistrationOrder += 1
             entity.set(SystemDescriptor(id: systemID, implementation: system, registrationOrder: order))
-            system.initialize(world: self)
+            system.initialize()
             return entity
         }
     }
@@ -56,6 +57,13 @@ extension World {
             for entity in entities {
                 removeEntity(entity.id)
             }
+        }
+    }
+
+    public func run(_ system: System, deltaTime: Double) throws {
+        try system.validate()
+        try mutations.batch {
+            try system.execute(self, deltaTime)
         }
     }
 

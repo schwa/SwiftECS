@@ -18,27 +18,19 @@ struct Health: Component {
 
 // MARK: - Test Systems
 
-struct MovementSystem: System {
-    static let query = Query(with: Position.self, Velocity.self)
-
-    func initialize(world: World) {
-        world.register(Self.query)
-    }
-
-    func update(world: World, deltaTime: Double) {
-        for entity in world.entities(matching: Self.query) {
-            entity[Position.self]!.x += entity[Velocity.self]!.dx * deltaTime
-            entity[Position.self]!.y += entity[Velocity.self]!.dy * deltaTime
-        }
+func movementSystem() -> System {
+    System("MovementSystem").query(Write<Position>(), Read<Velocity>()).each { context, position, velocity in
+        var value = position.value
+        value.x += velocity.dx * context.deltaTime
+        value.y += velocity.dy * context.deltaTime
+        position.value = value
     }
 }
 
-struct InitializableMovementSystem: System {
-    func initialize(world _: World) { /* intentionally empty */ }
-    func update(world _: World, deltaTime _: Double) { /* intentionally empty */ }
+func initializableMovementSystem() -> System {
+    System("InitializableMovementSystem").onInitialize { /* intentionally empty */ }
 }
 
-struct CleanupMovementSystem: System {
-    func update(world _: World, deltaTime _: Double) { /* intentionally empty */ }
-    func cleanup(world _: World) { /* intentionally empty */ }
+func cleanupMovementSystem() -> System {
+    System("CleanupMovementSystem").onCleanup { /* intentionally empty */ }
 }

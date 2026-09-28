@@ -7,7 +7,7 @@ import Testing
 @Test func `movement uses delta time`() throws {
     let world = World()
     let entity = world.createEntity(Position(x: 0.5, y: 0.1), Velocity(y: 0.2))
-    MovementSystem().update(world: world, deltaTime: 0.5)
+    try world.run(movementSystem(), deltaTime: 0.5)
     let position = try #require(entity[Position.self])
     #expect(abs(position.y - 0.2) < 0.00001)
 }
@@ -16,19 +16,19 @@ import Testing
     let world = World()
     let player = world.createEntity(Position(x: 0.5, y: 0.9), Player())
     let star = world.createEntity(Position(x: 0.5, y: 0.9), FallingObject(kind: .star))
-    CollisionSystem().update(world: world, deltaTime: 0)
+    try world.run(collisionSystem(), deltaTime: 0)
     #expect(player[Player.self]?.score == 10)
     #expect(player[Player.self]?.lives == 3)
     #expect(!star.exists)
 }
 
-@Test func `meteors and missed stars cost lives but missed meteors do not`() {
+@Test func `meteors and missed stars cost lives but missed meteors do not`() throws {
     let world = World()
     let player = world.createEntity(Position(x: 0.5, y: 0.9), Player())
     world.createEntity(Position(x: 0.5, y: 0.9), FallingObject(kind: .meteor))
     world.createEntity(Position(x: 0.2, y: 1.1), FallingObject(kind: .star))
     world.createEntity(Position(x: 0.8, y: 1.1), FallingObject(kind: .meteor))
-    CollisionSystem().update(world: world, deltaTime: 0)
+    try world.run(collisionSystem(), deltaTime: 0)
     #expect(player[Player.self]?.lives == 1)
     #expect(world.entityCount == 1)
 }

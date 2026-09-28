@@ -91,18 +91,13 @@ private final class RelationshipQueryTracker: @unchecked Sendable {
     }
 }
 
-private struct ReparentSystem: System {
-    let parent: Entity
-    let child: Entity
-
-    func update(world _: World, deltaTime _: Double) {
-        do {
-            try child.setParent(parent)
-            try child.setParent(nil)
-            try child.setParent(parent)
-        } catch {
-            Issue.record(error)
-        }
+private func reparentSystem(parent: Entity, child: Entity) -> System {
+    let parentID = parent.id
+    let childID = child.id
+    return System("ReparentSystem").run(Commands()) { _, commands in
+        commands.addRelationship(ChildOf.self, from: childID, to: parentID)
+        commands.removeRelationship(ChildOf.self, from: childID, to: parentID)
+        commands.addRelationship(ChildOf.self, from: childID, to: parentID)
     }
 }
 
@@ -123,7 +118,7 @@ private struct ReparentSystem: System {
         try child.setParent(nil)
         #expect(tracker.notifications == 2)
     }
-    try world.addSystem(ReparentSystem(parent: parent, child: child))
+    try world.addSystem(reparentSystem(parent: parent, child: child))
     let tracker = RelationshipQueryTracker { _ = child.parent }
     try world.update(deltaTime: 1)
     #expect(tracker.notifications == 1)

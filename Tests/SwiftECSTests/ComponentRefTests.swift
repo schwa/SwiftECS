@@ -44,12 +44,9 @@ private final class ComponentRefChange: @unchecked Sendable {
     world.removeObserver(velocityToken)
 }
 
-private struct SelectiveMovementSystem: System {
-    func update(world: World, deltaTime: Double) {
-        for row in world.query(Position.self, Velocity.self) {
-            let (position, velocity) = row.components
-            position.value.x += velocity.value.dx * deltaTime
-        }
+private func selectiveMovementSystem() -> System {
+    System("SelectiveMovementSystem").query(Write<Position>(), Read<Velocity>()).each { context, position, velocity in
+        position.value.x += velocity.dx * context.deltaTime
     }
 }
 
@@ -62,7 +59,7 @@ private struct SelectiveMovementSystem: System {
     var velocityEvents = 0
     let positionToken = world.observe(Position.self) { _ in positionEvents += 1 }
     let velocityToken = world.observe(Velocity.self) { _ in velocityEvents += 1 }
-    try world.addSystem(SelectiveMovementSystem())
+    try world.addSystem(selectiveMovementSystem())
     let change = ComponentRefChange { _ = world.entityCount }
     try world.update(deltaTime: 1)
     #expect(positionEvents == 10)

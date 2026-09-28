@@ -59,12 +59,8 @@ private func `write paths publish changed state before component events and inva
     #expect(log.entries == ["component", "storage"])
 }
 
-private struct MutationSystem: System {
-    let action: () -> Void
-
-    func update(world _: World, deltaTime _: Double) {
-        action()
-    }
+private func mutationSystem(_ action: @escaping () -> Void) -> System {
+    System("MutationSystem").run { _ in action() }
 }
 
 @Test(arguments: [false, true])
@@ -90,7 +86,7 @@ private func `reentrant component callbacks preserve synchronous ordering and up
         world.removeObserver(healthToken)
     }
     if batched {
-        try world.addSystem(MutationSystem { entity.set(Position(x: 1, y: 2)) })
+        try world.addSystem(mutationSystem { entity.set(Position(x: 1, y: 2)) })
         #expect(log.entries == ["storage"])
         log.entries.removeAll()
         try world.update(deltaTime: 1)

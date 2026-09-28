@@ -1,12 +1,12 @@
 import Foundation
-import SwiftECS
+@testable import SwiftECS
 import Testing
 
 private enum TypedQueryPhase: CaseIterable {
     case setup, iterate, read, write, retainedRead, retainedWrite
 }
 
-private final class TypedQueryCostSystem: System {
+private final class TypedQueryCostProbe {
     let phase: TypedQueryPhase
     let query = Query(with: Transform.self, Physics.self)
     var retained: [TypedEntityRef<Transform, Physics>] = []
@@ -102,14 +102,14 @@ struct TypedQueryCostTests {
             let entity = world.createEntity(Transform(x: Double(index), y: 0, z: 0), Physics(velocityX: 1, velocityY: 2, velocityZ: 3))
             expectedIdentity &+= entity.id.value
         }
-        let system = TypedQueryCostSystem(phase: phase)
-        try world.addSystem(system)
+        let system = TypedQueryCostProbe(phase: phase)
+        system.initialize(world: world)
         for _ in 0..<2 {
-            try world.update(deltaTime: 1.0 / 60)
+            world.mutations.batch { system.update(world: world, deltaTime: 1.0 / 60) }
         }
-        let duration = try ContinuousClock().measure {
+        let duration = ContinuousClock().measure {
             for _ in 0..<10 {
-                try world.update(deltaTime: 1.0 / 60)
+                world.mutations.batch { system.update(world: world, deltaTime: 1.0 / 60) }
             }
         }
         switch phase {
