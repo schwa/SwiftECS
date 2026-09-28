@@ -1,5 +1,7 @@
 # SwiftECS
 
+The package requires Swift 6.2 or later. Declared Apple deployment targets are macOS 14 and iOS 26 or later.
+
 ## Usage
 
 ### Components and entities
@@ -291,7 +293,8 @@ Nested runs merge completed outer callbacks before schedule selection. The activ
 During observer reentrancy, a nested run drains the remaining commands from the current merge before its own execution.
 A caught reentrant flush error still aborts the owning merge. Cleanup waits until the outermost run finishes.
 
-These are sequential synchronization points, not parallel system execution. Captured world access remains outside the declared-access contract, except for explicit nested runs.
+Synchronization alone does not authorize concurrent callbacks. Parallel execution requires the separate eligibility contract below.
+Captured world access remains outside the declared-access contract, except for explicit nested runs in the synchronous runner.
 
 The opt-in `SynchronizationPerformanceTests` compares `.automatic` with `.afterEachSystem` using identical commands and final-state checks:
 
@@ -301,6 +304,142 @@ ECS_RUN_SYNC_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter Sync
 
 The initial 32-producer measurement reduced merges from 32 to 1 for 4,096 commands per frame.
 Median frame time was 4.06 ms automatically versus 3.99 ms per-system. Fewer merges did not improve runtime in this workload.
+
+### Parallel systems and entity iteration
+
+Parallel execution is opt-in. `ConcurrentComponent` combines the existing value-semantics contract with `Sendable` and marks data as eligible for workers.
+Ordinary `Component` types remain supported by serial systems. Direct class components remain invalid system inputs.
+
+```swift
+struct Particle: ConcurrentComponent {
+    var x: Double
+    var speed: Double
+}
+
+let particleMovement = System("particles")
+    .query(Write<Particle>())
+    .eachParallel(minimumRowsPerTask: 256) { context, row in
+        var particle = row.fields.value
+        particle.x += particle.speed * context.deltaTime
+        row.fields.value = particle
+    }
+
+try world.addSystem(particleMovement)
+world.createEntity(Particle(x: 0, speed: 1))
+
+@MainActor func advance(_ world: World) async throws {
+    try await world.update(deltaTime: 1.0 / 60, parallelism: 4)
+}
+```
+
+`System.runParallel(inputs...)` and `.query(...).runParallel` declare one eligible callback per system.
+The async runner groups independent callbacks while preserving conflicts, phases, explicit dependencies, and the captured schedule.
+The concurrency limit bounds active jobs across the entire group, not separately for each system.
+
+`.eachParallel` partitions one query into disjoint row ranges across its matching archetypes.
+Its callback receives `SystemContext`, a typed `SystemRow`, and any declared command capabilities.
+Empty queries launch no jobs. Small queries use fewer partitions according to `minimumRowsPerTask`.
+
+```swift
+struct Trail: ConcurrentComponent { let source: EntityID }
+
+let trailSystem = System("trails").query(Read<Particle>())
+    .eachParallel(CreateEntities(Trail.self), minimumRowsPerTask: 128) { _, row, creator in
+        try creator.create(Trail(source: row.entityID))
+    }
+```
+
+Each partition can access only its own rows and declared commands. Additional queries belong in a whole-system `runParallel` callback, not a partitioned callback.
+Callback order across rows is unspecified. Order-dependent state and reductions require a serial callback or separately synchronized, order-independent logic.
+Commands retain prepared row order within a partitioned system, regardless of task completion order.
+
+All parallel callbacks are synchronous `@Sendable` closures. Captures must satisfy Swift concurrency checking, including actor isolation.
+Typed creation and component-edit payloads must conform to `ConcurrentComponent`.
+Parallel relationship tags use `ConcurrentRelationship`, which requires a transferable metatype without transferring relationship instances.
+`ChildOf`, `DependsOn`, and `InPhase` support this contract. Typed destruction is also supported.
+Unrestricted `Commands()` is serial-only. Parallel bindings carry their own serial fallback and metadata, so preparation cannot change declared access.
+
+`World`, `System`, query rows, and writable references are not `Sendable`. Workers receive task-local views, never a world handle.
+World columns remain lock-protected. Workers read snapshots and edit task-owned buffers, without per-element column or bookkeeping locks.
+Partitions copy only their selected rows. Overlapping queries within a whole-system callback share one buffer per column.
+After jobs join, dirty values are written back before dependent systems or structural commands run.
+The buffers and owner-local lifetime cells are not Sendable. Only immutable update payloads cross back to the owner.
+Only the lock-protected implementation types require `@unchecked Sendable`; worlds and callbacks do not.
+Raw ECS APIs do not become thread-safe. References cannot escape into another task. They expire when their owning system callback or partition finishes.
+
+**Ownership during an async run:** the world remains on its calling actor or task.
+While workers run, live storage reads, writes, and observer changes through raw APIs fail an ownership precondition.
+Concurrent or nested run calls on that world throw `SystemError.parallelRunInProgress`.
+Async runs also reject nesting inside an active synchronous run. The synchronous runner retains its existing nested-run behavior.
+
+Serial-only callbacks execute on the owner between worker groups. Component observers force serial fallback and retain synchronous delivery, including reentrant component mutations.
+Storage observation publishes on the owner after workers finish. Structural merges, cleanup, and world reuse occur only after all jobs join.
+A callback shared between worlds still needs thread-safe captured state and explicit application ordering when its external effects interact.
+
+Existing synchronous `world.update` and `world.run` remain serial, including eligible systems.
+The async overloads of `update` and every `run` form accept a positive `parallelism` limit. A limit of one uses serial execution.
+`parallelBatchCount` and `parallelTaskCount` supplement the existing run statistics. They count groups and total jobs, not dedicated threads.
+
+### Parallel failures and cancellation
+
+Cancellation is cooperative. The runner checks it at execution boundaries, and partitioned iteration checks it before each row.
+Long whole-system callbacks must call `Task.checkCancellation()` themselves if they need prompt interruption.
+The runner always joins its own jobs before returning. It does not forcibly terminate callbacks.
+
+If a group contains failures, its jobs finish before the lowest logical system/partition error is reported. Later groups do not start.
+Worker edits are written back after joining, including edits from failed callbacks and siblings. There is no rollback.
+Serial callbacks still write immediately and retain synchronous observer behavior.
+Only command batches from the successful system prefix before the failed system are retained.
+One failed partition discards all commands from that system. Reservations from discarded batches are released without applying those commands.
+Successful batches merge in schedule order, never completion order. An earlier merge failure takes precedence over a later callback failure.
+
+### Parallel validation and measurements
+
+Starfall movement and collision opt into parallel eligibility. Its stateful spawner and Survival stages retain serial fallback.
+Demo UI ticks remain synchronous because their views read the live world. Async UI simulation needs isolated render snapshots, tracked separately in issue #15.
+
+```sh
+fish Scripts/check-concurrency.fish
+xcb test SwiftECS/SwiftECS -- --sanitize thread
+ECS_RUN_PARALLEL_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter ParallelPerformanceTests
+```
+
+The compile checks cover unsafe captures, actor isolation, payloads, unrestricted commands, and escaped write handles.
+Tests cover bounded overlap, shared reads, separate-column writes, partitions, deterministic command order, cancellation, observers, ownership, and cleanup.
+
+Release measurements after the profiling fixes on Apple M5 Max, macOS 27.0, Swift 6.4 used 4,096 entities and two runs:
+
+| Workload | Serial ms/frame | Four-job limit ms/frame |
+| --- | ---: | ---: |
+| Independent compute | 9.67–9.75 | 2.91–3.01 |
+| Partitioned compute | 2.44–2.47 | 1.10 |
+| Memory-bound | 0.64 | 0.58–0.78 |
+| Conflicting systems | 9.63–9.81 | 9.88–10.04 |
+| Command-heavy | 16.20–16.27 | 17.02–17.03 |
+| Empty callbacks | 0.014–0.016 | 0.41–0.43 |
+
+The benchmark also covers 64 entities and limits of one and two. A limit of one measures the synchronous reference runner.
+Parallel execution helps these compute-heavy cases, but can add overhead to small, conflicting, and command-heavy workloads.
+The memory-bound case shows little benefit at this size. There is no automatic workload tuning or lock-free World storage claim.
+
+A direct 100,000-entity movement comparison uses the original XYZ arithmetic and three component writes per entity.
+Each mode has three warm-up frames, 60 measured frames, and three rotated rounds. Every entity is verified after each sample.
+
+| Movement path | Before profiling fixes | After fixes, ms/frame |
+| --- | ---: | ---: |
+| Original raw component-reference loop | 17.25 | 14.68 |
+| Typed system, serial | 77.28 | 12.50 |
+| Typed system, 2 jobs | 153.46 | 10.56 |
+| Typed system, 4 jobs | 116.59 | 7.97 |
+| Typed system, 8 jobs | 153.46 | 6.45 |
+
+The system modes use the same `.eachParallel` callback, with `Read<Physics>` supplying a value per row.
+The raw baseline retains its original component-reference access. Eight jobs are about 1.94 times faster than the corrected typed serial path.
+See [the profiling report](Experiments/ParallelMovementProfiling.md) for evidence, ownership details, and reproduction commands.
+
+```sh
+ECS_RUN_MOVEMENT_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter MovementParallelBenchmarkTests
+```
 
 ### Link entities
 

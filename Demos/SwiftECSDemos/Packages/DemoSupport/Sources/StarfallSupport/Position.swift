@@ -1,6 +1,6 @@
 import SwiftECS
 
-struct Position: Component, Equatable {
+struct Position: ConcurrentComponent, Equatable {
     var x: Double
     var y: Double
 }

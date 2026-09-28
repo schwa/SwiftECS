@@ -15,6 +15,9 @@ public enum SystemError: Error, Equatable {
     case referenceComponent(ComponentType)
     case duplicateTerm(ComponentType)
     case missingCommandEntity(EntityID)
+    case invalidParallelism
+    case invalidPartitionSize
+    case parallelRunInProgress
 }
 
 // MARK: - CustomStringConvertible
@@ -22,6 +25,12 @@ public enum SystemError: Error, Equatable {
 extension SystemError: CustomStringConvertible {
     public var description: String {
         switch self {
+        case .invalidParallelism:
+            return "Parallelism must be positive"
+        case .invalidPartitionSize:
+            return "Minimum rows per task must be positive"
+        case .parallelRunInProgress:
+            return "A run already owns this world"
         case .missingCommandEntity(let id):
             return "Command target \(id) no longer exists"
         case .referenceComponent(let type):

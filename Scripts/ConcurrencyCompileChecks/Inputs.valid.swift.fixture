@@ -1,0 +1,15 @@
+import SwiftECS
+
+struct Position: ConcurrentComponent { var value: Int }
+struct Created: ConcurrentComponent { let source: EntityID }
+
+@MainActor
+func verify() async throws {
+    let world = World()
+    let system = System("move").query(Write<Position>()).eachParallel(CreateEntities(Created.self)) { _, row, creator in
+        row.fields.value.value += 1
+        try creator.create(Created(source: row.entityID))
+    }
+    try world.addSystem(system)
+    try await world.update(deltaTime: 1, parallelism: 4)
+}

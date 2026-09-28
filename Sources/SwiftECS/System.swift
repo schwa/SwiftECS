@@ -5,6 +5,9 @@ public struct System {
     internal var initialize: () -> Void = {}
     internal var cleanup: () -> Void = {}
     internal var execute: (World, Double) throws -> SystemCommandBatch = { _, _ in SystemCommandBatch() }
+    internal var prepareParallel: ((World, Double, ParallelIDPool, Int) -> [ParallelJob])?
+
+    public var isParallelEligible: Bool { prepareParallel != nil }
 
     public init(_ id: SystemID) {
         self.id = id
@@ -15,8 +18,12 @@ public struct System {
     }
 
     public func run<each Input: SystemInput>(_ inputs: repeat each Input, body: @escaping (SystemContext, repeat (each Input).Value) throws -> Void) -> System {
+        bind(repeat (each inputs).binding, body: body)
+    }
+
+    internal func bind<each Value>(_ bindings: repeat SystemBinding<each Value>, body: @escaping (SystemContext, repeat each Value) throws -> Void) -> System {
         var system = self
-        let bindings = (repeat (each inputs).binding)
+        system.prepareParallel = nil
         var access = SystemAccess()
         repeat access.merge((each bindings).access)
         system.access = access

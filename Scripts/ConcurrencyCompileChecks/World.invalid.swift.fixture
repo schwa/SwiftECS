@@ -1,0 +1,5 @@
+import SwiftECS
+
+func invalid(_ world: World) -> System {
+    System("invalid").runParallel { _ in world.createEntity() }
+}

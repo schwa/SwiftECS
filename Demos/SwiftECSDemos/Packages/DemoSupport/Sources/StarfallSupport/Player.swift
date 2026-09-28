@@ -1,6 +1,6 @@
 import SwiftECS
 
-struct Player: Component {
+struct Player: ConcurrentComponent {
     var score = 0
     var lives = 3
 }

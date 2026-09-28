@@ -44,19 +44,56 @@ protocol AnyColumn: AnyObject {
 /// Typed column storage for one component type.
 @usableFromInline
 final class Column<T: Component>: AnyColumn {
-    @usableFromInline var data: ContiguousArray<T> = []
+    // ABI-visible for generic specialization; storage access goes through withLock.
+    @usableFromInline let lock = ScopedLock()
+    @usableFromInline var storage: ContiguousArray<T> = []
+
+    @inlinable
+    @inline(__always)
+    func withLock<Result>(_ body: () throws -> Result) rethrows -> Result {
+        try lock.withLock(body)
+    }
+
+    @inlinable
+    @inline(__always)
+    func value(at index: Int) -> T {
+        withLock { storage[index] }
+    }
 
     @inlinable
     @inline(__always)
     func setValue(_ value: T, at index: Int) {
-        data[index] = value
+        withLock { storage[index] = value }
+    }
+
+    func snapshot() -> ContiguousArray<T> {
+        withLock { storage }
+    }
+
+    func apply(_ values: ContiguousArray<T>, indices: [Int]?, changed: [Bool]) {
+        withLock {
+            for index in values.indices where changed[index] {
+                storage[indices?[index] ?? index] = values[index]
+            }
+        }
+    }
+
+    func insert(_ value: T, at index: Int) {
+        withLock {
+            while storage.count <= index {
+                storage.append(value)
+            }
+            storage[index] = value
+        }
     }
 
     func swapRemove(at index: Int) {
-        if index < data.count - 1 {
-            data[index] = data[data.count - 1]
+        withLock {
+            if index < storage.count - 1 {
+                storage[index] = storage[storage.count - 1]
+            }
+            storage.removeLast()
         }
-        data.removeLast()
     }
 
     func makeEmptyColumn() -> AnyColumn {
@@ -65,18 +102,23 @@ final class Column<T: Component>: AnyColumn {
 
     func copyValue(at sourceIndex: Int, to target: AnyColumn, at targetIndex: Int) {
         guard let targetColumn = target as? Column<T> else { return }
-        let value = data[sourceIndex]
-        while targetColumn.data.count <= targetIndex {
-            targetColumn.data.append(value)
-        }
-        targetColumn.data[targetIndex] = value
+        targetColumn.insert(value(at: sourceIndex), at: targetIndex)
     }
 
     func getValue(at index: Int) -> (any Component)? {
-        guard index < data.count else { return nil }
-        return data[index]
+        valueIfPresent(at: index)
+    }
+
+    func valueIfPresent(at index: Int) -> T? {
+        withLock {
+            guard index < storage.count else { return nil }
+            return storage[index]
+        }
     }
 }
+
+// Every storage access is locked; only eligible component columns can cross tasks.
+extension Column: @unchecked Sendable where T: ConcurrentComponent {}
 
 /// Storage for entities with the same component signature.
 @usableFromInline
@@ -105,20 +147,12 @@ final class Archetype {
             columns[typeID] = col
         }
 
-        while col.data.count <= index {
-            col.data.append(value)
-        }
-        if col.data.count == index {
-            col.data.append(value)
-        } else {
-            col.data[index] = value
-        }
+        col.insert(value, at: index)
     }
 
     func getComponent<T: Component>(_ type: T.Type, at index: Int) -> T? {
-        guard let col = columns[ComponentType(type)] as? Column<T>,
-              index < col.data.count else { return nil }
-        return col.data[index]
+        guard let col = columns[ComponentType(type)] as? Column<T> else { return nil }
+        return col.valueIfPresent(at: index)
     }
 
     func removeEntity(at index: Int) -> EntityID? {

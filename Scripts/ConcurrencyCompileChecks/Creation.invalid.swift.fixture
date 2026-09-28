@@ -1,0 +1,4 @@
+import SwiftECS
+
+struct SerialPayload: Component, Sendable { var value: Int }
+let system = System("invalid").runParallel(CreateEntities(SerialPayload.self)) { _, _ in }

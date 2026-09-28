@@ -11,13 +11,13 @@ func measureTime(_ block: () throws -> Void) rethrows -> Double {
 
 // MARK: - Additional Test Components
 
-struct Transform: Component {
+struct Transform: ConcurrentComponent {
     var x: Double
     var y: Double
     var z: Double
 }
 
-struct Physics: Component {
+struct Physics: ConcurrentComponent {
     var velocityX: Double
     var velocityY: Double
     var velocityZ: Double

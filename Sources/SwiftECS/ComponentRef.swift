@@ -16,7 +16,7 @@ public struct ComponentRef<Value: Component> {
     public var value: Value {
         get {
             world.trackStorageAccess()
-            return column.data[index]
+            return column.value(at: index)
         }
         nonmutating set {
             world.mutations.perform({

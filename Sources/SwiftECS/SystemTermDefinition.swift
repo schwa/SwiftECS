@@ -1,4 +1,10 @@
 public struct SystemTermDefinition<Value: Component, Output> {
-    internal let writes: Bool
-    internal let resolve: (SystemComponent<Value>) -> Output
+    @usableFromInline internal let writes: Bool
+    @usableFromInline internal let bind: (SystemScope, Column<Value>, TaskColumn<Value>?, UInt64) -> (EntityID, Int) -> Output
+
+    @inlinable
+    internal init(writes: Bool, bind: @escaping (SystemScope, Column<Value>, TaskColumn<Value>?, UInt64) -> (EntityID, Int) -> Output) {
+        self.writes = writes
+        self.bind = bind
+    }
 }

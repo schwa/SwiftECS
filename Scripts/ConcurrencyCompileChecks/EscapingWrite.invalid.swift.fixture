@@ -1,0 +1,7 @@
+import SwiftECS
+
+struct Position: ConcurrentComponent { var value: Int }
+
+let system = System("invalid").query(Write<Position>()).eachParallel { _, row in
+    Task { @Sendable in row.fields.value.value += 1 }
+}

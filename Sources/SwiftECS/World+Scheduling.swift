@@ -84,6 +84,10 @@ extension World {
     }
 
     internal func resolve(_ pipeline: Pipeline) throws -> [SystemDescriptor] {
+        try resolveSchedule(pipeline).map(\.descriptor)
+    }
+
+    internal func resolveSchedule(_ pipeline: Pipeline) throws -> [ScheduledSystem] {
         let selected = snapshot(matching: pipeline.query.with(SystemDescriptor.self))
             .filter { $0[SystemDescriptor.self]?.isRegistered == true }
             .sorted { ($0[SystemDescriptor.self]?.registrationOrder ?? 0) < ($1[SystemDescriptor.self]?.registrationOrder ?? 0) }
@@ -150,17 +154,17 @@ extension World {
         return predecessors
     }
 
-    private func orderedSystems(_ selected: [Entity], dependencies: [EntityID: Set<EntityID>]) throws -> [SystemDescriptor] {
-        var dependencies = dependencies
+    private func orderedSystems(_ selected: [Entity], dependencies originalDependencies: [EntityID: Set<EntityID>]) throws -> [ScheduledSystem] {
+        var dependencies = originalDependencies
         var remaining = selected
-        var result: [SystemDescriptor] = []
+        var result: [ScheduledSystem] = []
         while !remaining.isEmpty {
             guard let index = remaining.firstIndex(where: { dependencies[$0.id, default: []].isEmpty }) else {
                 throw SystemError.cyclicDependency(remaining.compactMap { $0[SystemDescriptor.self]?.id })
             }
             let entity = remaining.remove(at: index)
             if let descriptor = entity[SystemDescriptor.self] {
-                result.append(descriptor)
+                result.append(ScheduledSystem(entityID: entity.id, descriptor: descriptor, predecessors: originalDependencies[entity.id, default: []]))
             }
             for dependent in remaining {
                 dependencies[dependent.id]?.remove(entity.id)

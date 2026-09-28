@@ -1,0 +1,7 @@
+import SwiftECS
+
+final class MutableState { var value = 0 }
+
+func invalid(_ state: MutableState) -> System {
+    System("invalid").runParallel { _ in state.value += 1 }
+}

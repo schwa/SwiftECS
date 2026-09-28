@@ -1,0 +1,3 @@
+import SwiftECS
+
+let system = System("invalid").runParallel(Commands()) { _, _ in }

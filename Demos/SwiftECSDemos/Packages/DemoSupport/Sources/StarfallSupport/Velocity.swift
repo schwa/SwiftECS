@@ -1,5 +1,5 @@
 import SwiftECS
 
-struct Velocity: Component {
+struct Velocity: ConcurrentComponent {
     var y: Double
 }

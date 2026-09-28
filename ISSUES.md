@@ -641,11 +641,13 @@ This issue covers sequential Flecs-style synchronization points, not parallel sy
 ## 30: Systems lack an enforceable parallel-execution eligibility contract
 
 +++
-status: new
+status: closed
 priority: medium
 kind: feature
 labels: systems, concurrency
 created: 2026-09-28T19:35:16Z
+updated: 2026-09-28T21:50:53Z
+closed: 2026-09-28T21:50:53Z
 +++
 
 System callbacks and lifecycle hooks can capture arbitrary mutable state. Component only marks data, and the current value-semantics contract does not establish Sendable safety. Read/write declarations describe ECS access, not captured state or executor isolation.
@@ -656,17 +658,21 @@ The contract must distinguish safe task transfer from exclusive access to live E
 
 This concerns concurrent systems within a world. Off-main simulation ownership and render snapshots remain tracked separately in #15.
 
+- `2026-09-28T21:50:53Z`: Added ConcurrentComponent and ConcurrentRelationship eligibility, Sendable callbacks, transferable input metatypes, and sealed parallel bindings. Serial actor-bound callbacks remain supported. Compile checks reject unsafe captures, payloads, actor-isolated access, unrestricted inputs, and escaped write handles.
+
 ---
 
 ## 31: Nonconflicting component access still reaches shared mutable world state
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
 labels: storage, concurrency
 depends: 30
 created: 2026-09-28T19:35:28Z
+updated: 2026-09-28T21:50:53Z
+closed: 2026-09-28T21:50:53Z
 +++
 
 Systems with disjoint component declarations still use shared World state, query machinery, and mutation bookkeeping. SystemComponent also falls back to world lookups after a structural revision. A false result from SystemAccess.conflicts is therefore not proof that concurrent callbacks are race-free.
@@ -677,17 +683,21 @@ Structural changes, world reuse, and external world access must not invalidate s
 
 Coverage must include different components on the same entities, different archetypes, read/read sharing, conflicting writes, and structural access attempts during execution.
 
+- `2026-09-28T21:50:53Z`: Workers use scoped column views without World access. Column access is lock-protected, query preparation stays on the owner, and raw storage access is gated while jobs run. Async runs reject concurrent or nested ownership. Actor ownership, shared reads, disjoint writes, and repeated partition updates pass Thread Sanitizer.
+
 ---
 
 ## 32: Observers and storage invalidation have no parallel-execution contract
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
 labels: observation, concurrency
 depends: 30
 created: 2026-09-28T19:35:39Z
+updated: 2026-09-28T21:50:53Z
+closed: 2026-09-28T21:50:53Z
 +++
 
 Component observers run synchronously and can access or mutate arbitrary world state. MutationCoordinator maintains shared batching and notification state. Sequential synchronization currently treats observers conservatively, but that does not define safe behavior when several system callbacks execute concurrently.
@@ -698,17 +708,21 @@ Reentrant observers, nested runs, observer registration/removal, and callback-tr
 
 Render-snapshot publication is separate work in #15; this issue covers the existing ECS observation APIs.
 
+- `2026-09-28T21:50:53Z`: Component observers force owner-isolated serial fallback with synchronous delivery. Storage publication and lifecycle cleanup occur after jobs join. Nested runs during an async execution are rejected; the synchronous runner retains its prior nesting behavior. Observer and cleanup boundary tests pass.
+
 ---
 
 ## 33: Deferred commands and entity reservations are unsafe for concurrent producers
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
 labels: systems, commands, concurrency
 depends: 30
 created: 2026-09-28T19:35:50Z
+updated: 2026-09-28T21:50:53Z
+closed: 2026-09-28T21:50:53Z
 +++
 
 Each callback has a command array, but creation also mutates World.reservedCommandIDs. Deferred operations capture payloads in non-Sendable closures, and PipelineExecution consumes batches in sequential callback order. These assumptions do not support concurrent producers.
@@ -719,17 +733,21 @@ Merge order must follow a defined logical system order, not task completion orde
 
 Success, cancellation, callback failure, and partial merge failure must release reservations and discard the correct uncommitted commands. No buffer or scoped handle may outlive its permitted execution interval.
 
+- `2026-09-28T21:50:53Z`: Added task-local command buffers, synchronized identity reservations, checked payload transport, and deterministic schedule/partition merge order. Failure commits only the successful logical system prefix; a failed partition discards that entire system command batch. Cancellation, reservations, creation, edits, relationship changes, and cleanup are covered.
+
 ---
 
 ## 34: Pipelines cannot execute independent eligible systems concurrently
 
 +++
-status: new
+status: closed
 priority: medium
 kind: feature
 labels: systems, pipelines, concurrency
 depends: 30, 31, 32, 33
 created: 2026-09-28T19:36:03Z
+updated: 2026-09-28T21:50:53Z
+closed: 2026-09-28T21:50:53Z
 +++
 
 PipelineExecution runs every callback serially. Access metadata and sequential merge points exist, but there is no supported parallel execution mode or completion boundary for a group of concurrent callbacks.
@@ -742,17 +760,21 @@ Cancellation and one or more callback failures must have explicit semantics for 
 
 Existing synchronous serial execution remains supported. This issue covers parallel systems, not subdivision of one system query.
 
+- `2026-09-28T21:50:53Z`: Added async World update/run overloads with a bounded structured executor and conflict/dependency/phase-aware groups. Serial-only systems and observers retain serial execution. All jobs join before errors, merges, or cleanup; errors use logical order and cancellation is cooperative. Concurrent ownership is rejected and execution statistics report groups and jobs.
+
 ---
 
 ## 35: Parallel execution lacks race validation and scaling measurements
 
 +++
-status: new
+status: closed
 priority: medium
 kind: task
 labels: testing, performance, concurrency
 depends: 34
 created: 2026-09-28T19:36:14Z
+updated: 2026-09-28T21:50:53Z
+closed: 2026-09-28T21:50:53Z
 +++
 
 The existing tests and synchronization benchmark validate sequential execution. They do not establish race freedom, actual callback overlap, bounded concurrency, serial equivalence, or useful scaling for parallel systems.
@@ -763,17 +785,21 @@ Serial and parallel executions must produce equivalent logical results for deter
 
 Measurements must compare the serial baseline with several concurrency limits and workload sizes. Include compute-heavy, memory-bound, highly conflicting, and command-heavy cases; report runtime, scheduling overhead, merge counts, and small-workload regressions. Record the hardware and build configuration, and do not infer a speedup from overlap alone.
 
+- `2026-09-28T21:50:53Z`: Added compile-failure fixtures, deterministic overlap/bound tests, stress comparisons, and a workload benchmark covering idle, compute, memory, conflicts, commands, and partitions at multiple sizes and limits. The 253-test package suite passes Debug, Release, and Thread Sanitizer; 18 demo tests and macOS/iOS simulator builds pass. Recorded M5 Max measurements show compute gains but memory/conflict/command regressions and nonzero serial overhead; no universal speedup claim.
+
 ---
 
 ## 36: A single large system query cannot use parallel entity iteration
 
 +++
-status: new
+status: closed
 priority: low
 kind: feature
-labels: systems,queries,concurrency
-depends: 34,35
+labels: systems, queries, concurrency
+depends: 34, 35
 created: 2026-09-28T19:36:25Z
+updated: 2026-09-28T21:50:53Z
+closed: 2026-09-28T21:50:53Z
 +++
 
 Parallel execution of independent systems cannot accelerate a workload dominated by one large query. SystemRows currently exposes a sequential iterator, and its access contract grants component-type access rather than disjoint row ownership.
@@ -783,5 +809,53 @@ Expected: a separately eligible per-entity callback can process disjoint portion
 Command ordering, filtering, cancellation, errors, and completion before structural merges must remain defined across partitions. Validation must cover uneven archetype sizes, empty matches, component sharing, deterministic results, and partitioning overhead.
 
 This is a later follow-up to validated parallel-system execution, not a requirement for its first release.
+
+- `2026-09-28T21:50:53Z`: Added eachParallel with disjoint prepared row ranges, minimum partition sizes, and a global concurrency bound. Partition callbacks receive only their row and sealed command capabilities; additional mutable queries cannot be disguised as command inputs. Empty/uneven/filtered archetypes, exact coverage, command order, partition failure, serial equivalence, and partitioning costs are tested. Stateful/order-dependent reductions remain explicitly serial or caller-synchronized.
+
+---
+
+## 37: Typed serial movement is substantially slower than direct component references
+
++++
+status: closed
+priority: high
+kind: bug
+labels: performance, systems
+created: 2026-09-29T02:11:25Z
+updated: 2026-09-29T04:02:55Z
+closed: 2026-09-29T04:02:55Z
++++
+
+The Release 100,000-entity movement comparison measures 77.28 ms/frame for the typed serial system versus 17.25 ms/frame for the original component-reference loop. Both apply the same XYZ movement math and three component writes per entity. Full-state verification passes.
+
+Reproduce with ECS_RUN_MOVEMENT_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter MovementParallelBenchmarkTests. Results are three-round medians with three warm-up frames and 60 measured frames, on Apple M5 Max and macOS 27.0.
+
+Expected: type-safe system access should not impose this large per-entity overhead. Profile the actual hot path and retain matching, reference lifetime, observer, and mutation semantics while addressing the regression.
+
+- `2026-09-29T04:02:55Z`: Profiled Release movement with sample. Generic/tuple metadata and repeated exclusivity checks dominated serial access. Bound field accessors once, specialized iteration over resolved output types, and kept lifetime/revision checks in non-Sendable owner-local cells. Three-round 100K median improved from 77.28 to 12.50 ms/frame; raw reference loop measured 14.68 ms. Full-state verification and 260 tests pass. Evidence and reproduction are in Experiments/ParallelMovementProfiling.md.
+
+---
+
+## 38: Partitioned movement slows down as workers contend on fine-grained access
+
++++
+status: closed
+priority: high
+kind: bug
+labels: performance, concurrency
+created: 2026-09-29T02:11:25Z
+updated: 2026-09-29T04:02:55Z
+closed: 2026-09-29T04:02:55Z
++++
+
+The Release 100,000-entity movement comparison measures 153.46, 116.59, and 153.46 ms/frame with 2, 4, and 8 jobs, respectively, versus 77.28 ms/frame for the same typed callback executed serially. The original raw loop measures 17.25 ms/frame.
+
+Current component access locks the column and worker bookkeeping for individual operations, even when partitions own distinct rows. Lock contention is a suspected contributor, not yet a profiled conclusion.
+
+Reproduce with ECS_RUN_MOVEMENT_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter MovementParallelBenchmarkTests on Apple M5 Max, macOS 27.0. All results pass full-state verification.
+
+Expected: disjoint row processing should avoid per-element synchronization overhead that defeats parallel execution. Changes must retain ownership boundaries, deterministic command merges, cancellation cleanup, observer fallback, and race freedom. Validate with profiles, repeated benchmarks, compile-failure checks, and Thread Sanitizer.
+
+- `2026-09-29T04:02:55Z`: The four-job profile confirmed column-lock waits and metadata overhead. Workers now use task-owned buffers with shared per-task query aliases and dirty-only writeback after joining, before structural merges. Failure writeback and command-prefix behavior remain covered. 100K medians improved from 116.59 to 7.97 ms with four jobs and from 153.46 to 6.45 ms with eight. Debug/Release tests, Thread Sanitizer, Address Sanitizer, compile checks, demo tests, macOS/iOS builds, and lint pass. No new unchecked-Sendable buffer or owner-cell wrappers were introduced.
 
 ---

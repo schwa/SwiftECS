@@ -1,1 +1,1 @@
-public enum DependsOn: Relationship {}
+public enum DependsOn: ConcurrentRelationship {}

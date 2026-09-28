@@ -1,13 +1,21 @@
 public struct SystemQuery<each Term: SystemTerm>: SystemInput {
-    internal let terms: (repeat each Term)
-    internal let filter: Query
+    @usableFromInline internal let terms: (repeat each Term)
+    @usableFromInline internal let filter: Query
 
     public init(_ terms: repeat each Term, matching filter: Query = .all) {
         self.terms = (repeat each terms)
         self.filter = filter
     }
 
+    @inlinable
     public var binding: SystemBinding<SystemRows<repeat each Term>> {
+        makeBinding { scope, storage in
+            Self.bindRows(terms: (repeat each terms), storage: storage, scope: scope, revision: scope.world.structuralRevision)
+        }
+    }
+
+    @usableFromInline
+    internal func makeBinding(_ bind: @escaping (SystemScope, [SystemQueryStorage<repeat (each Term).ComponentValue>]) -> SystemRows<repeat each Term>) -> SystemBinding<SystemRows<repeat each Term>> {
         var access = SystemAccess()
         repeat Self.record(each terms, in: &access)
         let matching = Query(with: repeat (each Term).ComponentValue.self).and(filter)
@@ -33,8 +41,21 @@ public struct SystemQuery<each Term: SystemTerm>: SystemInput {
             let storage = selection.archetypes.map {
                 SystemQueryStorage<repeat (each Term).ComponentValue>(archetype: $0, filter: selection.filter, world: scope.world)
             }
-            return SystemRows<repeat each Term>(terms: (repeat each terms), storage: storage, scope: scope, revision: scope.world.structuralRevision)
+            return bind(scope, storage)
         })
+    }
+
+    @inlinable
+    internal static func bindRows(terms: (repeat each Term), storage: [SystemQueryStorage<repeat (each Term).ComponentValue>], scope: SystemScope, revision: UInt64) -> SystemRows<repeat each Term> {
+        let definitions = (repeat (each terms).definition)
+        var required: Set<ComponentType> = []
+        for type in repeat (each Term).ComponentValue.self {
+            required.insert(ComponentType(type))
+        }
+        let batches = storage.map { batch in
+            BoundSystemBatch(ids: batch.ids, indices: batch.matchingIndices, fields: (repeat (each definitions).bind(scope, each batch.columns, each batch.buffers, revision)), dense: batch.usesDenseIndices)
+        }
+        return SystemOutputRows(storage: batches, scope: scope, revision: revision, required: required)
     }
 
     private static func record<Field: SystemTerm>(_ term: Field, in access: inout SystemAccess) {

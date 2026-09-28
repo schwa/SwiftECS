@@ -1,0 +1,4 @@
+import SwiftECS
+
+final class MutableState { var value = 0 }
+struct InvalidPayload: ConcurrentComponent { var state: MutableState }

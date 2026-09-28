@@ -8,6 +8,16 @@ internal final class MutationCoordinator: Observable {
     private var isDirty = false
     private var nextTokenID: UInt64 = 0
     private var handlers: [ObjectIdentifier: [UInt64: AnyObserverHandler]] = [:]
+    @usableFromInline let suspended = OwnerCell(false)
+    @inlinable var isParallelSuspended: Bool {
+        get { suspended.value }
+        set { suspended.value = newValue }
+    }
+
+    @inlinable
+    func checkAccessible() {
+        precondition(!isParallelSuspended, "World access is unavailable while parallel callbacks are running")
+    }
 
     @usableFromInline
     var hasObservers: Bool {
@@ -16,6 +26,7 @@ internal final class MutationCoordinator: Observable {
 
     @usableFromInline
     func access() {
+        checkAccessible()
         registrar.access(self, keyPath: \.revision)
     }
 
@@ -26,21 +37,29 @@ internal final class MutationCoordinator: Observable {
 
     @inlinable
     func perform(_ write: () -> Void, events: () -> Void) {
+        checkAccessible()
         write()
         defer { didChange() }
         events()
     }
 
     func batch<Result>(_ body: () throws -> Result) rethrows -> Result {
-        batchDepth += 1
-        defer {
-            batchDepth -= 1
-            if batchDepth == 0, isDirty {
-                isDirty = false
-                publish()
-            }
-        }
+        beginBatch()
+        defer { endBatch() }
         return try body()
+    }
+
+    func beginBatch() {
+        checkAccessible()
+        batchDepth += 1
+    }
+
+    func endBatch() {
+        batchDepth -= 1
+        if batchDepth == 0, isDirty {
+            isDirty = false
+            publish()
+        }
     }
 
     @usableFromInline
@@ -59,6 +78,7 @@ internal final class MutationCoordinator: Observable {
     }
 
     func observe<T: Component>(_ type: T.Type, handler: @escaping (ComponentEvent<T>) -> Void) -> ObservationToken {
+        checkAccessible()
         let tokenID = nextTokenID
         nextTokenID += 1
         let typeID = ObjectIdentifier(type)
@@ -67,6 +87,7 @@ internal final class MutationCoordinator: Observable {
     }
 
     func removeObserver(_ token: ObservationToken) {
+        checkAccessible()
         handlers[token.componentType]?.removeValue(forKey: token.id)
         if handlers[token.componentType]?.isEmpty == true {
             handlers.removeValue(forKey: token.componentType)

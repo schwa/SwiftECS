@@ -1,0 +1,5 @@
+import SwiftECS
+
+struct SerialComponent: Component, Sendable { var value: Int }
+
+let system = System("invalid").query(Read<SerialComponent>()).runParallel { _, _ in }

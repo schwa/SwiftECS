@@ -1,0 +1,14 @@
+import SwiftECS
+
+struct Position: ConcurrentComponent { var value: Int }
+struct ExtraRows: ParallelCommandInput {
+    var binding: SystemBinding<SystemRows<Write<Position>>> {
+        SystemQuery(Write<Position>()).binding
+    }
+    var parallelBinding: ParallelBinding<SystemRows<Write<Position>>> {
+        SystemQuery(Write<Position>()).parallelBinding
+    }
+    var parallelCommands: ParallelCommandBinding<SystemRows<Write<Position>>> {
+        ParallelCommandBinding(binding: parallelBinding)
+    }
+}

@@ -14,7 +14,7 @@ private func probeColumn<Value: Component>(_ type: Value.Type, in archetype: Arc
 }
 
 private func probeValue<Value: Component>(_ column: Column<Value>, at index: Int) -> Value {
-    column.data[index]
+    column.value(at: index)
 }
 
 // This is a compiler feasibility probe, not a proposed public query API.
@@ -45,7 +45,7 @@ private struct TypedQueryPackProbe<each Value: Component> {
     func set(_ values: repeat each Value) {
         world.mutations.perform({
             for (column, value) in repeat (each columns, each values) {
-                column.data[index] = value
+                column.setValue(value, at: index)
             }
         }, events: {
             for value in repeat each values {

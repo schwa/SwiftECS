@@ -1,0 +1,1 @@
+main actor-isolated property 'value' can not be mutated from a Sendable closure

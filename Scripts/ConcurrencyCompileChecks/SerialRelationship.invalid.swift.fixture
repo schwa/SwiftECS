@@ -1,0 +1,4 @@
+import SwiftECS
+
+enum SerialLink: Relationship {}
+let system = System("invalid").runParallel(EditRelationship<SerialLink>()) { _, _ in }

@@ -1,0 +1,7 @@
+import SwiftECS
+
+@MainActor final class Model { var value = 0 }
+
+@MainActor func invalid(_ model: Model) -> System {
+    System("invalid").runParallel { _ in model.value += 1 }
+}

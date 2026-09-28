@@ -1,0 +1,7 @@
+import SwiftECS
+
+@MainActor final class Model { var value = 0 }
+
+@MainActor func serial(_ model: Model) -> System {
+    System("serial").run { _ in model.value += 1 }
+}

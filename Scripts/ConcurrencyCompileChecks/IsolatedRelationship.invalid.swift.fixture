@@ -1,0 +1,11 @@
+import SwiftECS
+
+enum IsolatedLink: @MainActor ConcurrentRelationship {
+    @MainActor static var isExclusive: Bool { true }
+}
+
+@MainActor func invalid() -> System {
+    System("invalid").runParallel(EditRelationship<IsolatedLink>()) { _, links in
+        links.add(from: EntityID(), to: EntityID())
+    }
+}

@@ -1,7 +1,7 @@
 import SwiftECS
 
-struct FallingObject: Component {
-    enum Kind {
+struct FallingObject: ConcurrentComponent {
+    enum Kind: Sendable {
         case star, meteor
     }
 

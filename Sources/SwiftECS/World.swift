@@ -12,13 +12,20 @@ public final class World {
     @ObservationIgnored
     internal var executions: [PipelineExecution] = []
     @ObservationIgnored
+    internal var parallelRunActive = false
+    @ObservationIgnored
     internal var reservedCommandIDs: Set<EntityID> = []
     @ObservationIgnored
     public internal(set) var lastRunStatistics = PipelineRunStatistics()
     @ObservationIgnored
     internal var archetypes: [ArchetypeSignature: Archetype] = [:]
     @ObservationIgnored
-    internal var structuralRevision: UInt64 = 0
+    @usableFromInline internal let revisionCell = OwnerCell<UInt64>(0)
+
+    @inlinable internal var structuralRevision: UInt64 {
+        get { revisionCell.value }
+        set { revisionCell.value = newValue }
+    }
     @ObservationIgnored
     internal var entityLocations: [EntityID: EntityLocation] = [:]
     @ObservationIgnored
@@ -207,6 +214,7 @@ public final class World {
 
     // MARK: - Component Access (Internal)
 
+    @usableFromInline
     internal func addComponent<T: Component>(_ component: T, to entityID: EntityID) {
         guard let location = entityLocations[entityID], let archetype = archetypes[location.signature] else {
             return
@@ -232,6 +240,7 @@ public final class World {
         })
     }
 
+    @usableFromInline
     internal func component<T: Component>(_ type: T.Type, for entityID: EntityID) -> T? {
         trackStorageAccess()
         guard let location = entityLocations[entityID],
@@ -267,6 +276,13 @@ public final class World {
         return value
     }
 
+    @usableFromInline
+    internal func matchesSystemRow(_ id: EntityID, requiring types: Set<ComponentType>) -> Bool {
+        trackStorageAccess()
+        return entityLocations[id]?.signature.isSuperset(of: types) == true
+    }
+
+    @usableFromInline
     internal func hasComponent<T: Component>(_ type: T.Type, for entityID: EntityID) -> Bool {
         trackStorageAccess()
         guard let location = entityLocations[entityID] else { return false }
@@ -344,6 +360,9 @@ public final class World {
     }
 
     internal func synchronizeBeforeRun() throws {
+        guard !parallelRunActive else {
+            throw SystemError.parallelRunInProgress
+        }
         for execution in executions {
             try execution.flush(in: self)
         }
@@ -371,8 +390,33 @@ public final class World {
             if advancesTime {
                 simulationTime += deltaTime
             }
-            try execution.run(systems, in: self, deltaTime: deltaTime, synchronization: synchronization)
+            try execution.run(systems, in: self, deltaTime: deltaTime, synchronization: synchronization, cancellationChecks: false)
         }
+    }
+
+    internal func beginParallelRun(_ execution: PipelineExecution, deltaTime: Double, advancesTime: Bool) {
+        mutations.beginBatch()
+        parallelRunActive = true
+        pipelineExecutionDepth += 1
+        executions.append(execution)
+        if advancesTime {
+            simulationTime += deltaTime
+        }
+    }
+
+    internal func endParallelRun(_ execution: PipelineExecution) {
+        mutations.isParallelSuspended = false
+        execution.discard(in: self)
+        executions.removeLast()
+        pipelineExecutionDepth -= 1
+        let cleanup = pendingSystemCleanup
+        pendingSystemCleanup.removeAll()
+        for system in cleanup {
+            system.cleanup()
+        }
+        lastRunStatistics = execution.statistics
+        mutations.endBatch()
+        parallelRunActive = false
     }
 
     /// Get the current system execution order.

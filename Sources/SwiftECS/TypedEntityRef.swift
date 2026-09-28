@@ -45,6 +45,6 @@ public struct TypedEntityRef<each Value: Component> {
     @inlinable
     @inline(__always)
     internal func read<T: Component>(_ column: Column<T>) -> T {
-        column.data[index]
+        column.value(at: index)
     }
 }
