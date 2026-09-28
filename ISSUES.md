@@ -566,3 +566,62 @@ Existing public relationship tests provide useful boundary coverage. Preserve re
 Related: #8 concerns archetype reclamation, #17 explores graph-backed scheduling, and #19 measures relationship workloads. This issue concerns ownership of the existing graph contract.
 
 ---
+
+## 27: Structural command access is too coarse for selective synchronization
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: systems, synchronization
+created: 2026-09-28T17:21:00Z
++++
+
+Commands() currently reports only SystemAccess.changesStructure. Every command-capable system therefore conflicts with every other system, regardless of the commands it can issue.
+
+The metadata cannot distinguish entity creation or destruction from component-specific or relationship-specific effects. It also cannot express which component sets a creation command can introduce.
+
+Expected: structural effects are explicit and enforceable through the typed command API. Metadata must describe all permitted effects, including relationship cleanup caused by destruction. Unknown or unrestricted effects must remain conservative rather than allow a required synchronization point to be omitted.
+
+---
+
+## 28: System access metadata omits query-matching dependencies
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: systems, queries, synchronization
+created: 2026-09-28T17:21:09Z
++++
+
+SystemQuery records its typed Read and Write terms in SystemAccess, but matching predicates are absent from that metadata. Filters can depend on component presence or absence, relationship edges, and descendant traversal without reading component values.
+
+For example, a system that reads Position while excluding Disabled depends on Disabled membership. A relationship-filtered query can change its result after a queued link change even when none of its component values change. A zero-term query also depends on entity existence.
+
+Expected: dependency metadata accounts for all conditions that can change query membership, including compound predicates and relationship traversal. These dependencies must remain distinguishable from component-value access. Coverage must demonstrate that relevant structural changes cannot be missed when deciding whether synchronization is required.
+
+---
+
+## 29: Pipelines flush deferred commands after every system regardless of dependencies
+
++++
+status: new
+priority: medium
+kind: feature
+labels: systems,pipelines,synchronization
+depends: 27,28
+created: 2026-09-28T17:21:21Z
++++
+
+Each System execution owns its command buffer and flushes it immediately after its callback. This provides conservative synchronization but prevents commands from remaining pending across unrelated systems. Pipelines have no dependency-aware synchronization plan.
+
+Expected: queued structural changes become visible before a downstream system depends on their effects, without unnecessary intermediate merges. Pending effects must be considered across all systems since the previous merge. Immediate component-value writes must not be confused with deferred structural commands, and a read/write conflict must not invent execution order.
+
+Existing phases, explicit dependencies, registration-order tie breaking, and captured schedules must retain their ordering guarantees. Command order, query-binding timing, callback-scoped references, observer reentrancy, and deferred cleanup must remain safe across merges.
+
+Visibility and failure behavior must be explicit and tested for pipeline completion, empty selections, manual runs, nested runs, callback errors, and command-flush errors. Regression coverage must include creation followed by matching queries, exclusions, relationship traversal, and unrelated systems between a producer and consumer. Measurements must report merge counts and runtime against the current per-system flush behavior.
+
+This issue covers sequential Flecs-style synchronization points, not parallel system execution.
+
+---
