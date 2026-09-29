@@ -255,8 +255,8 @@ closed: 2026-09-29T15:27:37Z
 
 Applications currently own pause state and decide whether to call World.update. There is no agreed reason to move this policy into the ECS. Decide whether pause belongs in World or remains application-owned. Record the rationale and, if library support is warranted, define simulationTime, system execution, and direct-write behavior while paused. This is a design task only; implementation requires a separate decision.
 
-- `2026-09-23T19:55:27Z`: Related idea #17 evaluates selectable pipelines. Consider that design when deciding whether pause is world-wide or application-owned.
-- `2026-09-29T15:27:37Z`: Decision: pause and resume remain application-owned. No library pause API is added.
+\- `2026-09-23T19:55:27Z`: Related idea #17 evaluates selectable pipelines. Consider that design when deciding whether pause is world-wide or application-owned.
+\- `2026-09-29T15:27:37Z`: Decision: pause and resume remain application-owned. No library pause API is added.
 
 Rationale:
 - World has no run loop. update(deltaTime:) is caller-driven per frame/substep, so 'pause' is simply 'do not call update'. A world.paused flag would only gate update internally - pure indirection with no new capability.
@@ -384,12 +384,13 @@ Remaining focused work continues separately: #5 broader observation and SwiftUI 
 ## 15: Explore off-main simulation with isolated render snapshots
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: idea, effort:m, area:observation, area:concurrency
 created: 2026-09-23T19:53:23Z
-updated: 2026-09-29T14:37:53Z
+updated: 2026-09-29T15:30:36Z
+closed: 2026-09-29T15:30:36Z
 +++
 
 Idea: separate simulation ownership from rendering so ECS updates can run off the main actor without concurrent access to mutable World storage. World is currently unsynchronized; components need not be Sendable, query references retain mutable storage, and observer callbacks execute synchronously.
@@ -405,6 +406,23 @@ This is a design idea, not an implementation commitment. Preserve the existing s
 
 - `2026-09-29T14:37:53Z`: Triage: scope is a design investigation, not approval to implement the snapshot bridge. effort:m covers the ownership/API decision and representative extraction/transfer measurements. Parallel ECS execution now exists, but live World access remains unavailable while workers run and demo UI ticks remain serial.
 - `2026-09-29T14:38:22Z`: Related to #4 and #5: render snapshots and off-main ownership must define frame publication cadence and quantify UI/observation cost. Those issues cover substep batching and broad invalidation, not the snapshot bridge.
+- `2026-09-29T15:30:36Z`: Evaluation and recommendation: keep the single-owner World model. Off-main simulation with isolated render snapshots is achievable at the application layer today with no library changes, so no snapshot-bridge API is added now.
+
+Assessment against the current parallel/ownership model:
+- The parallel execution work is orthogonal to this idea. It parallelizes within one owner's run using task-local snapshots and blocks live world access while workers run; it does not move World off-main or decouple simulation cadence from rendering. The snapshot bridge is a separate concern.
+- World is not Sendable, but it is not @MainActor either, so it can be confined to a custom actor and ticked off the main actor. Entities, query rows, and Entity/query references are non-Sendable, so the compiler already prevents live storage from escaping across an actor boundary. That is the critical safety property the issue asked to establish, and it holds by construction.
+- The clean shape is: an actor owns World, receives Sendable input commands, ticks, and returns an immutable Sendable render snapshot containing only value data the renderer needs; a main-actor model publishes the latest snapshot to SwiftUI. This required zero library changes.
+
+Cost and boundary notes:
+- Snapshot extraction is O(rendered entities) per tick - a value copy of render data (see #40 on copy costs). It is bounded by the rendered subset, which is typically small; large scenes should measure it, but it is app-tunable (extract only what the renderer draws).
+- Sendable boundary: the snapshot must be plain values (no live entities/rows/queries). The type system enforces this - the existing World.invalid concurrency compile-check fixture already proves a World reference cannot be captured into a Sendable/cross-actor closure.
+- Observer execution context: the actor-owned world's Swift Observation would fire on the actor's executor, not main. In this design the app does not observe the world across the boundary; it observes the published snapshot on main, so world-level @Observable is simply unused across actors. No conflict.
+- Double-buffering whole worlds remains rejected (structural changes, reference-type components, query-reference lifetimes). Snapshot-of-render-data is the safer approach and is what the PoC uses.
+- Cadence and stale-frame handling (publish latest, drop intermediate) are application policy, consistent with the #10 decision that World owns no run loop.
+
+Recommendation: do not add a library SimulationActor or generic snapshot API. It would be speculative and would bake in cadence and snapshot-shape policy that belongs to applications (same reasoning as #10). Revisit only if a concrete app need plus measured extraction/transfer costs justify a shared convenience. Preserve the single-owner World model.
+
+Artifact (clearly safe, test-only): added OffMainSimulationTests, a proof of concept with an actor (SimulationActor) that owns a World, applies Sendable SimCommands, ticks a movement system, and returns a Sendable RenderSnapshot consumed by a @MainActor test. It compiles and passes under strict Swift 6 concurrency, demonstrating the feasibility and the enforced boundary without committing to any public API. No production code changed. Related: #4 (substep batching), #5 (invalidation cost), #10 (application-owned run policy), #40 (snapshot copy costs).
 
 ---
 
