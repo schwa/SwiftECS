@@ -100,10 +100,10 @@ closed: 2026-09-29T14:55:31Z
 
 Storage observation is batched per outermost world.update(), not per rendered frame. Apps that perform several sequential simulation substeps per frame receive one storage invalidation for each changed substep. Starfall uses this pattern. Notification volume therefore scales with substep count even when the UI only needs the final frame state. The existing per-update guarantee remains correct; batching across sequential updates is not currently supported.
 
-- `2026-09-23T18:01:44Z`: Related to #5: notification counts across substeps are part of the observation measurements. This issue concerns batching semantics across sequential updates.
-- `2026-09-23T19:29:01Z`: Tracked by umbrella #14 alongside observation measurements in #5 and row-cost work in #13.
-- `2026-09-29T14:38:22Z`: Related to #15: an isolated render-snapshot bridge also needs a frame publication boundary. This issue remains about batching sequential simulation substeps, not simulation ownership or snapshot transport.
-- `2026-09-29T14:55:31Z`: Added an opt-in World.batchingObservation { } scope that coalesces storage-observation notifications across sequential update(deltaTime:) substeps. It publishes a single storage invalidation when the outermost scope exits, so a per-frame loop with N substeps notifies SwiftUI once instead of N times.
+\- `2026-09-23T18:01:44Z`: Related to #5: notification counts across substeps are part of the observation measurements. This issue concerns batching semantics across sequential updates.
+\- `2026-09-23T19:29:01Z`: Tracked by umbrella #14 alongside observation measurements in #5 and row-cost work in #13.
+\- `2026-09-29T14:38:22Z`: Related to #15: an isolated render-snapshot bridge also needs a frame publication boundary. This issue remains about batching sequential simulation substeps, not simulation ownership or snapshot transport.
+\- `2026-09-29T14:55:31Z`: Added an opt-in World.batchingObservation { } scope that coalesces storage-observation notifications across sequential update(deltaTime:) substeps. It publishes a single storage invalidation when the outermost scope exits, so a per-frame loop with N substeps notifies SwiftUI once instead of N times.
 
 This reuses the existing MutationCoordinator batch depth, so no default semantics change: unbatched updates still publish once each, component-event observers still fire synchronously, and a thrown substep still flushes the pending invalidation as the scope unwinds. It is a serial API and does not bracket the async parallel update overloads (documented).
 
@@ -116,12 +116,13 @@ No frame-boundary guessing was required: the application opts in by wrapping its
 ## 5: Observation overhead and world-wide redraw scope lack dedicated measurements
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:m, area:observation, area:performance
 created: 2026-09-23T17:47:35Z
-updated: 2026-09-29T14:37:53Z
+updated: 2026-09-29T14:59:00Z
+closed: 2026-09-29T14:59:00Z
 +++
 
 World storage observation now tracks ECS reads and invalidates at world scope. Correctness tests cover notification batching, but dedicated measurements do not establish its runtime overhead or the UI work caused by broad invalidation. Measure representative large-world workloads with and without active observers, ordinary and fast-query reads/writes, sequential simulation substeps, and multiple views reading unrelated entities or components. Distinguish storage notifications from actual SwiftUI body evaluations and rendering work. These measurements are needed before deciding whether finer-grained observation is worthwhile.
@@ -132,6 +133,22 @@ World storage observation now tracks ECS reads and invalidates at world scope. C
 - `2026-09-23T19:29:01Z`: Tracked by umbrella #14. Current baseline and trace provenance are in Experiments/TypedQueryPacks/Performance.md and ~/Desktop/ECS-Profiles/README.md.
 - `2026-09-29T04:24:01Z`: Preserved from retired performance notes: the historical single-archetype comparison used 100K entities, registered queries, fresh worlds, warm-up, and three rotated Release samples. One synchronous rearming storage observer added no clear large cost, but both variants retained observation instrumentation. No SwiftUI rendering or unrelated-view measurement was performed. QueryPerformanceTests and TypedQueryCostTests remain available via ECS_RUN_BENCHMARKS=1. Historical captures/logs were recorded under ~/Desktop/ECS-Profiles, including typed-query-column-inline.trace; their current presence is unverified, and all-process captures need review before sharing. Old document references in earlier comments are historical; broader work here remains open.
 - `2026-09-29T14:38:22Z`: Related to #15: snapshot publication can change UI invalidation scope and cadence. Observation/rendering measurements here can inform that design without assuming snapshots are already implemented.
+- `2026-09-29T14:59:00Z`: Added opt-in ObservationOverheadBenchmarkTests (ECS_RUN_OBSERVATION_BENCHMARKS=1) isolating storage-observation cost and notification volume from work, across access styles, observer counts, and substep batching. Overridable via ECS_OBS_ENTITIES/ROUNDS/FRAMES. SwiftUI body/rendering measurement is explicitly out of scope (noted in code).
+
+Measured Apple M5 Max (18 processors), macOS 27.0 (26A428), Swift 6.4, Release; 100,000 entities, rounds=3, frames=30, one storage publish per frame:
+
+Work vs observer count (median ms/frame, notifications/frame):
+- entityHandles: 0 obs 174.89 (0/f); 1 obs 175.75 (1/f); 8 obs 175.59 (8/f).
+- typedQuery: 0 obs 9.56 (0/f); 1 obs 9.74 (1/f); 8 obs 11.92 (8/f).
+
+Notification volume across 4 sequential substeps: unbatched 4 notifications; wrapped in World.batchingObservation (see #4) 1 notification.
+
+Findings:
+- Storage observation publishes exactly once per frame regardless of observer count; each armed observer is notified once and rearms.
+- Per-observer overhead is negligible against heavy entity-handle work (~0.5%) but measurable on the fast typed path: 0->1 observer +~2%, 1->8 observers +~22% (9.74->11.92 ms). The cost is each observer recomputing its read on every world-wide invalidation; two of the eight observers scan 100k entities per rearm, so this reflects world-wide redraw scope, not per-write dispatch.
+- Substep notifications scale with substep count unless batched; batchingObservation coalesces them to one.
+
+Distinguishing notifications from work: notification count is one publish/frame (or N per substeps unbatched), independent of the large access-style work gap between entity handles and typed queries. Whether finer-grained (per-component or per-query) observation is worthwhile depends on real SwiftUI body/rendering cost, which remains unmeasured here and is out of scope for this issue. README updated with the command and headline results.
 
 ---
 

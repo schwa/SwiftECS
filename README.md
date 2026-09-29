@@ -468,6 +468,14 @@ ECS_RUN_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter TypedQuer
 ECS_RUN_SCALING_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter MovementScalingBenchmarkTests
 ```
 
+`ObservationOverheadBenchmarkTests` isolates storage-observation cost and notification volume from the work, across access styles, observer counts, and substep batching (SwiftUI body/rendering cost is out of scope):
+
+```sh
+ECS_RUN_OBSERVATION_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter ObservationOverheadBenchmarkTests
+```
+
+Storage observation publishes once per frame regardless of observer count; each armed observer is notified once and recomputes its read (world-wide invalidation). On the fast typed path this per-observer recompute is measurable as observer count rises, while it is negligible against heavier entity-handle work.
+
 Movement is memory-bandwidth bound. On Apple M5 Max (18 processors, macOS 27.0, Swift 6.4, Release), light movement scaled to about 1.26x at 18 jobs for 100,000 entities.
 One million entities peaked near 1.89x at four jobs and regressed beyond it. Raising per-entity work (`ECS_SCALING_ITERATIONS=200`) reached about 2.11x at 16 jobs.
 Parallel efficiency falls as jobs increase; more jobs do not approach linear speedup. Phase-level timing (dispatch, join, writeback, merge) needs core instrumentation and is tracked in #40 and #41.
