@@ -1035,8 +1035,8 @@ Preserve registration-order tie breaking, explicit dependency errors, phase reac
 
 Extracted from the retired phases-and-pipelines notes. Related to #39, which measures full execution phases for movement workloads.
 
-- `2026-09-29T14:38:22Z`: Related to #39 and #19: #39 measures end-to-end movement phases, while #19 measures relationship operations. This issue isolates schedule construction and ordering as system/phase graph size and density grow.
-- `2026-09-29T15:05:55Z`: Added opt-in ScheduleResolutionBenchmarkTests (ECS_RUN_SCHEDULE_BENCHMARKS=1). It isolates schedule construction/ordering via executionOrder(for:) (no callbacks) from dispatch, and verifies resolved schedule sizes outside timing. Overridable via ECS_SCHED_ROUNDS/REPEATS/COUNTS.
+\- `2026-09-29T14:38:22Z`: Related to #39 and #19: #39 measures end-to-end movement phases, while #19 measures relationship operations. This issue isolates schedule construction and ordering as system/phase graph size and density grow.
+\- `2026-09-29T15:05:55Z`: Added opt-in ScheduleResolutionBenchmarkTests (ECS_RUN_SCHEDULE_BENCHMARKS=1). It isolates schedule construction/ordering via executionOrder(for:) (no callbacks) from dispatch, and verifies resolved schedule sizes outside timing. Overridable via ECS_SCHED_ROUNDS/REPEATS/COUNTS.
 
 Measured Apple M5 Max (18 processors), macOS 27.0 (26A428), Swift 6.4, Release; rounds=3, repeats=20, medians per resolve:
 
@@ -1085,7 +1085,7 @@ priority: medium
 kind: task
 labels: effort:m, area:testing, area:compatibility
 created: 2026-09-29T04:23:03Z
-updated: 2026-09-29T14:37:54Z
+updated: 2026-09-29T15:07:04Z
 +++
 
 Package.swift declares Swift tools 6.2, while the retained typed-query investigation and recent concurrency validation used Apple Swift 6.4. The old notes explicitly left Swift 6.2 compatibility unverified. Parameter-pack and concurrency-heavy APIs now depend on this untested minimum.
@@ -1099,5 +1099,16 @@ error: failed to produce diagnostic for expression; please submit a bug report (
 error: cannot assign value of type 'Position' to type 'Position'
 
 Generic read helpers and the variadic setter avoided those errors. These historical observations are not new verification of another compiler. ECS coverage remains in TypedQueryPackTests, and Scripts/check-concurrency.fish checks the parallel API boundaries. This extends the minimum-toolchain gap left by closed investigation #7.
+
+- `2026-09-29T15:07:04Z`: Punting: full Swift 6.2 verification is not possible on this machine, and neither remedy in the task is warranted.
+
+Verified on Swift 6.4 (swiftlang-6.4.0.34.1, Xcode 27.0 selected; 27.1/27.2 and swift-latest.xctoolchain are also 6.4):
+- Toolchains: no Swift 6.2 or 6.3 toolchain is installed (xcode-select lists only 27.0/27.1/27.2, all Swift 6.4; /Library/Developer/Toolchains has only swift-latest -> 6.4). A 6.2 compiler cannot be exercised here.
+- Standalone probe behaves as documented: xcrun swift Experiments/TypedQueryPacks/Probe.swift succeeds (exit 0); -D DIRECT_ACCESS fails ('failed to produce diagnostic for expression'); -D SINGLE_ASSIGNMENT fails ('cannot assign value of type Position to type Position'). Matches the recorded 6.4 behavior.
+- Feature-floor analysis of Sources: the parallel APIs use SendableMetatype (ParallelSystemInput, ConcurrentRelationship) and @concurrent (ParallelExecutor), both introduced in Swift 6.2, plus isolated (any Actor)? = #isolation and typed throws(E) (6.0). No 6.3/6.4-only constructs are present (no 'sending', '~Copyable', '~Escapable', or newer syntax). The full Debug/Release suites and Scripts/check-concurrency.fish pass on 6.4.
+
+Conclusion: the declared swift-tools-version: 6.2 is consistent with the code's actual requirements, not an arbitrary untested number - the concurrency surface genuinely needs 6.2 features and would not build on 6.0/6.1. Nothing indicates a need for >6.2, so bumping the minimum to 6.4 (task option a) would be incorrect and over-restrictive; not doing it. Claiming verified 6.2 support without a 6.2 compiler would be guessing (task option: avoid), so not doing that either.
+
+Unblocker: install a Swift 6.2 (and ideally 6.3) toolchain, then run 'xcb test SwiftECS/SwiftECS' (Debug and Release), 'fish Scripts/check-concurrency.fish', and the probe under that toolchain to confirm the public APIs, suites, and compile-failure fixtures behave. Only then can the 6.2 floor be marked verified (or adjusted to the lowest toolchain that actually builds). Leaving the issue open.
 
 ---
