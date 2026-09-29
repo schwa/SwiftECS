@@ -859,3 +859,65 @@ Expected: disjoint row processing should avoid per-element synchronization overh
 - `2026-09-29T04:02:55Z`: The four-job profile confirmed column-lock waits and metadata overhead. Workers now use task-owned buffers with shared per-task query aliases and dirty-only writeback after joining, before structural merges. Failure writeback and command-prefix behavior remain covered. 100K medians improved from 116.59 to 7.97 ms with four jobs and from 153.46 to 6.45 ms with eight. Debug/Release tests, Thread Sanitizer, Address Sanitizer, compile checks, demo tests, macOS/iOS builds, and lint pass. No new unchecked-Sendable buffer or owner-cell wrappers were introduced.
 
 ---
+
+## 39: Movement scaling beyond eight jobs and limiting phases are unmeasured
+
++++
+status: new
+priority: medium
+kind: task
+labels: performance, concurrency, scaling
+created: 2026-09-29T04:18:27Z
++++
+
+The corrected 100,000-entity movement benchmark measures 12.50 ms/frame serial, 10.56 ms with two jobs, 7.97 ms with four, and 6.45 ms with eight. Eight jobs provide about 1.94x speedup over the same typed serial path. The test host reports 18 logical processors, but limits above eight have not been measured. These data do not establish a scaling ceiling or explain the remaining limit.
+
+Expected: repeated Release measurements cover concurrency limits through the available processor count, including 12, 16, and 18 on this host. Include several entity counts and per-entity compute costs, with identical work and full-state verification. Report speedup, parallel efficiency, variability, and the best observed limit rather than assuming linear scaling.
+
+Separate end-to-end time into schedule/query preparation, task dispatch and execution, joining, value writeback, and command merging. Distinguish configured concurrency, job count, and observed overlap/utilization. Record CPU topology, toolchain, hardware, and build configuration; logical processors are not interchangeable dedicated worker threads.
+
+This extends the initial validation in #35 and the fixes in #37/#38. Profiled runs must remain separate from benchmark timings.
+
+---
+
+## 40: Snapshot and writeback costs are not isolated in parallel scaling results
+
++++
+status: new
+priority: medium
+kind: task
+labels: performance, storage, scaling
+depends: 39
+created: 2026-09-29T04:18:45Z
++++
+
+Parallel queries use snapshots and task-owned buffers. Partition preparation allocates selected rows and index mappings; writes maintain dirty masks, and the owner applies updates after all jobs join. These costs remain even after per-element worker locks were removed. Their contribution to current frame time and memory-bandwidth pressure has not been quantified separately.
+
+Expected: measurements identify bytes copied, allocations, peak temporary memory, dirty-mask scanning, and owner-side writeback time as entity count, component size, write density, archetype count, and job count vary. Read-only, sparse-write, and full-write workloads need distinct results, including overlapping queries within one task.
+
+Avoidable costs established by these measurements must be reduced without restoring per-element contention or weakening ownership. Preserve task-local read-after-write behavior, disjoint partitions, dirty-only updates, writes from failed callbacks, command-prefix semantics, and observer fallback. Any optimization must retain compile-time capability checks and sanitizer coverage.
+
+Copying and serial writeback are candidates for investigation, not established explanations for the observed 1.94x movement speedup.
+
+---
+
+## 41: Row-count partitioning does not account for uneven work or dispatch cost
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: performance,scheduling,scaling
+depends: 39
+created: 2026-09-29T04:19:01Z
++++
+
+eachParallel divides matching rows into fixed ranges and caps the partition count at the concurrency limit. minimumRowsPerTask considers row count, not actual computation or differences in executor throughput. Equal-sized ranges can therefore contain unequal work, and small jobs can cost more to dispatch than to execute. Current measurements do not isolate partition tail latency, idle capacity, or the break-even point for parallel execution.
+
+Expected: scaling coverage includes skewed per-entity costs, mixed archetype sizes, several ready systems, filters, and small workloads. Report per-job duration, last-job tail time, observed utilization, and dispatch/join overhead across partition sizes and concurrency limits.
+
+Address demonstrated imbalance or excess overhead while keeping active concurrency bounded. Preserve exact row coverage, exclusive writable ownership, query matching, explicit ordering constraints, logical command order, deterministic error selection, cancellation cleanup, and complete joins before storage reuse.
+
+The runtime owns thread and core assignment. More jobs are not evidence of more CPU utilization, and no fixed thread-per-core mapping or universal speedup is assumed.
+
+---
