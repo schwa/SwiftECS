@@ -886,12 +886,13 @@ Expected: disjoint row processing should avoid per-element synchronization overh
 ## 39: Movement scaling beyond eight jobs and limiting phases are unmeasured
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:m, area:performance, area:concurrency, area:scaling
 created: 2026-09-29T04:18:27Z
-updated: 2026-09-29T14:37:54Z
+updated: 2026-09-29T14:52:33Z
+closed: 2026-09-29T14:52:33Z
 +++
 
 The corrected 100,000-entity movement benchmark measures 12.50 ms/frame serial, 10.56 ms with two jobs, 7.97 ms with four, and 6.45 ms with eight. Eight jobs provide about 1.94x speedup over the same typed serial path. The test host reports 18 logical processors, but limits above eight have not been measured. These data do not establish a scaling ceiling or explain the remaining limit.
@@ -903,6 +904,19 @@ Separate end-to-end time into schedule/query preparation, task dispatch and exec
 This extends the initial validation in #35 and the fixes in #37/#38. Profiled runs must remain separate from benchmark timings.
 
 - `2026-09-29T14:38:22Z`: Related to #40, #41, and #42. #40 and #41 depend on this phase-level scaling evidence before addressing buffer/writeback and partition/dispatch costs. #42 separately varies system/phase graph size rather than movement entity count.
+- `2026-09-29T14:52:33Z`: Added opt-in MovementScalingBenchmarkTests (ECS_RUN_SCALING_BENCHMARKS=1) sweeping job limits 1,2,4,8,12,16,18 across entity counts with full-state verification each sample, reporting speedup, parallel efficiency, and best observed limit. Overridable via ECS_SCALING_ENTITIES/LIMITS/ROUNDS/FRAMES/ITERATIONS.
+
+Measured Apple M5 Max (18 processors), macOS 27.0 (26A428), Swift 6.4, Release; rounds=2, frames=20, one movement system:
+
+100,000 entities (ms/frame, speedup, efficiency): limit1 8.31/1.00x/1.00; 2 21.06/0.40x/0.20; 4 11.97/0.69x/0.17; 8 8.22/1.01x/0.13; 12 7.32/1.14x/0.10; 16 7.18/1.16x/0.07; 18 6.60/1.26x/0.07. Best 18 jobs, 1.26x.
+
+1,000,000 entities: limit1 82.04/1.00x; 2 64.26/1.28x/0.64; 4 43.33/1.89x/0.47; 8 69.78/1.18x/0.15; 12 69.97/1.17x; 16 70.10/1.17x; 18 67.51/1.22x. Best 4 jobs, 1.89x, regressing beyond four.
+
+Compute-heavy control (ECS_SCALING_ITERATIONS=200, 100k): 8 jobs 1.84x, 16 jobs 2.11x. Raising per-entity work improves scaling, confirming the light movement workload is memory-bandwidth bound rather than framework-bound.
+
+Findings: this workload does not scale to the 18 logical processors; efficiency falls steadily and more jobs never approach linear. The 1M case regressing past four jobs indicates memory-bandwidth saturation. Low-round runs show notable variance (e.g. the 100k limit=2 spike); raise ECS_SCALING_ROUNDS for stability.
+
+Phase-level breakdown (schedule/query prep, dispatch, join, writeback, command merge) needs invasive core instrumentation and is deferred to #40 (snapshot/writeback) and #41 (partition/dispatch), which build on this baseline. lastRunStatistics job/batch/merge counters are asserted in the benchmark. Profiled runs stay separate from these benchmark timings. README updated with the command and headline results.
 
 ---
 
