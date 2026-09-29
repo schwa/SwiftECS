@@ -89,12 +89,13 @@ World.query(with:) filters entities by component presence but returns untyped En
 ## 4: Multiple simulation substeps produce separate storage invalidations within one rendered frame
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: effort:m, area:observation
 created: 2026-09-23T17:47:35Z
-updated: 2026-09-29T14:37:53Z
+updated: 2026-09-29T14:55:31Z
+closed: 2026-09-29T14:55:31Z
 +++
 
 Storage observation is batched per outermost world.update(), not per rendered frame. Apps that perform several sequential simulation substeps per frame receive one storage invalidation for each changed substep. Starfall uses this pattern. Notification volume therefore scales with substep count even when the UI only needs the final frame state. The existing per-update guarantee remains correct; batching across sequential updates is not currently supported.
@@ -102,6 +103,13 @@ Storage observation is batched per outermost world.update(), not per rendered fr
 - `2026-09-23T18:01:44Z`: Related to #5: notification counts across substeps are part of the observation measurements. This issue concerns batching semantics across sequential updates.
 - `2026-09-23T19:29:01Z`: Tracked by umbrella #14 alongside observation measurements in #5 and row-cost work in #13.
 - `2026-09-29T14:38:22Z`: Related to #15: an isolated render-snapshot bridge also needs a frame publication boundary. This issue remains about batching sequential simulation substeps, not simulation ownership or snapshot transport.
+- `2026-09-29T14:55:31Z`: Added an opt-in World.batchingObservation { } scope that coalesces storage-observation notifications across sequential update(deltaTime:) substeps. It publishes a single storage invalidation when the outermost scope exits, so a per-frame loop with N substeps notifies SwiftUI once instead of N times.
+
+This reuses the existing MutationCoordinator batch depth, so no default semantics change: unbatched updates still publish once each, component-event observers still fire synchronously, and a thrown substep still flushes the pending invalidation as the scope unwinds. It is a serial API and does not bracket the async parallel update overloads (documented).
+
+Regression tests (ObservationBatchTests): 4 sequential updates produce 4 notifications unbatched and exactly 1 when wrapped; a mid-frame throw still publishes once; nesting and body-result return are covered. Full Debug suite (265) green; lint clean.
+
+No frame-boundary guessing was required: the application opts in by wrapping its substep loop. simulationTime remains a separate observable and is out of scope here; broader observation/rendering measurement stays in #5.
 
 ---
 
@@ -903,8 +911,8 @@ Separate end-to-end time into schedule/query preparation, task dispatch and exec
 
 This extends the initial validation in #35 and the fixes in #37/#38. Profiled runs must remain separate from benchmark timings.
 
-- `2026-09-29T14:38:22Z`: Related to #40, #41, and #42. #40 and #41 depend on this phase-level scaling evidence before addressing buffer/writeback and partition/dispatch costs. #42 separately varies system/phase graph size rather than movement entity count.
-- `2026-09-29T14:52:33Z`: Added opt-in MovementScalingBenchmarkTests (ECS_RUN_SCALING_BENCHMARKS=1) sweeping job limits 1,2,4,8,12,16,18 across entity counts with full-state verification each sample, reporting speedup, parallel efficiency, and best observed limit. Overridable via ECS_SCALING_ENTITIES/LIMITS/ROUNDS/FRAMES/ITERATIONS.
+\- `2026-09-29T14:38:22Z`: Related to #40, #41, and #42. #40 and #41 depend on this phase-level scaling evidence before addressing buffer/writeback and partition/dispatch costs. #42 separately varies system/phase graph size rather than movement entity count.
+\- `2026-09-29T14:52:33Z`: Added opt-in MovementScalingBenchmarkTests (ECS_RUN_SCALING_BENCHMARKS=1) sweeping job limits 1,2,4,8,12,16,18 across entity counts with full-state verification each sample, reporting speedup, parallel efficiency, and best observed limit. Overridable via ECS_SCALING_ENTITIES/LIMITS/ROUNDS/FRAMES/ITERATIONS.
 
 Measured Apple M5 Max (18 processors), macOS 27.0 (26A428), Swift 6.4, Release; rounds=2, frames=20, one movement system:
 
