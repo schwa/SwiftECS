@@ -1,3 +1,15 @@
+@usableFromInline
+internal struct PartitionPlan {
+    @usableFromInline let minimumRowsPerTask: Int
+    @usableFromInline let tasksPerWorker: Int
+
+    @inlinable
+    init(minimumRowsPerTask: Int, tasksPerWorker: Int) {
+        self.minimumRowsPerTask = minimumRowsPerTask
+        self.tasksPerWorker = tasksPerWorker
+    }
+}
+
 // Swift 6 capture checking is required, not a Swift 5 compatibility warning.
 // swiftlint:disable incompatible_concurrency_annotation
 extension SystemQueryBuilder where repeat each Term: ParallelSystemTerm {
@@ -5,10 +17,19 @@ extension SystemQueryBuilder where repeat each Term: ParallelSystemTerm {
         system.runParallel(query, body: body)
     }
 
+    /// Runs `body` for each matching row across disjoint partitions.
+    ///
+    /// `minimumRowsPerTask` is the smallest partition the query is split into.
+    /// `tasksPerWorker` over-decomposes the query into up to `parallelism *
+    /// tasksPerWorker` partitions (still bounded by the row floor). Values above
+    /// one let the bounded worker pool load-balance skewed per-row work, at the
+    /// cost of more partitions; the default of one preserves one partition per
+    /// worker.
     @inlinable
-    public func eachParallel<each Input: ParallelCommandInput>(_ inputs: repeat each Input, minimumRowsPerTask: Int = 256, body: @escaping @Sendable (SystemContext, SystemRow<repeat each Term>, repeat (each Input).Value) throws -> Void) -> System {
+    public func eachParallel<each Input: ParallelCommandInput>(_ inputs: repeat each Input, minimumRowsPerTask: Int = 256, tasksPerWorker: Int = 1, body: @escaping @Sendable (SystemContext, SystemRow<repeat each Term>, repeat (each Input).Value) throws -> Void) -> System {
         let terms = (repeat each query.terms)
-        return makeEachParallel(repeat each inputs, minimumRowsPerTask: minimumRowsPerTask, queryBinding: query.binding, bindParallel: { scope, storage in
+        let plan = PartitionPlan(minimumRowsPerTask: minimumRowsPerTask, tasksPerWorker: tasksPerWorker)
+        return makeEachParallel(repeat each inputs, plan: plan, queryBinding: query.binding, bindParallel: { scope, storage in
             SystemQuery<repeat each Term>.bindRows(terms: (repeat each terms), storage: storage, scope: scope, revision: 0)
         }, iterate: { (context: SystemContext, rows: SystemRows<repeat each Term>, commands: repeat (each Input).Value) in
             for row in rows {
@@ -19,13 +40,13 @@ extension SystemQueryBuilder where repeat each Term: ParallelSystemTerm {
     }
 
     @usableFromInline
-    internal func makeEachParallel<each Input: ParallelCommandInput>(_ inputs: repeat each Input, minimumRowsPerTask: Int, queryBinding: SystemBinding<SystemRows<repeat each Term>>, bindParallel: @escaping @Sendable (SystemScope, [SystemQueryStorage<repeat (each Term).ComponentValue>]) -> SystemRows<repeat each Term>, iterate: @escaping @Sendable (SystemContext, SystemRows<repeat each Term>, repeat (each Input).Value) throws -> Void) -> System {
+    internal func makeEachParallel<each Input: ParallelCommandInput>(_ inputs: repeat each Input, plan: PartitionPlan, queryBinding: SystemBinding<SystemRows<repeat each Term>>, bindParallel: @escaping @Sendable (SystemScope, [SystemQueryStorage<repeat (each Term).ComponentValue>]) -> SystemRows<repeat each Term>, iterate: @escaping @Sendable (SystemContext, SystemRows<repeat each Term>, repeat (each Input).Value) throws -> Void) -> System {
         let bindings = (repeat (each inputs).parallelCommands.binding)
         var result = system.bind(queryBinding, repeat (each bindings).binding, body: iterate)
         let validate = result.validate
         result.validate = {
             try validate()
-            guard minimumRowsPerTask > 0 else {
+            guard plan.minimumRowsPerTask > 0, plan.tasksPerWorker > 0 else {
                 throw SystemError.invalidPartitionSize
             }
         }
@@ -37,7 +58,7 @@ extension SystemQueryBuilder where repeat each Term: ParallelSystemTerm {
             guard count > 0 else {
                 return []
             }
-            let partitions = min(parallelism, 1 + (count - 1) / minimumRowsPerTask)
+            let partitions = min(parallelism * plan.tasksPerWorker, 1 + (count - 1) / plan.minimumRowsPerTask)
             let size = 1 + (count - 1) / partitions
             return stride(from: 0, to: count, by: size).map { start in
                 let range = start..<min(start + size, count)

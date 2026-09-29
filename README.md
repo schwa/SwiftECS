@@ -348,6 +348,7 @@ The concurrency limit bounds active jobs across the entire group, not separately
 `.eachParallel` partitions one query into disjoint row ranges across its matching archetypes.
 Its callback receives `SystemContext`, a typed `SystemRow`, and any declared command capabilities.
 Empty queries launch no jobs. Small queries use fewer partitions according to `minimumRowsPerTask`.
+By default one partition is created per worker. `tasksPerWorker` over-decomposes the query into up to `parallelism * tasksPerWorker` partitions (still bounded by `minimumRowsPerTask`), so the bounded worker pool can load-balance skewed per-row work instead of waiting on a straggling equal-sized range. It preserves exact row coverage, disjoint writable ownership, and prepared-order command merging; the default of one keeps current behavior.
 
 ```swift
 struct Trail: ConcurrentComponent { let source: EntityID }
@@ -487,6 +488,14 @@ ECS_RUN_SCHEDULE_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter 
 ```
 
 Each run resolves a fresh schedule with no cache. Resolution is superlinear (about O(N^2)) in the selected system count: sub-millisecond for typical small schedules, but tens of milliseconds once schedules reach hundreds to thousands of systems. Dependency chains and system-bearing phase chains cost the most; a no-op run is dominated by resolution, not dispatch.
+
+`ParallelPartitionBenchmarkTests` isolates tail latency under skewed per-row work and the parallel dispatch break-even:
+
+```sh
+ECS_RUN_PARTITION_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter ParallelPartitionBenchmarkTests
+```
+
+With skewed work, fixed equal partitions leave the heaviest range as a straggler; over-decomposition (`tasksPerWorker` above one) lets the bounded pool load-balance. On Apple M5 Max (limit 8, 100k skewed rows) it improved 3.87x to 5.50x speedup, cutting frame time from about 31.5 to 22.2 ms. Parallel dispatch has a fixed floor near 0.7 ms per frame, so serial wins below roughly 16k uniform rows; over-decomposition helps skewed or compute-heavy work, not small or purely memory-bound work.
 
 Acyclic chain construction is quadratic (a cycle check walks toward the root before each link), so deep hierarchies are the costly case. Descendant-predicate queries evaluate per candidate and cost far more than a single breadth-first traversal from the root. Registered and unregistered direct-child queries measure the same, because registration caches archetypes, not relationship matches.
 

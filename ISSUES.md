@@ -994,13 +994,14 @@ Copying and serial writeback are candidates for investigation, not established e
 ## 41: Row-count partitioning does not account for uneven work or dispatch cost
 
 +++
-status: open
+status: closed
 priority: medium
 kind: enhancement
 labels: effort:l, area:performance, area:scaling, area:scheduling
 depends: 39
 created: 2026-09-29T04:19:01Z
-updated: 2026-09-29T14:37:54Z
+updated: 2026-09-29T15:13:52Z
+closed: 2026-09-29T15:13:52Z
 +++
 
 eachParallel divides matching rows into fixed ranges and caps the partition count at the concurrency limit. minimumRowsPerTask considers row count, not actual computation or differences in executor throughput. Equal-sized ranges can therefore contain unequal work, and small jobs can cost more to dispatch than to execute. Current measurements do not isolate partition tail latency, idle capacity, or the break-even point for parallel execution.
@@ -1012,6 +1013,24 @@ Address demonstrated imbalance or excess overhead while keeping active concurren
 The runtime owns thread and core assignment. More jobs are not evidence of more CPU utilization, and no fixed thread-per-core mapping or universal speedup is assumed.
 
 - `2026-09-29T14:38:22Z`: Related to #39: use its scaling measurements as the baseline. This issue isolates skewed work, tail latency, partition sizes, and dispatch/join costs rather than just varying worker count.
+- `2026-09-29T15:13:52Z`: Checked #39 first: it measured uniform (memory-bound) movement, not skew or dispatch, which are exactly what #41 asked to isolate. Added an opt-in benchmark (ParallelPartitionBenchmarkTests, ECS_RUN_PARTITION_BENCHMARKS=1) that isolates skew tail latency and dispatch break-even, and implemented a bounded, opt-in over-decomposition knob.
+
+Fix: eachParallel gains tasksPerWorker (default 1). Partitions become min(parallelism * tasksPerWorker, 1 + (count-1)/minimumRowsPerTask). Default (1) is byte-for-byte the previous behavior. Values above one create more, smaller partitions that the existing bounded task group load-balances across at most 'parallelism' active workers. Invariants preserved: exact disjoint row coverage, exclusive writable ownership, prepared-order command merge, deterministic lowest-index error selection, cancellation cleanup, and complete joins before writeback. Validation rejects tasksPerWorker <= 0 with SystemError.invalidPartitionSize.
+
+Regression tests (ParallelPartitionTests): default uses one partition per worker; over-decomposition marks every row exactly once in prepared order (count and Set both 4000, markers == snapshot order) with parallelTaskCount == 16; the row floor still caps partitions (10 rows, minRows 8, tpw 8 -> 2 partitions); a failing over-decomposed partition discards the whole system's command batch while immediate writes remain and reservations release. Full suite (274) green; TSan clean on the parallel suites; lint clean.
+
+Measurements (Apple M5 Max, macOS 27.0, Swift 6.4, Release; limit=8):
+Skew tail latency (100k rows, per-row cost rising with index):
+- serial 121.9 ms/frame.
+- tasksPerWorker=1 (8 fixed partitions): 31.5 ms, 3.87x. The heaviest equal-sized range is the straggler.
+- tasksPerWorker=4 (32): 23.1 ms, 5.28x.
+- tasksPerWorker=8 (64): 22.2 ms, 5.50x (best).
+- tasksPerWorker=16 (128): 22.5 ms, 5.43x (overhead outweighs further balancing).
+Over-decomposition cuts skewed frame time ~30% (31.5 -> 22.2 ms) and lifts speedup from 3.87x to 5.50x.
+
+Dispatch break-even (uniform tiny work, serial vs parallel limit=8): entities 64/256/1024/4096 stay serial-favoured (parallel ~0.65-0.74 ms fixed floor); crossover near 16384 (0.797 vs 0.800 ms, ~1.0x); 65536 uniform still slightly favours serial (2.99 vs 3.48 ms), consistent with the memory-bandwidth bound from #39. So parallel has a ~0.7 ms dispatch floor and pays off only above roughly 16k rows with enough per-row work.
+
+Conclusion: the imbalance is real and the opt-in knob addresses it without changing defaults or adding unbounded concurrency. A work-aware automatic split would need per-row cost estimates the framework does not have; the manual knob plus these baselines is the bounded, safe improvement. README documents tasksPerWorker and the results. Related: #39 (uniform scaling), #40 (snapshot/writeback costs).
 
 ---
 
@@ -1100,7 +1119,7 @@ error: cannot assign value of type 'Position' to type 'Position'
 
 Generic read helpers and the variadic setter avoided those errors. These historical observations are not new verification of another compiler. ECS coverage remains in TypedQueryPackTests, and Scripts/check-concurrency.fish checks the parallel API boundaries. This extends the minimum-toolchain gap left by closed investigation #7.
 
-- `2026-09-29T15:07:04Z`: Punting: full Swift 6.2 verification is not possible on this machine, and neither remedy in the task is warranted.
+\- `2026-09-29T15:07:04Z`: Punting: full Swift 6.2 verification is not possible on this machine, and neither remedy in the task is warranted.
 
 Verified on Swift 6.4 (swiftlang-6.4.0.34.1, Xcode 27.0 selected; 27.1/27.2 and swift-latest.xctoolchain are also 6.4):
 - Toolchains: no Swift 6.2 or 6.3 toolchain is installed (xcode-select lists only 27.0/27.1/27.2, all Swift 6.4; /Library/Developer/Toolchains has only swift-latest -> 6.4). A 6.2 compiler cannot be exercised here.
