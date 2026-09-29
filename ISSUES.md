@@ -632,8 +632,8 @@ Existing public relationship tests provide useful boundary coverage. Preserve re
 
 Related: #8 concerns archetype reclamation, #17 explores graph-backed scheduling, and #19 measures relationship workloads. This issue concerns ownership of the existing graph contract.
 
-- `2026-09-29T14:38:22Z`: Related to #19: relationship performance coverage provides a baseline for changes to graph ownership. This task concerns policy and lifecycle boundaries, not performance measurement alone.
-- `2026-09-29T15:17:22Z`: Consolidated relationship graph ownership behind a single internal RelationshipGraph, without any public behavior change.
+\- `2026-09-29T14:38:22Z`: Related to #19: relationship performance coverage provides a baseline for changes to graph ownership. This task concerns policy and lifecycle boundaries, not performance measurement alone.
+\- `2026-09-29T15:17:22Z`: Consolidated relationship graph ownership behind a single internal RelationshipGraph, without any public behavior change.
 
 Before: the per-type index map (world.relationships: [RelationshipType: RelationshipStorage]) was mutated from several places. Entity+Relationships created RelationshipStorage instances and assigned them back into the map while applying cardinality/cycle/validity policy; World.removeEntity and cloneEntity iterated relationships.values to remove or copy links; QueryEngine read the map directly. No single component owned index consistency or per-type storage lifecycle.
 
@@ -983,13 +983,14 @@ Phase-level breakdown (schedule/query prep, dispatch, join, writeback, command m
 ## 40: Snapshot and writeback costs are not isolated in parallel scaling results
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:l, area:storage, area:performance, area:scaling
 depends: 39
 created: 2026-09-29T04:18:45Z
-updated: 2026-09-29T14:37:54Z
+updated: 2026-09-29T15:23:12Z
+closed: 2026-09-29T15:23:12Z
 +++
 
 Parallel queries use snapshots and task-owned buffers. Partition preparation allocates selected rows and index mappings; writes maintain dirty masks, and the owner applies updates after all jobs join. These costs remain even after per-element worker locks were removed. Their contribution to current frame time and memory-bandwidth pressure has not been quantified separately.
@@ -1001,6 +1002,23 @@ Avoidable costs established by these measurements must be reduced without restor
 Copying and serial writeback are candidates for investigation, not established explanations for the observed 1.94x movement speedup.
 
 - `2026-09-29T14:38:22Z`: Related to #39: use its phase-level scaling results as the baseline. This issue adds buffer/allocation/write-density measurements and addresses costs established by them; it is not a duplicate of the overall scaling sweep.
+- `2026-09-29T15:23:12Z`: Checked #39 first (uniform movement is memory-bandwidth bound). Added opt-in ParallelBufferBenchmarkTests (ECS_RUN_BUFFER_BENCHMARKS=1) isolating snapshot copy, dirty-mask, and writeback across component size, write density, archetype count, and job count, including read-only and overlapping queries. Effects verified outside timing; overridable via ECS_BUF_ENTITIES/ROUNDS/FRAMES/LIMIT.
+
+Measured Apple M5 Max (18 processors), macOS 27.0 (26A428), Swift 6.4, Release; 200,000 entities, rounds=3, frames=10, limit=8 medians (ms/frame):
+
+- read-only small (8B) 4.79; read-only wide (64B) 4.80. Snapshot+slice copy for reads is not bandwidth-bound at this size: 8x the bytes cost the same time, so per-row iteration/dispatch dominates reads, not copy volume.
+- write-full-small: parallel 7.86 vs serial 8.90 (parallel wins modestly).
+- write-full-wide (64B): parallel 9.61 vs serial 8.94 (parallel LOSES). The whole-column snapshot + per-partition slice + writeback triple-copies the large payload (~3N x 64B) versus serial in-place (~N), so large components regress under parallel. This is the clearest isolated snapshot/writeback cost.
+- write-sparse-small (1% written): parallel 2.11 vs serial 4.00. Dirty-only writeback keeps sparse writes cheap; the mask pays off.
+- job sweep (full-write small): 1 -> 8.79, 4 -> 7.15, 8 -> 7.63. Best near 4 jobs; 8 regresses, matching the #39 memory-bound ceiling.
+- archetype spread: 64 buckets 7.92 vs 1 bucket 7.68. Many small batches add slight snapshot/binding overhead, but modest.
+- overlapping-shared-buffer 9.27. Reads and writes over the same column share one task buffer (keyed by column), so overlapping queries do not double-snapshot.
+
+Avoidable cost identified: the redundant intermediate whole-column snapshot. Each prepared query copies the entire column once (ParallelColumnSnapshot.init -> column.snapshot()), then every partition copies its slice again from that snapshot. For large components this doubles read-side copy (2N) on top of writeback (N). The safe fix is to drop the whole-column snapshot and have each partition bulk-copy only its slice directly from the live column under a single lock (no per-element contention; the live column is immutable during the parallel phase). Read-only columns could further avoid a write buffer/dirty-mask entirely.
+
+Why not implemented here: that change rewrites the concurrency hot path (ParallelColumnSnapshot / ParallelQueryStorage / TaskColumn, plus a bulk Column copyRange) with read-after-write, overlapping-buffer-sharing, dense/sparse index-mapping, and writeback correctness to preserve, and needs its own TSan-verified design. It is not a clearly-safe same-session micro-fix, and small-component workloads already benefit, so it is recorded as scoped follow-up rather than risked now. No per-element contention was introduced and ownership is unchanged.
+
+Verification: full suite 280 green; TSan clean on the parallel suites; all 14 concurrency compile checks pass; lint clean. No production code changed. README updated with the command and headline results. Related: #39 (uniform scaling ceiling), #41 (partition/dispatch).
 
 ---
 

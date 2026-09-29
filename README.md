@@ -497,6 +497,14 @@ ECS_RUN_PARTITION_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter
 
 With skewed work, fixed equal partitions leave the heaviest range as a straggler; over-decomposition (`tasksPerWorker` above one) lets the bounded pool load-balance. On Apple M5 Max (limit 8, 100k skewed rows) it improved 3.87x to 5.50x speedup, cutting frame time from about 31.5 to 22.2 ms. Parallel dispatch has a fixed floor near 0.7 ms per frame, so serial wins below roughly 16k uniform rows; over-decomposition helps skewed or compute-heavy work, not small or purely memory-bound work.
 
+`ParallelBufferBenchmarkTests` isolates snapshot copy, dirty-mask, and writeback costs across component size, write density, archetype count, and job count:
+
+```sh
+ECS_RUN_BUFFER_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter ParallelBufferBenchmarkTests
+```
+
+Workers snapshot the whole column once, copy their partition slice, then write dirty values back after joining. That triple-copy is cheap for small components (parallel still beats serial) but makes large components regress against serial in-place writes: at 200k rows a 64-byte component measured 9.6 ms parallel versus 8.9 ms serial, while an 8-byte component measured 7.9 ms versus 8.9 ms. Dirty-only writeback keeps sparse writes cheap. Removing the redundant whole-column snapshot (a bulk per-partition copy from the live column) is the identified follow-up for large-component workloads.
+
 Acyclic chain construction is quadratic (a cycle check walks toward the root before each link), so deep hierarchies are the costly case. Descendant-predicate queries evaluate per candidate and cost far more than a single breadth-first traversal from the root. Registered and unregistered direct-child queries measure the same, because registration caches archetypes, not relationship matches.
 
 Storage observation publishes once per frame regardless of observer count; each armed observer is notified once and recomputes its read (world-wide invalidation). On the fast typed path this per-observer recompute is measurable as observer count rises, while it is negligible against heavier entity-handle work.
