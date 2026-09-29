@@ -615,12 +615,13 @@ Related: #19 measures relationship-query scaling. This issue concerns query owne
 ## 26: Relationship policies and lifecycle cleanup have split ownership
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:l, area:storage, area:relationships
 created: 2026-09-24T01:30:21Z
-updated: 2026-09-29T14:37:53Z
+updated: 2026-09-29T15:17:22Z
+closed: 2026-09-29T15:17:22Z
 +++
 
 Entity+Relationships enforces cardinality, cycles, and entity validity; RelationshipStorage owns forward/reverse indexes; World cloning and deletion copy or remove links; query predicates read that storage directly. One relationship lifecycle spans these layers.
@@ -632,6 +633,18 @@ Existing public relationship tests provide useful boundary coverage. Preserve re
 Related: #8 concerns archetype reclamation, #17 explores graph-backed scheduling, and #19 measures relationship workloads. This issue concerns ownership of the existing graph contract.
 
 - `2026-09-29T14:38:22Z`: Related to #19: relationship performance coverage provides a baseline for changes to graph ownership. This task concerns policy and lifecycle boundaries, not performance measurement alone.
+- `2026-09-29T15:17:22Z`: Consolidated relationship graph ownership behind a single internal RelationshipGraph, without any public behavior change.
+
+Before: the per-type index map (world.relationships: [RelationshipType: RelationshipStorage]) was mutated from several places. Entity+Relationships created RelationshipStorage instances and assigned them back into the map while applying cardinality/cycle/validity policy; World.removeEntity and cloneEntity iterated relationships.values to remove or copy links; QueryEngine read the map directly. No single component owned index consistency or per-type storage lifecycle.
+
+After: RelationshipGraph owns the [RelationshipType: RelationshipStorage] map and is the only code that creates per-type storage and mutates forward/reverse indexes. It exposes reads (targets/sources/contains/traverse/reaches) and pure writes (insert/remove/removeOutgoing/removeEntity/copyOutgoing). Callers no longer touch the map:
+- Entity+Relationships expresses cardinality (isExclusive) and cycle (isAcyclic) policy and validity checks on top of graph primitives, still wrapping index writes in world.mutations.perform for observation. No caller constructs RelationshipStorage or assigns into a dictionary anymore.
+- World.removeEntity -> relationshipGraph.removeEntity(id); World.cloneEntity -> relationshipGraph.copyOutgoing(from:to:), inside their existing mutation scopes.
+- QueryEngine reads via relationshipGraph.contains/reaches.
+
+Owner boundary: RelationshipGraph owns index state and per-type storage; the Entity API owns policy; the mutation coordinator owns observation. This gives one owner of the graph contract while keeping policy and observation where they belong. Low risk: mechanical routing plus one new internal type; no public signatures changed and no policy weakened.
+
+Verification: all existing relationship tests (reparenting, clone, detach, recursive deletion, rejected mutations, traversal order, observation) pass unchanged. Added RelationshipGraphTests boundary coverage: forward/reverse index consistency across mixed non-exclusive edits, isolation between distinct relationship types, entity deletion clearing both directions across types, clone copying outgoing-only with the self-link retargeted to the original, and acyclic cycle rejection preserving existing links and BFS descendant order. Full suite 279 green, 18 demo-support tests green, lint clean. No public behavior change.
 
 ---
 
@@ -1012,8 +1025,8 @@ Address demonstrated imbalance or excess overhead while keeping active concurren
 
 The runtime owns thread and core assignment. More jobs are not evidence of more CPU utilization, and no fixed thread-per-core mapping or universal speedup is assumed.
 
-- `2026-09-29T14:38:22Z`: Related to #39: use its scaling measurements as the baseline. This issue isolates skewed work, tail latency, partition sizes, and dispatch/join costs rather than just varying worker count.
-- `2026-09-29T15:13:52Z`: Checked #39 first: it measured uniform (memory-bound) movement, not skew or dispatch, which are exactly what #41 asked to isolate. Added an opt-in benchmark (ParallelPartitionBenchmarkTests, ECS_RUN_PARTITION_BENCHMARKS=1) that isolates skew tail latency and dispatch break-even, and implemented a bounded, opt-in over-decomposition knob.
+\- `2026-09-29T14:38:22Z`: Related to #39: use its scaling measurements as the baseline. This issue isolates skewed work, tail latency, partition sizes, and dispatch/join costs rather than just varying worker count.
+\- `2026-09-29T15:13:52Z`: Checked #39 first: it measured uniform (memory-bound) movement, not skew or dispatch, which are exactly what #41 asked to isolate. Added an opt-in benchmark (ParallelPartitionBenchmarkTests, ECS_RUN_PARTITION_BENCHMARKS=1) that isolates skew tail latency and dispatch break-even, and implemented a bounded, opt-in over-decomposition knob.
 
 Fix: eachParallel gains tasksPerWorker (default 1). Partitions become min(parallelism * tasksPerWorker, 1 + (count-1)/minimumRowsPerTask). Default (1) is byte-for-byte the previous behavior. Values above one create more, smaller partitions that the existing bounded task group load-balances across at most 'parallelism' active workers. Invariants preserved: exact disjoint row coverage, exclusive writable ownership, prepared-order command merge, deterministic lowest-index error selection, cancellation cleanup, and complete joins before writeback. Validation rejects tasksPerWorker <= 0 with SystemError.invalidPartitionSize.
 

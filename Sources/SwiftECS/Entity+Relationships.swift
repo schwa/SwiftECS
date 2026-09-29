@@ -13,11 +13,11 @@ extension Entity {
         } else {
             try world.validateRelationshipEntity(self)
             let type = RelationshipType(ChildOf.self)
-            guard let storage = world.relationships[type], !storage.targets(from: id).isEmpty else {
+            guard world.relationshipGraph.contains(type, source: id, target: nil) else {
                 return
             }
             world.mutations.perform {
-                storage.removeOutgoing(from: id)
+                world.relationshipGraph.removeOutgoing(type, source: id)
             }
         }
     }
@@ -26,19 +26,18 @@ extension Entity {
         try world.validateRelationshipEntity(self)
         try world.validateRelationshipEntity(target)
         let relationshipType = RelationshipType(type)
-        let storage = world.relationships[relationshipType] ?? RelationshipStorage()
-        if storage.contains(source: id, target: target.id) {
+        let graph = world.relationshipGraph
+        if graph.contains(relationshipType, source: id, target: target.id) {
             return
         }
-        if R.isAcyclic, storage.reaches(from: target.id, to: id) {
+        if R.isAcyclic, graph.reaches(relationshipType, from: target.id, to: id) {
             throw RelationshipError.cycleDetected(relationshipType)
         }
         world.mutations.perform {
             if R.isExclusive {
-                storage.removeOutgoing(from: id)
+                graph.removeOutgoing(relationshipType, source: id)
             }
-            storage.insert(source: id, target: target.id)
-            world.relationships[relationshipType] = storage
+            graph.insert(relationshipType, source: id, target: target.id)
         }
     }
 
@@ -46,23 +45,24 @@ extension Entity {
     public func removeRelationship<R: Relationship>(_ type: R.Type, to target: Entity) throws -> Bool {
         try world.validateRelationshipEntity(self)
         try world.validateRelationshipEntity(target)
-        guard let storage = world.relationships[RelationshipType(type)], storage.contains(source: id, target: target.id) else {
+        let relationshipType = RelationshipType(type)
+        guard world.relationshipGraph.contains(relationshipType, source: id, target: target.id) else {
             return false
         }
         world.mutations.perform {
-            storage.remove(source: id, target: target.id)
+            world.relationshipGraph.remove(relationshipType, source: id, target: target.id)
         }
         return true
     }
 
     public func targets<R: Relationship>(of type: R.Type) -> [Entity] {
         world.trackStorageAccess()
-        return (world.relationships[RelationshipType(type)]?.targets(from: id) ?? []).map { Entity(id: $0, world: world) }
+        return world.relationshipGraph.targets(RelationshipType(type), from: id).map { Entity(id: $0, world: world) }
     }
 
     public func sources<R: Relationship>(of type: R.Type) -> [Entity] {
         world.trackStorageAccess()
-        return (world.relationships[RelationshipType(type)]?.sources(to: id) ?? []).map { Entity(id: $0, world: world) }
+        return world.relationshipGraph.sources(RelationshipType(type), to: id).map { Entity(id: $0, world: world) }
     }
 
     public func hasRelationship<R: Relationship>(_ type: R.Type, to target: Entity) -> Bool {
@@ -70,17 +70,17 @@ extension Entity {
         guard world === target.world else {
             return false
         }
-        return world.relationships[RelationshipType(type)]?.contains(source: id, target: target.id) == true
+        return world.relationshipGraph.contains(RelationshipType(type), source: id, target: target.id)
     }
 
     public func ancestors<R: Relationship>(via type: R.Type) -> [Entity] {
         world.trackStorageAccess()
-        return (world.relationships[RelationshipType(type)]?.traverse(from: id, reversed: false) ?? []).map { Entity(id: $0, world: world) }
+        return world.relationshipGraph.traverse(RelationshipType(type), from: id, reversed: false).map { Entity(id: $0, world: world) }
     }
 
     public func descendants<R: Relationship>(via type: R.Type) -> [Entity] {
         world.trackStorageAccess()
-        return (world.relationships[RelationshipType(type)]?.traverse(from: id, reversed: true) ?? []).map { Entity(id: $0, world: world) }
+        return world.relationshipGraph.traverse(RelationshipType(type), from: id, reversed: true).map { Entity(id: $0, world: world) }
     }
 
     public func ancestors() -> [Entity] {

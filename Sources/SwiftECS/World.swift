@@ -39,7 +39,7 @@ public final class World {
     }
 
     @ObservationIgnored
-    internal var relationships: [RelationshipType: RelationshipStorage] = [:]
+    internal let relationshipGraph = RelationshipGraph()
 
     internal func removeEntities<S: Sequence>(_ ids: S) -> Int where S.Element == EntityID {
         mutations.batch {
@@ -114,9 +114,7 @@ public final class World {
         mutations.perform {
             entityLocations.removeValue(forKey: id)
             structuralRevision &+= 1
-            for storage in relationships.values {
-                storage.removeEntity(id)
-            }
+            relationshipGraph.removeEntity(id)
             if let movedEntity = archetype.removeEntity(at: location.index) {
                 entityLocations[movedEntity]?.index = location.index
             }
@@ -144,11 +142,7 @@ public final class World {
             sourceArchetype.copyComponents(at: location.index, to: targetArchetype, targetIndex: newIndex)
             entityLocations[newID] = EntityLocation(signature: location.signature, index: newIndex)
             structuralRevision &+= 1
-            for storage in relationships.values {
-                for target in storage.targets(from: id) {
-                    storage.insert(source: newID, target: target)
-                }
-            }
+            relationshipGraph.copyOutgoing(from: id, to: newID)
         }
 
         return Entity(id: newID, world: self)

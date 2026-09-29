@@ -112,12 +112,12 @@ internal final class QueryEngine {
             guard let entityID else {
                 return .requiresEntity
             }
-            return Match(world.relationships[type]?.contains(source: entityID, target: target) == true)
+            return Match(world.relationshipGraph.contains(type, source: entityID, target: target))
         case let .descendant(type, root):
             guard let entityID else {
                 return .requiresEntity
             }
-            return Match(entityID != root && world.relationships[type]?.reaches(from: entityID, to: root) == true)
+            return Match(entityID != root && world.relationshipGraph.reaches(type, from: entityID, to: root))
         case let .not(inner):
             return evaluate(inner, signature: signature, entityID: entityID, in: world).inverted
         case let .and(predicates):
