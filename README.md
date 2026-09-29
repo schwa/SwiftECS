@@ -269,6 +269,8 @@ Explicit system dependencies outside the selection throw an error. Phase depende
 Ready systems run in registration order.
 
 System entities appear in normal queries and entity counts. `systemCount` counts registered systems only.
+
+Singletons are application-owned. Model global state as one well-known entity whose id the application retains, then read it with `world[id]?.get(_:)`. There is no library singleton API: an entity-backed singleton is stored as an ordinary component, so it appears in `query`/`snapshot` results and entity counts like any other entity, and uniqueness is the application's responsibility. A dedicated API would either inherit that query-visibility surprise or require a separate non-entity store, so it is intentionally left to the application.
 `systemExecutionOrder` now requires `try` because invalid schedules throw instead of returning stale results.
 Registration without an explicit phase uses a lazily created `Update` phase. There is no fixed engine phase list.
 `before:`, `after:`, and `dependencies:` permit forward references. Later registration reuses the unresolved entity, which does not count toward `systemCount`.

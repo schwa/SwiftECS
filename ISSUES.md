@@ -404,9 +404,9 @@ Double-buffering whole worlds is an alternative, not a requirement. It must acco
 
 This is a design idea, not an implementation commitment. Preserve the existing single-owner World model unless the investigation establishes a reason to change it.
 
-- `2026-09-29T14:37:53Z`: Triage: scope is a design investigation, not approval to implement the snapshot bridge. effort:m covers the ownership/API decision and representative extraction/transfer measurements. Parallel ECS execution now exists, but live World access remains unavailable while workers run and demo UI ticks remain serial.
-- `2026-09-29T14:38:22Z`: Related to #4 and #5: render snapshots and off-main ownership must define frame publication cadence and quantify UI/observation cost. Those issues cover substep batching and broad invalidation, not the snapshot bridge.
-- `2026-09-29T15:30:36Z`: Evaluation and recommendation: keep the single-owner World model. Off-main simulation with isolated render snapshots is achievable at the application layer today with no library changes, so no snapshot-bridge API is added now.
+\- `2026-09-29T14:37:53Z`: Triage: scope is a design investigation, not approval to implement the snapshot bridge. effort:m covers the ownership/API decision and representative extraction/transfer measurements. Parallel ECS execution now exists, but live World access remains unavailable while workers run and demo UI ticks remain serial.
+\- `2026-09-29T14:38:22Z`: Related to #4 and #5: render snapshots and off-main ownership must define frame publication cadence and quantify UI/observation cost. Those issues cover substep batching and broad invalidation, not the snapshot bridge.
+\- `2026-09-29T15:30:36Z`: Evaluation and recommendation: keep the single-owner World model. Off-main simulation with isolated render snapshots is achievable at the application layer today with no library changes, so no snapshot-bridge API is added now.
 
 Assessment against the current parallel/ownership model:
 - The parallel execution work is orthogonal to this idea. It parallelizes within one owner's run using task-local snapshots and blocks live world access while workers run; it does not move World off-main or decouple simulation cadence from rendering. The snapshot bridge is a separate concern.
@@ -478,12 +478,13 @@ This design depends on the relationship scope explored in #16. Related: #9 conce
 ## 18: Explore singleton components backed by ordinary entity storage
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: idea, effort:s, area:storage
 created: 2026-09-23T19:55:27Z
-updated: 2026-09-29T14:37:53Z
+updated: 2026-09-29T15:33:01Z
+closed: 2026-09-29T15:33:01Z
 +++
 
 World-level singleton components remain an exploratory Flecs-inspired idea. There is no agreed API or lifecycle contract for accessing global state through ordinary entity/component storage.
@@ -494,6 +495,17 @@ This is an exploratory design task, not an implementation commitment. The idea i
 
 - `2026-09-29T14:37:53Z`: Triage: effort:s applies to the bounded singleton design decision, not implementation of a singleton API.
 - `2026-09-29T14:38:22Z`: Related to #43: singleton state and inherited lookup both need explicit lookup, query, observation, and access contracts. They remain separate design investigations rather than one implicit global-state mechanism.
+- `2026-09-29T15:33:01Z`: Evaluation and recommendation: singletons stay application-owned. No library singleton API is added, because no minimal, clearly-good, low-risk API emerges - the entity-backed approach carries an unresolved query-visibility hazard.
+
+Assessment of the open questions:
+- Identity and uniqueness: an entity-backed singleton is either one shared entity accumulating many component types (pollutes many queries) or one entity per singleton type (many hidden entities). Neither is obviously right, and uniqueness would need enforcement the storage layer does not provide today.
+- Query visibility and enumeration: this is the deciding factor. Backed by ordinary storage, a singleton component is indistinguishable from any other entity - it appears in query and snapshot results and in entity counts. System entities already appear in normal queries, but they hold a distinct type (SystemDescriptor); a singleton of a gameplay type (for example a config or a Position) would pollute gameplay queries and counts and surprise users. Hiding singletons would require special-casing every query path, which contradicts the backed-by-ordinary-storage premise.
+- Creation and removal, observation: these are the one clean part - set and remove fire the same storage notifications as any component, so lifecycle and Swift Observation behave consistently with no special work.
+- Library API vs application-owned well-known entity: the only value a library API adds over an app-owned well-known entity is type-keyed access without stashing an id, plus uniqueness. That is marginal against the query-visibility hazard, the shared-vs-per-type decision, and a new lifecycle contract. A dedicated API would either inherit the query-visibility surprise or require a separate non-entity resource store, which is a different and larger design (out of scope for effort:s and not requested).
+
+Recommendation: keep singletons application-owned. Model global state as one well-known entity whose id the app retains, read with world[id]?.get(_:). Uniqueness is the app holding a single id. This is zero-hazard and uses only existing API. Revisit only if a concrete need plus a decision on query visibility (a real resource store separate from entity storage) justifies it. Consistent with #10 (World owns no run-loop policy) and #15 (no speculative bridge API); inherited lookup remains separate in #43.
+
+Artifacts (test-only, no production change): added SingletonPatternTests demonstrating the well-known-entity pattern (type-keyed read via retained id, mutation, destruction) and pinning the tradeoff (an entity-backed singleton is visible to ordinary queries and counts). Added a README note under the systems/queries section documenting that singletons are application-owned and why there is no library API.
 
 ---
 
