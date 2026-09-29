@@ -469,8 +469,8 @@ Measure deep trees, broad trees, multi-parent graphs, frequent reparenting, dire
 
 Record scaling and profiles before deciding whether transitive caching or other changes are warranted. Preserve cycle rejection, cache correctness, traversal order, and deletion semantics. Related: #16 introduced relationships; #14 tracks overall performance. Existing component-only benchmarks do not establish relationship performance.
 
-- `2026-09-29T14:38:22Z`: Related to #26 and #42: graph performance measurements can protect a relationship-ownership refactor and distinguish underlying traversal costs from schedule construction. Neither issue duplicates these relationship workload measurements.
-- `2026-09-29T15:02:18Z`: Added opt-in RelationshipBenchmarkTests (ECS_RUN_RELATIONSHIP_BENCHMARKS=1). Entity creation is outside the timer; all result counts are verified outside timing. Overridable via ECS_REL_ROUNDS/DEEP/BROAD/QUERY_REPEATS.
+\- `2026-09-29T14:38:22Z`: Related to #26 and #42: graph performance measurements can protect a relationship-ownership refactor and distinguish underlying traversal costs from schedule construction. Neither issue duplicates these relationship workload measurements.
+\- `2026-09-29T15:02:18Z`: Added opt-in RelationshipBenchmarkTests (ECS_RUN_RELATIONSHIP_BENCHMARKS=1). Entity creation is outside the timer; all result counts are verified outside timing. Overridable via ECS_REL_ROUNDS/DEEP/BROAD/QUERY_REPEATS.
 
 Measured Apple M5 Max (18 processors), macOS 27.0 (26A428), Swift 6.4, Release; rounds=3 medians:
 
@@ -1018,12 +1018,13 @@ The runtime owns thread and core assignment. More jobs are not evidence of more 
 ## 42: Large phase graphs have no schedule-resolution cost measurements
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:m, area:performance, area:scheduling
 created: 2026-09-29T04:23:03Z
-updated: 2026-09-29T14:37:54Z
+updated: 2026-09-29T15:05:55Z
+closed: 2026-09-29T15:05:55Z
 +++
 
 The scheduler resolves a fresh schedule for each execution and execution-order inspection. It materializes phase-implied system dependencies, including transitive phase ancestors, and repeatedly scans remaining systems during topological ordering. Large phase graphs can therefore require quadratic work and storage. The existing movement benchmarks do not isolate this case.
@@ -1035,6 +1036,22 @@ Preserve registration-order tie breaking, explicit dependency errors, phase reac
 Extracted from the retired phases-and-pipelines notes. Related to #39, which measures full execution phases for movement workloads.
 
 - `2026-09-29T14:38:22Z`: Related to #39 and #19: #39 measures end-to-end movement phases, while #19 measures relationship operations. This issue isolates schedule construction and ordering as system/phase graph size and density grow.
+- `2026-09-29T15:05:55Z`: Added opt-in ScheduleResolutionBenchmarkTests (ECS_RUN_SCHEDULE_BENCHMARKS=1). It isolates schedule construction/ordering via executionOrder(for:) (no callbacks) from dispatch, and verifies resolved schedule sizes outside timing. Overridable via ECS_SCHED_ROUNDS/REPEATS/COUNTS.
+
+Measured Apple M5 Max (18 processors), macOS 27.0 (26A428), Swift 6.4, Release; rounds=3, repeats=20, medians per resolve:
+
+Flat scaling (default phase, N systems): 250 -> 2.165; 500 -> 7.340; 1000 -> 25.685; 2000 -> 95.917 ms. Doubling N multiplies time ~3.3-3.7x -> superlinear, ~O(N^2).
+
+Graph shapes at scale:
+- system-chain 2000 (dense linear deps): 127.9 ms, worse than flat-2000.
+- phase-chain 500 phases x 2 systems (1000 systems): 89.4 ms, far more than flat-1000 (25.7) at equal system count, because each system materializes/unions all transitive phase-ancestor members.
+- wide-dag 500 phases on one root: 28.0 ms (shallow, cheaper).
+- empty-intermediary 500 phases, 2 systems: 5.6 ms (traversing empty phases is cheap relative to system count).
+- subset-pipeline 2000 systems, query selects 1000: 26.5 ms, matching flat-1000; selection limits work to the selected set.
+
+Resolution vs run: resolve-only 2000 = 100.1 ms; run-noop 2000 = 98.8 ms. A no-op run is essentially all resolution; callback dispatch is negligible for large graphs.
+
+Is resolution a material cost? Yes, but only for large schedules. It is superlinear and re-run on every execution and every executionOrder inspection with no cache. The dominant terms are the Kahn ordering's linear rescans (orderedSystems firstIndex-where-deps-empty per removal) and transitive phase-ancestor member unions. For typical game schedules (tens of systems) resolution is sub-millisecond and irrelevant. A cached schedule (invalidated on query membership and DependsOn/InPhase edits) would help large or subset-heavy pipelines; whether that complexity is warranted is a separate decision, now backed by these numbers. No production code changed. README updated. Related: #39 (end-to-end movement phases), #19 (relationship traversal costs).
 
 ---
 

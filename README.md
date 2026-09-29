@@ -480,6 +480,14 @@ ECS_RUN_OBSERVATION_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filt
 ECS_RUN_RELATIONSHIP_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter RelationshipBenchmarkTests
 ```
 
+`ScheduleResolutionBenchmarkTests` isolates schedule construction and ordering (via `executionOrder(for:)`) from callback dispatch, across system/phase counts, chains, wide DAGs, empty phases, and subset pipelines:
+
+```sh
+ECS_RUN_SCHEDULE_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter ScheduleResolutionBenchmarkTests
+```
+
+Each run resolves a fresh schedule with no cache. Resolution is superlinear (about O(N^2)) in the selected system count: sub-millisecond for typical small schedules, but tens of milliseconds once schedules reach hundreds to thousands of systems. Dependency chains and system-bearing phase chains cost the most; a no-op run is dominated by resolution, not dispatch.
+
 Acyclic chain construction is quadratic (a cycle check walks toward the root before each link), so deep hierarchies are the costly case. Descendant-predicate queries evaluate per candidate and cost far more than a single breadth-first traversal from the root. Registered and unregistered direct-child queries measure the same, because registration caches archetypes, not relationship matches.
 
 Storage observation publishes once per frame regardless of observer count; each armed observer is notified once and recomputes its read (world-wide invalidation). On the fast typed path this per-observer recompute is measurable as observer count rises, while it is negligible against heavier entity-handle work.
