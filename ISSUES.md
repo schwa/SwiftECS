@@ -92,15 +92,16 @@ World.query(with:) filters entities by component presence but returns untyped En
 status: open
 priority: medium
 kind: enhancement
-labels: effort:m
+labels: effort:m, area:observation
 created: 2026-09-23T17:47:35Z
-updated: 2026-09-23T18:01:44Z
+updated: 2026-09-29T14:37:53Z
 +++
 
 Storage observation is batched per outermost world.update(), not per rendered frame. Apps that perform several sequential simulation substeps per frame receive one storage invalidation for each changed substep. Starfall uses this pattern. Notification volume therefore scales with substep count even when the UI only needs the final frame state. The existing per-update guarantee remains correct; batching across sequential updates is not currently supported.
 
 - `2026-09-23T18:01:44Z`: Related to #5: notification counts across substeps are part of the observation measurements. This issue concerns batching semantics across sequential updates.
 - `2026-09-23T19:29:01Z`: Tracked by umbrella #14 alongside observation measurements in #5 and row-cost work in #13.
+- `2026-09-29T14:38:22Z`: Related to #15: an isolated render-snapshot bridge also needs a frame publication boundary. This issue remains about batching sequential simulation substeps, not simulation ownership or snapshot transport.
 
 ---
 
@@ -110,9 +111,9 @@ Storage observation is batched per outermost world.update(), not per rendered fr
 status: open
 priority: medium
 kind: task
-labels: effort:m
+labels: effort:m, area:observation, area:performance
 created: 2026-09-23T17:47:35Z
-updated: 2026-09-23T18:01:44Z
+updated: 2026-09-29T14:37:53Z
 +++
 
 World storage observation now tracks ECS reads and invalidates at world scope. Correctness tests cover notification batching, but dedicated measurements do not establish its runtime overhead or the UI work caused by broad invalidation. Measure representative large-world workloads with and without active observers, ordinary and fast-query reads/writes, sequential simulation substeps, and multiple views reading unrelated entities or components. Distinguish storage notifications from actual SwiftUI body evaluations and rendering work. These measurements are needed before deciding whether finer-grained observation is worthwhile.
@@ -122,6 +123,7 @@ World storage observation now tracks ECS reads and invalidates at world scope. C
 - `2026-09-23T18:42:11Z`: Related investigation #13 measures row read/write costs without active subscribers. Broader instrumentation cost and SwiftUI behavior remain unmeasured here.
 - `2026-09-23T19:29:01Z`: Tracked by umbrella #14. Current baseline and trace provenance are in Experiments/TypedQueryPacks/Performance.md and ~/Desktop/ECS-Profiles/README.md.
 - `2026-09-29T04:24:01Z`: Preserved from retired performance notes: the historical single-archetype comparison used 100K entities, registered queries, fresh worlds, warm-up, and three rotated Release samples. One synchronous rearming storage observer added no clear large cost, but both variants retained observation instrumentation. No SwiftUI rendering or unrelated-view measurement was performed. QueryPerformanceTests and TypedQueryCostTests remain available via ECS_RUN_BENCHMARKS=1. Historical captures/logs were recorded under ~/Desktop/ECS-Profiles, including typed-query-column-inline.trace; their current presence is unverified, and all-process captures need review before sharing. Old document references in earlier comments are historical; broader work here remains open.
+- `2026-09-29T14:38:22Z`: Related to #15: snapshot publication can change UI invalidation scope and cadence. Observation/rendering measurements here can inform that design without assuming snapshots are already implemented.
 
 ---
 
@@ -172,9 +174,9 @@ The retired PLAN.md records a compiler crash when attempting EntityRef<each T: C
 status: open
 priority: low
 kind: enhancement
-labels: effort:l
+labels: effort:l, area:storage
 created: 2026-09-23T17:57:52Z
-updated: 2026-09-23T18:01:44Z
+updated: 2026-09-29T14:37:53Z
 +++
 
 Adding and removing component types can leave empty intermediate archetypes in World. No empty-archetype reclamation exists. Long-lived worlds with changing component signatures can retain unused storage and query-cache entries. Any future reclamation must account for registered query caches and the lifetime rules of lazy sequences and query references.
@@ -206,9 +208,9 @@ World.systemCount reports the registered system count but reads ignored system s
 status: open
 priority: low
 kind: task
-labels: effort:s
+labels: effort:s, area:systems
 created: 2026-09-23T17:57:52Z
-updated: 2026-09-23T18:01:44Z
+updated: 2026-09-29T14:37:53Z
 +++
 
 Applications currently own pause state and decide whether to call World.update. There is no agreed reason to move this policy into the ECS. Decide whether pause belongs in World or remains application-owned. Record the rationale and, if library support is warranted, define simulationTime, system execution, and direct-write behavior while paused. This is a design task only; implementation requires a separate decision.
@@ -329,11 +331,12 @@ Remaining focused work continues separately: #5 broader observation and SwiftUI 
 ## 15: Explore off-main simulation with isolated render snapshots
 
 +++
-status: new
+status: open
 priority: low
-kind: feature
-labels: idea
+kind: task
+labels: idea, effort:m, area:observation, area:concurrency
 created: 2026-09-23T19:53:23Z
+updated: 2026-09-29T14:37:53Z
 +++
 
 Idea: separate simulation ownership from rendering so ECS updates can run off the main actor without concurrent access to mutable World storage. World is currently unsynchronized; components need not be Sendable, query references retain mutable storage, and observer callbacks execute synchronously.
@@ -346,6 +349,9 @@ Investigate snapshot extraction/transfer costs, update cadence, stale-frame hand
 Double-buffering whole worlds is an alternative, not a requirement. It must account for structural changes, reference-type components, query-reference lifetimes, and renderer ownership before reusing buffers. Two buffers alone do not establish safe reuse.
 
 This is a design idea, not an implementation commitment. Preserve the existing single-owner World model unless the investigation establishes a reason to change it.
+
+- `2026-09-29T14:37:53Z`: Triage: scope is a design investigation, not approval to implement the snapshot bridge. effort:m covers the ownership/API decision and representative extraction/transfer measurements. Parallel ECS execution now exists, but live World access remains unavailable while workers run and demo UI ticks remain serial.
+- `2026-09-29T14:38:22Z`: Related to #4 and #5: render snapshots and off-main ownership must define frame publication cadence and quantify UI/observation cost. Those issues cover substep batching and broad invalidation, not the snapshot bridge.
 
 ---
 
@@ -401,12 +407,12 @@ This design depends on the relationship scope explored in #16. Related: #9 conce
 ## 18: Explore singleton components backed by ordinary entity storage
 
 +++
-status: new
+status: open
 priority: low
 kind: task
-labels: idea
+labels: idea, effort:s, area:storage
 created: 2026-09-23T19:55:27Z
-updated: 2026-09-29T04:24:01Z
+updated: 2026-09-29T14:37:53Z
 +++
 
 World-level singleton components remain an exploratory Flecs-inspired idea. There is no agreed API or lifecycle contract for accessing global state through ordinary entity/component storage.
@@ -415,16 +421,20 @@ The open questions are singleton identity and uniqueness, creation and removal, 
 
 This is an exploratory design task, not an implementation commitment. The idea is preserved here from the retired Flecs RFC. Inherited component lookup is separate work in #43.
 
+- `2026-09-29T14:37:53Z`: Triage: effort:s applies to the bounded singleton design decision, not implementation of a singleton API.
+- `2026-09-29T14:38:22Z`: Related to #43: singleton state and inherited lookup both need explicit lookup, query, observation, and access contracts. They remain separate design investigations rather than one implicit global-state mechanism.
+
 ---
 
 ## 19: Relationship-heavy workloads lack performance measurements
 
 +++
-status: new
+status: open
 priority: medium
 kind: task
-labels: effort:m
+labels: effort:m, area:performance, area:relationships, area:queries
 created: 2026-09-23T21:17:09Z
+updated: 2026-09-29T14:37:53Z
 +++
 
 The relationship implementation has correctness coverage but no dedicated scale measurements. Descendant predicates traverse links separately for each candidate entity. Acyclic relationship insertion searches the graph before each new link, so deep hierarchy construction can become expensive.
@@ -432,6 +442,8 @@ The relationship implementation has correctness coverage but no dedicated scale 
 Measure deep trees, broad trees, multi-parent graphs, frequent reparenting, direct and transitive queries, and recursive deletion. Include registered and unregistered queries, live membership changes, and observation. Use opt-in serial Release benchmarks with setup separated from the measured operation where appropriate, and verify results outside timing.
 
 Record scaling and profiles before deciding whether transitive caching or other changes are warranted. Preserve cycle rejection, cache correctness, traversal order, and deletion semantics. Related: #16 introduced relationships; #14 tracks overall performance. Existing component-only benchmarks do not establish relationship performance.
+
+- `2026-09-29T14:38:22Z`: Related to #26 and #42: graph performance measurements can protect a relationship-ownership refactor and distinguish underlying traversal costs from schedule construction. Neither issue duplicates these relationship workload measurements.
 
 ---
 
@@ -556,10 +568,12 @@ Related: #19 measures relationship-query scaling. This issue concerns query owne
 ## 26: Relationship policies and lifecycle cleanup have split ownership
 
 +++
-status: new
+status: open
 priority: medium
 kind: task
+labels: effort:l, area:storage, area:relationships
 created: 2026-09-24T01:30:21Z
+updated: 2026-09-29T14:37:53Z
 +++
 
 Entity+Relationships enforces cardinality, cycles, and entity validity; RelationshipStorage owns forward/reverse indexes; World cloning and deletion copy or remove links; query predicates read that storage directly. One relationship lifecycle spans these layers.
@@ -570,6 +584,8 @@ Existing public relationship tests provide useful boundary coverage. Preserve re
 
 Related: #8 concerns archetype reclamation, #17 explores graph-backed scheduling, and #19 measures relationship workloads. This issue concerns ownership of the existing graph contract.
 
+- `2026-09-29T14:38:22Z`: Related to #19: relationship performance coverage provides a baseline for changes to graph ownership. This task concerns policy and lifecycle boundaries, not performance measurement alone.
+
 ---
 
 ## 27: Structural command access is too coarse for selective synchronization
@@ -578,9 +594,9 @@ Related: #8 concerns archetype reclamation, #17 explores graph-backed scheduling
 status: closed
 priority: medium
 kind: enhancement
-labels: systems, synchronization
+labels: area:systems, area:synchronization
 created: 2026-09-28T17:21:00Z
-updated: 2026-09-28T17:45:51Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-28T17:45:51Z
 +++
 
@@ -600,9 +616,9 @@ Expected: structural effects are explicit and enforceable through the typed comm
 status: closed
 priority: medium
 kind: enhancement
-labels: systems, queries, synchronization
+labels: area:systems, area:synchronization, area:queries
 created: 2026-09-28T17:21:09Z
-updated: 2026-09-28T17:45:51Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-28T17:45:51Z
 +++
 
@@ -622,10 +638,10 @@ Expected: dependency metadata accounts for all conditions that can change query 
 status: closed
 priority: medium
 kind: feature
-labels: systems, pipelines, synchronization
+labels: area:systems, area:synchronization, area:pipelines
 depends: 27, 28
 created: 2026-09-28T17:21:21Z
-updated: 2026-09-28T17:45:51Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-28T17:45:51Z
 +++
 
@@ -649,9 +665,9 @@ This issue covers sequential Flecs-style synchronization points, not parallel sy
 status: closed
 priority: medium
 kind: feature
-labels: systems, concurrency
+labels: area:systems, area:concurrency
 created: 2026-09-28T19:35:16Z
-updated: 2026-09-28T21:50:53Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-28T21:50:53Z
 +++
 
@@ -673,10 +689,10 @@ This concerns concurrent systems within a world. Off-main simulation ownership a
 status: closed
 priority: medium
 kind: enhancement
-labels: storage, concurrency
+labels: area:concurrency, area:storage
 depends: 30
 created: 2026-09-28T19:35:28Z
-updated: 2026-09-28T21:50:53Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-28T21:50:53Z
 +++
 
@@ -698,10 +714,10 @@ Coverage must include different components on the same entities, different arche
 status: closed
 priority: medium
 kind: enhancement
-labels: observation, concurrency
+labels: area:concurrency, area:observation
 depends: 30
 created: 2026-09-28T19:35:39Z
-updated: 2026-09-28T21:50:53Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-28T21:50:53Z
 +++
 
@@ -723,10 +739,10 @@ Render-snapshot publication is separate work in #15; this issue covers the exist
 status: closed
 priority: medium
 kind: enhancement
-labels: systems, commands, concurrency
+labels: area:systems, area:concurrency, area:commands
 depends: 30
 created: 2026-09-28T19:35:50Z
-updated: 2026-09-28T21:50:53Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-28T21:50:53Z
 +++
 
@@ -748,10 +764,10 @@ Success, cancellation, callback failure, and partial merge failure must release 
 status: closed
 priority: medium
 kind: feature
-labels: systems, pipelines, concurrency
+labels: area:systems, area:pipelines, area:concurrency
 depends: 30, 31, 32, 33
 created: 2026-09-28T19:36:03Z
-updated: 2026-09-28T21:50:53Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-28T21:50:53Z
 +++
 
@@ -775,10 +791,10 @@ Existing synchronous serial execution remains supported. This issue covers paral
 status: closed
 priority: medium
 kind: task
-labels: testing, performance, concurrency
+labels: area:concurrency, area:testing, area:performance
 depends: 34
 created: 2026-09-28T19:36:14Z
-updated: 2026-09-28T21:50:53Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-28T21:50:53Z
 +++
 
@@ -800,10 +816,10 @@ Measurements must compare the serial baseline with several concurrency limits an
 status: closed
 priority: low
 kind: feature
-labels: systems, queries, concurrency
+labels: area:systems, area:queries, area:concurrency
 depends: 34, 35
 created: 2026-09-28T19:36:25Z
-updated: 2026-09-28T21:50:53Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-28T21:50:53Z
 +++
 
@@ -825,9 +841,9 @@ This is a later follow-up to validated parallel-system execution, not a requirem
 status: closed
 priority: high
 kind: bug
-labels: performance, systems
+labels: area:systems, area:performance
 created: 2026-09-29T02:11:25Z
-updated: 2026-09-29T04:02:55Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-29T04:02:55Z
 +++
 
@@ -848,9 +864,9 @@ Expected: type-safe system access should not impose this large per-entity overhe
 status: closed
 priority: high
 kind: bug
-labels: performance, concurrency
+labels: area:concurrency, area:performance
 created: 2026-09-29T02:11:25Z
-updated: 2026-09-29T04:02:55Z
+updated: 2026-09-29T14:37:54Z
 closed: 2026-09-29T04:02:55Z
 +++
 
@@ -870,11 +886,12 @@ Expected: disjoint row processing should avoid per-element synchronization overh
 ## 39: Movement scaling beyond eight jobs and limiting phases are unmeasured
 
 +++
-status: new
+status: open
 priority: medium
 kind: task
-labels: performance, concurrency, scaling
+labels: effort:m, area:performance, area:concurrency, area:scaling
 created: 2026-09-29T04:18:27Z
+updated: 2026-09-29T14:37:54Z
 +++
 
 The corrected 100,000-entity movement benchmark measures 12.50 ms/frame serial, 10.56 ms with two jobs, 7.97 ms with four, and 6.45 ms with eight. Eight jobs provide about 1.94x speedup over the same typed serial path. The test host reports 18 logical processors, but limits above eight have not been measured. These data do not establish a scaling ceiling or explain the remaining limit.
@@ -885,17 +902,20 @@ Separate end-to-end time into schedule/query preparation, task dispatch and exec
 
 This extends the initial validation in #35 and the fixes in #37/#38. Profiled runs must remain separate from benchmark timings.
 
+- `2026-09-29T14:38:22Z`: Related to #40, #41, and #42. #40 and #41 depend on this phase-level scaling evidence before addressing buffer/writeback and partition/dispatch costs. #42 separately varies system/phase graph size rather than movement entity count.
+
 ---
 
 ## 40: Snapshot and writeback costs are not isolated in parallel scaling results
 
 +++
-status: new
+status: open
 priority: medium
 kind: task
-labels: performance, storage, scaling
+labels: effort:l, area:storage, area:performance, area:scaling
 depends: 39
 created: 2026-09-29T04:18:45Z
+updated: 2026-09-29T14:37:54Z
 +++
 
 Parallel queries use snapshots and task-owned buffers. Partition preparation allocates selected rows and index mappings; writes maintain dirty masks, and the owner applies updates after all jobs join. These costs remain even after per-element worker locks were removed. Their contribution to current frame time and memory-bandwidth pressure has not been quantified separately.
@@ -906,17 +926,20 @@ Avoidable costs established by these measurements must be reduced without restor
 
 Copying and serial writeback are candidates for investigation, not established explanations for the observed 1.94x movement speedup.
 
+- `2026-09-29T14:38:22Z`: Related to #39: use its phase-level scaling results as the baseline. This issue adds buffer/allocation/write-density measurements and addresses costs established by them; it is not a duplicate of the overall scaling sweep.
+
 ---
 
 ## 41: Row-count partitioning does not account for uneven work or dispatch cost
 
 +++
-status: new
+status: open
 priority: medium
 kind: enhancement
-labels: performance, scheduling, scaling
+labels: effort:l, area:performance, area:scaling, area:scheduling
 depends: 39
 created: 2026-09-29T04:19:01Z
+updated: 2026-09-29T14:37:54Z
 +++
 
 eachParallel divides matching rows into fixed ranges and caps the partition count at the concurrency limit. minimumRowsPerTask considers row count, not actual computation or differences in executor throughput. Equal-sized ranges can therefore contain unequal work, and small jobs can cost more to dispatch than to execute. Current measurements do not isolate partition tail latency, idle capacity, or the break-even point for parallel execution.
@@ -927,16 +950,19 @@ Address demonstrated imbalance or excess overhead while keeping active concurren
 
 The runtime owns thread and core assignment. More jobs are not evidence of more CPU utilization, and no fixed thread-per-core mapping or universal speedup is assumed.
 
+- `2026-09-29T14:38:22Z`: Related to #39: use its scaling measurements as the baseline. This issue isolates skewed work, tail latency, partition sizes, and dispatch/join costs rather than just varying worker count.
+
 ---
 
 ## 42: Large phase graphs have no schedule-resolution cost measurements
 
 +++
-status: new
+status: open
 priority: medium
 kind: task
-labels: performance, scheduling
+labels: effort:m, area:performance, area:scheduling
 created: 2026-09-29T04:23:03Z
+updated: 2026-09-29T14:37:54Z
 +++
 
 The scheduler resolves a fresh schedule for each execution and execution-order inspection. It materializes phase-implied system dependencies, including transitive phase ancestors, and repeatedly scans remaining systems during topological ordering. Large phase graphs can therefore require quadratic work and storage. The existing movement benchmarks do not isolate this case.
@@ -947,16 +973,19 @@ Preserve registration-order tie breaking, explicit dependency errors, phase reac
 
 Extracted from the retired phases-and-pipelines notes. Related to #39, which measures full execution phases for movement workloads.
 
+- `2026-09-29T14:38:22Z`: Related to #39 and #19: #39 measures end-to-end movement phases, while #19 measures relationship operations. This issue isolates schedule construction and ordering as system/phase graph size and density grow.
+
 ---
 
 ## 43: Inherited component lookup has no agreed semantics
 
 +++
-status: new
+status: open
 priority: low
 kind: task
-labels: idea, relationships, queries
+labels: idea, effort:m, area:queries, area:relationships
 created: 2026-09-29T04:23:03Z
+updated: 2026-09-29T14:37:54Z
 +++
 
 The retired Flecs RFC identified ancestor/inherited component lookup as a possible extension. Current relationship queries select linked entities, but component reads do not inherit values from related entities. There is no agreed use case or lookup contract.
@@ -965,16 +994,20 @@ An evaluation needs to establish lookup direction, relationship selection, prece
 
 Expected: a bounded design decision that distinguishes useful inherited lookup from explicit application traversal. This is an exploratory idea, not approval to implement inheritance, relationship payloads, or a general graph framework. Singleton state remains separate in #18.
 
+- `2026-09-29T14:37:53Z`: Triage: effort:m covers the inheritance use-case and semantics investigation only. Implementation remains a separate decision.
+- `2026-09-29T14:38:22Z`: Related to #18: inherited component lookup is distinct from singleton identity and storage. Neither exploration approves implementation of the other.
+
 ---
 
 ## 44: Declared Swift 6.2 compatibility remains unverified
 
 +++
-status: new
+status: open
 priority: medium
 kind: task
-labels: compatibility, testing
+labels: effort:m, area:testing, area:compatibility
 created: 2026-09-29T04:23:03Z
+updated: 2026-09-29T14:37:54Z
 +++
 
 Package.swift declares Swift tools 6.2, while the retained typed-query investigation and recent concurrency validation used Apple Swift 6.4. The old notes explicitly left Swift 6.2 compatibility unverified. Parameter-pack and concurrency-heavy APIs now depend on this untested minimum.
