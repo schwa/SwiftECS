@@ -474,6 +474,14 @@ ECS_RUN_SCALING_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter M
 ECS_RUN_OBSERVATION_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter ObservationOverheadBenchmarkTests
 ```
 
+`RelationshipBenchmarkTests` measures deep/broad/DAG construction, reparenting, direct and descendant queries, transitive traversal, and recursive deletion:
+
+```sh
+ECS_RUN_RELATIONSHIP_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter RelationshipBenchmarkTests
+```
+
+Acyclic chain construction is quadratic (a cycle check walks toward the root before each link), so deep hierarchies are the costly case. Descendant-predicate queries evaluate per candidate and cost far more than a single breadth-first traversal from the root. Registered and unregistered direct-child queries measure the same, because registration caches archetypes, not relationship matches.
+
 Storage observation publishes once per frame regardless of observer count; each armed observer is notified once and recomputes its read (world-wide invalidation). On the fast typed path this per-observer recompute is measurable as observer count rises, while it is negligible against heavier entity-handle work.
 
 Movement is memory-bandwidth bound. On Apple M5 Max (18 processors, macOS 27.0, Swift 6.4, Release), light movement scaled to about 1.26x at 18 jobs for 100,000 entities.

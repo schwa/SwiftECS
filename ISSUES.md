@@ -127,13 +127,13 @@ closed: 2026-09-29T14:59:00Z
 
 World storage observation now tracks ECS reads and invalidates at world scope. Correctness tests cover notification batching, but dedicated measurements do not establish its runtime overhead or the UI work caused by broad invalidation. Measure representative large-world workloads with and without active observers, ordinary and fast-query reads/writes, sequential simulation substeps, and multiple views reading unrelated entities or components. Distinguish storage notifications from actual SwiftUI body evaluations and rendering work. These measurements are needed before deciding whether finer-grained observation is worthwhile.
 
-- `2026-09-23T18:01:44Z`: Related to #4 (substep notification volume) and #6 (component-access cost). Measurements must distinguish observation overhead from dictionary lookup/cast cost.
-- `2026-09-23T18:22:31Z`: Initial query comparison: one rearming storage observer adds no clear large cost in the measured single-archetype workload. This does not isolate the cost of observation instrumentation and does not measure SwiftUI body evaluation/rendering, multiple unrelated views, or substeps. See Experiments/TypedQueryPacks/Performance.md. Broader investigation remains open.
-- `2026-09-23T18:42:11Z`: Related investigation #13 measures row read/write costs without active subscribers. Broader instrumentation cost and SwiftUI behavior remain unmeasured here.
-- `2026-09-23T19:29:01Z`: Tracked by umbrella #14. Current baseline and trace provenance are in Experiments/TypedQueryPacks/Performance.md and ~/Desktop/ECS-Profiles/README.md.
-- `2026-09-29T04:24:01Z`: Preserved from retired performance notes: the historical single-archetype comparison used 100K entities, registered queries, fresh worlds, warm-up, and three rotated Release samples. One synchronous rearming storage observer added no clear large cost, but both variants retained observation instrumentation. No SwiftUI rendering or unrelated-view measurement was performed. QueryPerformanceTests and TypedQueryCostTests remain available via ECS_RUN_BENCHMARKS=1. Historical captures/logs were recorded under ~/Desktop/ECS-Profiles, including typed-query-column-inline.trace; their current presence is unverified, and all-process captures need review before sharing. Old document references in earlier comments are historical; broader work here remains open.
-- `2026-09-29T14:38:22Z`: Related to #15: snapshot publication can change UI invalidation scope and cadence. Observation/rendering measurements here can inform that design without assuming snapshots are already implemented.
-- `2026-09-29T14:59:00Z`: Added opt-in ObservationOverheadBenchmarkTests (ECS_RUN_OBSERVATION_BENCHMARKS=1) isolating storage-observation cost and notification volume from work, across access styles, observer counts, and substep batching. Overridable via ECS_OBS_ENTITIES/ROUNDS/FRAMES. SwiftUI body/rendering measurement is explicitly out of scope (noted in code).
+\- `2026-09-23T18:01:44Z`: Related to #4 (substep notification volume) and #6 (component-access cost). Measurements must distinguish observation overhead from dictionary lookup/cast cost.
+\- `2026-09-23T18:22:31Z`: Initial query comparison: one rearming storage observer adds no clear large cost in the measured single-archetype workload. This does not isolate the cost of observation instrumentation and does not measure SwiftUI body evaluation/rendering, multiple unrelated views, or substeps. See Experiments/TypedQueryPacks/Performance.md. Broader investigation remains open.
+\- `2026-09-23T18:42:11Z`: Related investigation #13 measures row read/write costs without active subscribers. Broader instrumentation cost and SwiftUI behavior remain unmeasured here.
+\- `2026-09-23T19:29:01Z`: Tracked by umbrella #14. Current baseline and trace provenance are in Experiments/TypedQueryPacks/Performance.md and ~/Desktop/ECS-Profiles/README.md.
+\- `2026-09-29T04:24:01Z`: Preserved from retired performance notes: the historical single-archetype comparison used 100K entities, registered queries, fresh worlds, warm-up, and three rotated Release samples. One synchronous rearming storage observer added no clear large cost, but both variants retained observation instrumentation. No SwiftUI rendering or unrelated-view measurement was performed. QueryPerformanceTests and TypedQueryCostTests remain available via ECS_RUN_BENCHMARKS=1. Historical captures/logs were recorded under ~/Desktop/ECS-Profiles, including typed-query-column-inline.trace; their current presence is unverified, and all-process captures need review before sharing. Old document references in earlier comments are historical; broader work here remains open.
+\- `2026-09-29T14:38:22Z`: Related to #15: snapshot publication can change UI invalidation scope and cadence. Observation/rendering measurements here can inform that design without assuming snapshots are already implemented.
+\- `2026-09-29T14:59:00Z`: Added opt-in ObservationOverheadBenchmarkTests (ECS_RUN_OBSERVATION_BENCHMARKS=1) isolating storage-observation cost and notification volume from work, across access styles, observer counts, and substep batching. Overridable via ECS_OBS_ENTITIES/ROUNDS/FRAMES. SwiftUI body/rendering measurement is explicitly out of scope (noted in code).
 
 Measured Apple M5 Max (18 processors), macOS 27.0 (26A428), Swift 6.4, Release; 100,000 entities, rounds=3, frames=30, one storage publish per frame:
 
@@ -454,12 +454,13 @@ This is an exploratory design task, not an implementation commitment. The idea i
 ## 19: Relationship-heavy workloads lack performance measurements
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:m, area:performance, area:relationships, area:queries
 created: 2026-09-23T21:17:09Z
-updated: 2026-09-29T14:37:53Z
+updated: 2026-09-29T15:02:18Z
+closed: 2026-09-29T15:02:18Z
 +++
 
 The relationship implementation has correctness coverage but no dedicated scale measurements. Descendant predicates traverse links separately for each candidate entity. Acyclic relationship insertion searches the graph before each new link, so deep hierarchy construction can become expensive.
@@ -469,6 +470,27 @@ Measure deep trees, broad trees, multi-parent graphs, frequent reparenting, dire
 Record scaling and profiles before deciding whether transitive caching or other changes are warranted. Preserve cycle rejection, cache correctness, traversal order, and deletion semantics. Related: #16 introduced relationships; #14 tracks overall performance. Existing component-only benchmarks do not establish relationship performance.
 
 - `2026-09-29T14:38:22Z`: Related to #26 and #42: graph performance measurements can protect a relationship-ownership refactor and distinguish underlying traversal costs from schedule construction. Neither issue duplicates these relationship workload measurements.
+- `2026-09-29T15:02:18Z`: Added opt-in RelationshipBenchmarkTests (ECS_RUN_RELATIONSHIP_BENCHMARKS=1). Entity creation is outside the timer; all result counts are verified outside timing. Overridable via ECS_REL_ROUNDS/DEEP/BROAD/QUERY_REPEATS.
+
+Measured Apple M5 Max (18 processors), macOS 27.0 (26A428), Swift 6.4, Release; rounds=3 medians:
+
+Construction (linking only, entities pre-created):
+- deep-chain depth=3000: 271.4 ms. Quadratic: the acyclic cycle check walks toward the root before each insert, so deep hierarchies are the costly case the issue flagged.
+- broad-star width=50000: 17.5 ms. Linear, cheap acyclic checks.
+- layered-dag layers=6 width=2000 fanIn=3 (30000 non-acyclic edges): 5.8 ms. No cycle search for non-acyclic links.
+
+Mutation:
+- reparent count=20000 iterations=5 (100000 exclusive setParent ops): 150.6 ms (~1.5 us/op), including outgoing-link replacement and reverse-index churn.
+
+Queries (per operation):
+- direct-query related(ChildOf, to: root) width=50000: unregistered 2.543 ms/query, registered 2.550 ms/query. Identical, confirming registration caches archetypes, not relationship matches.
+- descendant-query descendant(of: root) over 111111 nodes: 48.4 ms/query. Expensive: the predicate evaluates per candidate entity.
+- descendant-traversal root.descendants() (BFS) over 111111 nodes: 8.5 ms/traversal, far cheaper than the per-candidate predicate query.
+
+Deletion:
+- recursive-deletion of 111111 nodes: 104.2 ms.
+
+Findings: the two clear caching candidates are deep acyclic construction (quadratic cycle checks) and descendant-predicate queries (per-candidate traversal). A single BFS traversal is already ~6x cheaper than the equivalent descendant snapshot, so a transitive index or a traversal-based descendant evaluator are the natural next investigations; none is implemented here. Cycle rejection, traversal order (BFS, root-excluded), reparenting, and recursive-deletion semantics are unchanged and asserted in the benchmark. No production code changed. README updated with the command and headline results. Related: #26 (relationship ownership), #42 (schedule-graph costs).
 
 ---
 
