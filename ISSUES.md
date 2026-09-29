@@ -207,7 +207,7 @@ closed: 2026-09-29T15:26:41Z
 
 Adding and removing component types can leave empty intermediate archetypes in World. No empty-archetype reclamation exists. Long-lived worlds with changing component signatures can retain unused storage and query-cache entries. Any future reclamation must account for registered query caches and the lifetime rules of lazy sequences and query references.
 
-- `2026-09-29T15:26:41Z`: Implemented empty-archetype reclamation after component add/remove transitions and entity destruction.
+\- `2026-09-29T15:26:41Z`: Implemented empty-archetype reclamation after component add/remove transitions and entity destruction.
 
 Change: World.reclaimIfEmpty(archetype) drops an archetype once its last entity leaves. It is called at the end of both moveEntity variants (add and remove component) on the vacated source archetype, and in removeEntity after the entity's archetype loses its last row. Guards:
 - The base empty-signature archetype is never reclaimed (it is the reusable home for component-less entities and is recreated constantly otherwise).
@@ -244,17 +244,31 @@ World.systemCount reports the registered system count but reads ignored system s
 ## 10: Decide whether pause and resume belong in World
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: effort:s, area:systems
 created: 2026-09-23T17:57:52Z
-updated: 2026-09-29T14:37:53Z
+updated: 2026-09-29T15:27:37Z
+closed: 2026-09-29T15:27:37Z
 +++
 
 Applications currently own pause state and decide whether to call World.update. There is no agreed reason to move this policy into the ECS. Decide whether pause belongs in World or remains application-owned. Record the rationale and, if library support is warranted, define simulationTime, system execution, and direct-write behavior while paused. This is a design task only; implementation requires a separate decision.
 
 - `2026-09-23T19:55:27Z`: Related idea #17 evaluates selectable pipelines. Consider that design when deciding whether pause is world-wide or application-owned.
+- `2026-09-29T15:27:37Z`: Decision: pause and resume remain application-owned. No library pause API is added.
+
+Rationale:
+- World has no run loop. update(deltaTime:) is caller-driven per frame/substep, so 'pause' is simply 'do not call update'. A world.paused flag would only gate update internally - pure indirection with no new capability.
+- simulationTime advances only inside update(advancesTime: true). Not calling update already freezes simulation time, which is exactly the desired paused behavior; a library pause would have to re-specify this and could only match it.
+- The pipeline model already provides selective pause, and more expressively than a global flag. run(_:deltaTime:) executes a chosen pipeline without advancing simulation time, so an application can keep services/UI/audio systems running while skipping the gameplay pipeline. A single world.paused switch would be strictly less capable.
+- 'Which systems run while paused' is application policy (gameplay vs UI vs services). Encoding it in World would force a policy the library should not own; selectable pipelines let the app decide.
+- Direct component and relationship writes must stay available while paused - pause menus, upgrades (Survival's needsUpgrade/choose), and restarts all mutate a paused world. A pause that blocked writes would break these; a pause that allowed them adds nothing over app-owned state.
+- Applications already model pause as their own observable state that also drives UI (both demos hold a session-level 'paused' bool gating world.update). Duplicating it in World would create two sources of truth.
+
+Evidence from the demos: StarfallSupport/GameSession and SurvivalSupport/SurvivalSession each own a 'paused' flag and simply skip world.update while paused; they still mutate the world for menus/upgrades/restart. This is the intended, sufficient pattern.
+
+Conclusion favors the current state clearly, so this is a decision (not a punt) with no functional change. Added a short README note under the pipelines section documenting the pattern: pause by not calling update (freezes simulationTime), use run(_:deltaTime:) for selective systems while paused, and direct writes remain available. Related: #17 (selectable pipelines) supplies the selective-pause mechanism.
 
 ---
 

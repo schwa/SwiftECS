@@ -263,6 +263,8 @@ try world.update(deltaTime: 1.0 / 60)
 
 `run` does not advance simulation time. `update` runs `defaultPipeline` and advances time after validation.
 Each run captures its schedule before execution. Runtime changes affect the next run.
+
+Pause is application-owned: `World` has no run loop, so an application pauses by not calling `update`, which already freezes `simulationTime`. To keep some systems running while gameplay is paused, run a selective pipeline with `run(_:deltaTime:)` (which does not advance time) instead of `update`. Direct component and relationship writes remain available while paused, so pause menus, upgrades, and restarts work without a library pause flag.
 Explicit system dependencies outside the selection throw an error. Phase dependencies never select additional systems.
 Ready systems run in registration order.
 
