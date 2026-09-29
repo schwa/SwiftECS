@@ -493,9 +493,9 @@ The open questions are singleton identity and uniqueness, creation and removal, 
 
 This is an exploratory design task, not an implementation commitment. The idea is preserved here from the retired Flecs RFC. Inherited component lookup is separate work in #43.
 
-- `2026-09-29T14:37:53Z`: Triage: effort:s applies to the bounded singleton design decision, not implementation of a singleton API.
-- `2026-09-29T14:38:22Z`: Related to #43: singleton state and inherited lookup both need explicit lookup, query, observation, and access contracts. They remain separate design investigations rather than one implicit global-state mechanism.
-- `2026-09-29T15:33:01Z`: Evaluation and recommendation: singletons stay application-owned. No library singleton API is added, because no minimal, clearly-good, low-risk API emerges - the entity-backed approach carries an unresolved query-visibility hazard.
+\- `2026-09-29T14:37:53Z`: Triage: effort:s applies to the bounded singleton design decision, not implementation of a singleton API.
+\- `2026-09-29T14:38:22Z`: Related to #43: singleton state and inherited lookup both need explicit lookup, query, observation, and access contracts. They remain separate design investigations rather than one implicit global-state mechanism.
+\- `2026-09-29T15:33:01Z`: Evaluation and recommendation: singletons stay application-owned. No library singleton API is added, because no minimal, clearly-good, low-risk API emerges - the entity-backed approach carries an unresolved query-visibility hazard.
 
 Assessment of the open questions:
 - Identity and uniqueness: an entity-backed singleton is either one shared entity accumulating many component types (pollutes many queries) or one entity per singleton type (many hidden entities). Neither is obviously right, and uniqueness would need enforcement the storage layer does not provide today.
@@ -1166,12 +1166,13 @@ Is resolution a material cost? Yes, but only for large schedules. It is superlin
 ## 43: Inherited component lookup has no agreed semantics
 
 +++
-status: open
+status: closed
 priority: low
 kind: task
 labels: idea, effort:m, area:queries, area:relationships
 created: 2026-09-29T04:23:03Z
-updated: 2026-09-29T14:37:54Z
+updated: 2026-09-29T15:34:35Z
+closed: 2026-09-29T15:34:35Z
 +++
 
 The retired Flecs RFC identified ancestor/inherited component lookup as a possible extension. Current relationship queries select linked entities, but component reads do not inherit values from related entities. There is no agreed use case or lookup contract.
@@ -1182,6 +1183,22 @@ Expected: a bounded design decision that distinguishes useful inherited lookup f
 
 - `2026-09-29T14:37:53Z`: Triage: effort:m covers the inheritance use-case and semantics investigation only. Implementation remains a separate decision.
 - `2026-09-29T14:38:22Z`: Related to #18: inherited component lookup is distinct from singleton identity and storage. Neither exploration approves implementation of the other.
+- `2026-09-29T15:34:35Z`: Evaluation and recommendation: keep inherited component lookup as explicit application traversal. Do not add a library inheritance semantic. A general inherited-component model has multiple unresolved policy questions and conflicts with two load-bearing invariants (archetype-based query matching and the disjoint-access parallel model), so its value over the traversal that already exists does not justify the cost.
+
+Per-dimension assessment:
+- Lookup direction: toward ancestors, most-specific-first (self, then parent, then grandparent). Descendant inheritance is not meaningful for value lookup.
+- Relationship selection: must be an explicit relationship-type parameter. The library supports arbitrary relationship types, so inheritance cannot assume ChildOf; there is no safe implicit default.
+- Local vs inherited precedence: local value wins; an inherited value is used only when the entity lacks the component locally. This matches prefab/OO intuition.
+- Multiple-parent ambiguity: relationships allow multiple targets, so several parents can hold the component with no principled winner. First-by-traversal-order is fragile (order-dependent) and erroring or restricting to single-target relationships is a policy the app should choose, not the library.
+- Cycles: relationships allow cycles unless the type forbids them (ChildOf rejects cycles; general relationships do not). An inheritance chain is ill-defined under cycles; traversal already visits each entity once, but that is traversal safety, not an inheritance policy.
+- Overrides, writes, removal: the hard part. Inherited reads raise the question of what a write does (copy-on-write override into the child vs write-through to the parent) and what removal of a local override reveals. That is a full prefab/instancing model, far beyond a lookup helper, and is out of scope here.
+- Query matching: if query matched entities that only inherit a component, results would depend on graph shape and require per-entity graph walks, defeating archetype/signature matching and its fast path. If it did not, inherited lookup would be read-only sugar disconnected from queries (you could read a value you cannot query). Both are bad; the codebase relies on archetype matching.
+- Observation: an inherited value changes when an ancestor changes, so correctness would require fan-out invalidation through the graph. Observation is per-storage today; graph-propagating invalidation is a significant new mechanism.
+- System access and synchronization metadata: a system reading T with inheritance would need declared access to the relationship graph and to arbitrary ancestors' T storage. The Read/Write access model and the disjoint-partition parallel guarantees (see #40, #41) assume access is expressible per archetype/row; inherited reads cross entities unpredictably and would break safe parallel partitioning.
+
+Recommendation: resolve inherited values in application code using the existing ancestors(via:)/descendants(via:) API - walk ancestors nearest-first and take the first local hit, with the app choosing precedence and multi-parent tie-breaking. This keeps query matching, observation, writes/removal, and parallel access metadata sound because every read and write targets a concrete entity. If a real prefab/instancing need appears, design it as an explicit, opt-in overrides model with a single designated inheritance relationship and defined write/removal semantics - a separate proposal, not this exploration and not approval to implement inheritance, relationship payloads, or a graph framework. Consistent with #18 (no implicit global-state mechanism); the two remain separate investigations.
+
+Artifacts (test-only, no production change): added InheritedLookupPatternTests demonstrating the pattern - nearest-ancestor resolution, nearer overrides farther, local precedence over inherited, and that queries still match only local holders. Added a README note under the relationships section documenting that inherited lookup is explicit traversal and why there is no library inheritance semantic.
 
 ---
 
