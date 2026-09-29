@@ -118,6 +118,7 @@ public final class World {
             if let movedEntity = archetype.removeEntity(at: location.index) {
                 entityLocations[movedEntity]?.index = location.index
             }
+            reclaimIfEmpty(archetype)
         }
         if let implementation {
             if pipelineExecutionDepth > 0 {
@@ -298,6 +299,20 @@ public final class World {
         return archetype
     }
 
+    // Drop an archetype once its last entity leaves. The base empty-signature
+    // archetype is kept because it is the reusable home for component-less
+    // entities. Removal is result-invariant (an empty archetype matches nothing)
+    // and bumps the query generation so cached selections rebuild without it.
+    // Lazy sequences, snapshots, and typed references hold the archetype class
+    // directly, so a concurrent iteration keeps its own reference alive.
+    private func reclaimIfEmpty(_ archetype: Archetype) {
+        guard archetype.signature != emptySignature, archetype.entities.isEmpty else {
+            return
+        }
+        archetypes.removeValue(forKey: archetype.signature)
+        queries.invalidateArchetypes()
+    }
+
     private func moveEntity<T: Component>(
         _ entityID: EntityID,
         from oldLocation: EntityLocation,
@@ -317,6 +332,7 @@ public final class World {
 
         entityLocations[entityID] = EntityLocation(signature: newSignature, index: newIndex)
         structuralRevision &+= 1
+        reclaimIfEmpty(oldArchetype)
     }
 
     private func moveEntity(
@@ -337,6 +353,7 @@ public final class World {
 
         entityLocations[entityID] = EntityLocation(signature: newSignature, index: newIndex)
         structuralRevision &+= 1
+        reclaimIfEmpty(oldArchetype)
     }
 
     // MARK: - System Management

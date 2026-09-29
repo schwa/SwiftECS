@@ -196,15 +196,29 @@ The retired PLAN.md records a compiler crash when attempting EntityRef<each T: C
 ## 8: Empty archetypes remain allocated after component transitions
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: effort:l, area:storage
 created: 2026-09-23T17:57:52Z
-updated: 2026-09-29T14:37:53Z
+updated: 2026-09-29T15:26:41Z
+closed: 2026-09-29T15:26:41Z
 +++
 
 Adding and removing component types can leave empty intermediate archetypes in World. No empty-archetype reclamation exists. Long-lived worlds with changing component signatures can retain unused storage and query-cache entries. Any future reclamation must account for registered query caches and the lifetime rules of lazy sequences and query references.
+
+- `2026-09-29T15:26:41Z`: Implemented empty-archetype reclamation after component add/remove transitions and entity destruction.
+
+Change: World.reclaimIfEmpty(archetype) drops an archetype once its last entity leaves. It is called at the end of both moveEntity variants (add and remove component) on the vacated source archetype, and in removeEntity after the entity's archetype loses its last row. Guards:
+- The base empty-signature archetype is never reclaimed (it is the reusable home for component-less entities and is recreated constantly otherwise).
+- Only archetypes with no remaining entities are removed.
+- Removal bumps the query generation (queries.invalidateArchetypes()), so registered query caches rebuild without the reclaimed archetype on their next prepare.
+
+Safety against lifetime rules: reclamation is result-invariant because an empty archetype matches no entities, so query results are unchanged. Archetype is a class held strongly by lazy QuerySequence/QueryIterator, typed SystemQueryStorage, and snapshots; removing it from World.archetypes cannot deallocate it mid-iteration. A sequence captured before reclamation keeps its own reference and safely iterates (now empty). If an entity later transitions back into a reclaimed signature, getOrCreateArchetype recreates a fresh archetype and invalidates caches. Reclamation only runs inside structural mutations, which cannot occur during the parallel worker phase.
+
+Regression tests (ArchetypeReclamationTests), red before the fix and green after (verified by temporarily removing the three reclaim calls: the reclamation assertions failed): reclamation on component add and on remove (target archetype absent, count unchanged, results intact); base empty archetype retained and reused; destroy reclaims the archetype; archetypes still holding entities are not reclaimed; registered queries stay correct across reclaim/re-home/removal; and a captured lazy sequence survives reclamation of its archetype (iterates empty, a fresh sequence sees the re-homed entity).
+
+Verification: full suite 287 green; lint clean; the 100k system-update stress test is unaffected (~15.2 ms/frame), since the empty-check guard is negligible for non-transitioning workloads. Any future reclamation-cache work remains compatible; this change touches only per-transition cleanup.
 
 ---
 
@@ -1001,8 +1015,8 @@ Avoidable costs established by these measurements must be reduced without restor
 
 Copying and serial writeback are candidates for investigation, not established explanations for the observed 1.94x movement speedup.
 
-- `2026-09-29T14:38:22Z`: Related to #39: use its phase-level scaling results as the baseline. This issue adds buffer/allocation/write-density measurements and addresses costs established by them; it is not a duplicate of the overall scaling sweep.
-- `2026-09-29T15:23:12Z`: Checked #39 first (uniform movement is memory-bandwidth bound). Added opt-in ParallelBufferBenchmarkTests (ECS_RUN_BUFFER_BENCHMARKS=1) isolating snapshot copy, dirty-mask, and writeback across component size, write density, archetype count, and job count, including read-only and overlapping queries. Effects verified outside timing; overridable via ECS_BUF_ENTITIES/ROUNDS/FRAMES/LIMIT.
+\- `2026-09-29T14:38:22Z`: Related to #39: use its phase-level scaling results as the baseline. This issue adds buffer/allocation/write-density measurements and addresses costs established by them; it is not a duplicate of the overall scaling sweep.
+\- `2026-09-29T15:23:12Z`: Checked #39 first (uniform movement is memory-bandwidth bound). Added opt-in ParallelBufferBenchmarkTests (ECS_RUN_BUFFER_BENCHMARKS=1) isolating snapshot copy, dirty-mask, and writeback across component size, write density, archetype count, and job count, including read-only and overlapping queries. Effects verified outside timing; overridable via ECS_BUF_ENTITIES/ROUNDS/FRAMES/LIMIT.
 
 Measured Apple M5 Max (18 processors), macOS 27.0 (26A428), Swift 6.4, Release; 200,000 entities, rounds=3, frames=10, limit=8 medians (ms/frame):
 
