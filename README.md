@@ -1,6 +1,6 @@
 # SwiftECS
 
-The package requires Swift 6.2 or later. Declared Apple deployment targets are macOS 14 and iOS 26 or later.
+The package requires Swift 6.4 or later, the minimum verified toolchain. Declared Apple deployment targets are macOS 14 and iOS 26 or later.
 
 ## Usage
 

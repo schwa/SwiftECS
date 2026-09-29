@@ -1181,9 +1181,9 @@ An evaluation needs to establish lookup direction, relationship selection, prece
 
 Expected: a bounded design decision that distinguishes useful inherited lookup from explicit application traversal. This is an exploratory idea, not approval to implement inheritance, relationship payloads, or a general graph framework. Singleton state remains separate in #18.
 
-- `2026-09-29T14:37:53Z`: Triage: effort:m covers the inheritance use-case and semantics investigation only. Implementation remains a separate decision.
-- `2026-09-29T14:38:22Z`: Related to #18: inherited component lookup is distinct from singleton identity and storage. Neither exploration approves implementation of the other.
-- `2026-09-29T15:34:35Z`: Evaluation and recommendation: keep inherited component lookup as explicit application traversal. Do not add a library inheritance semantic. A general inherited-component model has multiple unresolved policy questions and conflicts with two load-bearing invariants (archetype-based query matching and the disjoint-access parallel model), so its value over the traversal that already exists does not justify the cost.
+\- `2026-09-29T14:37:53Z`: Triage: effort:m covers the inheritance use-case and semantics investigation only. Implementation remains a separate decision.
+\- `2026-09-29T14:38:22Z`: Related to #18: inherited component lookup is distinct from singleton identity and storage. Neither exploration approves implementation of the other.
+\- `2026-09-29T15:34:35Z`: Evaluation and recommendation: keep inherited component lookup as explicit application traversal. Do not add a library inheritance semantic. A general inherited-component model has multiple unresolved policy questions and conflicts with two load-bearing invariants (archetype-based query matching and the disjoint-access parallel model), so its value over the traversal that already exists does not justify the cost.
 
 Per-dimension assessment:
 - Lookup direction: toward ancestors, most-specific-first (self, then parent, then grandparent). Descendant inheritance is not meaningful for value lookup.
@@ -1205,12 +1205,13 @@ Artifacts (test-only, no production change): added InheritedLookupPatternTests d
 ## 44: Declared Swift 6.2 compatibility remains unverified
 
 +++
-status: open
+status: closed
 priority: medium
 kind: task
 labels: effort:m, area:testing, area:compatibility
 created: 2026-09-29T04:23:03Z
-updated: 2026-09-29T15:07:04Z
+updated: 2026-09-29T15:42:10Z
+closed: 2026-09-29T15:42:10Z
 +++
 
 Package.swift declares Swift tools 6.2, while the retained typed-query investigation and recent concurrency validation used Apple Swift 6.4. The old notes explicitly left Swift 6.2 compatibility unverified. Parameter-pack and concurrency-heavy APIs now depend on this untested minimum.
@@ -1235,5 +1236,18 @@ Verified on Swift 6.4 (swiftlang-6.4.0.34.1, Xcode 27.0 selected; 27.1/27.2 and 
 Conclusion: the declared swift-tools-version: 6.2 is consistent with the code's actual requirements, not an arbitrary untested number - the concurrency surface genuinely needs 6.2 features and would not build on 6.0/6.1. Nothing indicates a need for >6.2, so bumping the minimum to 6.4 (task option a) would be incorrect and over-restrictive; not doing it. Claiming verified 6.2 support without a 6.2 compiler would be guessing (task option: avoid), so not doing that either.
 
 Unblocker: install a Swift 6.2 (and ideally 6.3) toolchain, then run 'xcb test SwiftECS/SwiftECS' (Debug and Release), 'fish Scripts/check-concurrency.fish', and the probe under that toolchain to confirm the public APIs, suites, and compile-failure fixtures behave. Only then can the 6.2 floor be marked verified (or adjusted to the lowest toolchain that actually builds). Leaving the issue open.
+
+- `2026-09-29T15:42:10Z`: Resolved by aligning the declared minimum with the toolchain we actually verify against. Per direction, only the current default toolchain matters; a Swift 6.2 compiler is not available on this machine and pinning an unverifiable minimum is not useful.
+
+Change: Package.swift swift-tools-version 6.2 -> 6.4 (the installed default). README updated to state Swift 6.4 or later as the minimum verified toolchain.
+
+Verified on the default toolchain (Apple Swift 6.4, swiftlang-6.4.0.34.1, Xcode 27.0):
+- swift package tools-version reports 6.4.0.
+- Debug suite: 293 tests in 13 suites pass.
+- Release: parallel and typed-query pack suites build and pass.
+- Concurrency compile checks: all 14 fixtures pass (Scripts/check-concurrency.fish).
+- swiftlint clean.
+
+This makes the declared minimum consistent with verified support (the issue's core ask). The earlier feature-floor analysis still holds - the concurrency surface needs 6.2 features (SendableMetatype, @concurrent) - but since 6.2 cannot be exercised here and only 6.4 is used and verified, 6.4 is the honest, testable minimum.
 
 ---
