@@ -121,6 +121,7 @@ World storage observation now tracks ECS reads and invalidates at world scope. C
 - `2026-09-23T18:22:31Z`: Initial query comparison: one rearming storage observer adds no clear large cost in the measured single-archetype workload. This does not isolate the cost of observation instrumentation and does not measure SwiftUI body evaluation/rendering, multiple unrelated views, or substeps. See Experiments/TypedQueryPacks/Performance.md. Broader investigation remains open.
 - `2026-09-23T18:42:11Z`: Related investigation #13 measures row read/write costs without active subscribers. Broader instrumentation cost and SwiftUI behavior remain unmeasured here.
 - `2026-09-23T19:29:01Z`: Tracked by umbrella #14. Current baseline and trace provenance are in Experiments/TypedQueryPacks/Performance.md and ~/Desktop/ECS-Profiles/README.md.
+- `2026-09-29T04:24:01Z`: Preserved from retired performance notes: the historical single-archetype comparison used 100K entities, registered queries, fresh worlds, warm-up, and three rotated Release samples. One synchronous rearming storage observer added no clear large cost, but both variants retained observation instrumentation. No SwiftUI rendering or unrelated-view measurement was performed. QueryPerformanceTests and TypedQueryCostTests remain available via ECS_RUN_BENCHMARKS=1. Historical captures/logs were recorded under ~/Desktop/ECS-Profiles, including typed-query-column-inline.trace; their current presence is unverified, and all-process captures need review before sharing. Old document references in earlier comments are historical; broader work here remains open.
 
 ---
 
@@ -161,6 +162,7 @@ The retired PLAN.md records a compiler crash when attempting EntityRef<each T: C
 
 - `2026-09-23T18:01:44Z`: Related to #3 and #6: this bounded compiler investigation informs typed-query designs, without committing to a specific implementation.
 - `2026-09-23T18:07:14Z`: Investigation complete on Apple Swift 6.4 (swiftlang-6.4.0.34.1). Typed ECS column packs pass Debug and Release tests. Direct array access in pack expansion and single-element tuple-property assignment fail with reproducible diagnostics; generic read helpers and variadic setter methods work. Retained standalone repro variants and ECS-backed tests. Historical signal-11 crash not reproduced; Swift 6.2 remains unverified. Findings: Experiments/TypedQueryPacks/README.md. No production API changes.
+- `2026-09-29T04:24:01Z`: Documentation cleanup: the standalone Probe.swift and TypedQueryPackTests remain. Working and negative probe commands, historical diagnostics, and the unverified Swift 6.2 minimum are now captured in #44. The removed investigation notes remain in version control.
 
 ---
 
@@ -182,17 +184,19 @@ Adding and removing component types can leave empty intermediate archetypes in W
 ## 9: System count changes are not observable for debug interfaces
 
 +++
-status: open
+status: closed
 priority: low
 kind: enhancement
 labels: effort:s
 created: 2026-09-23T17:57:52Z
-updated: 2026-09-23T18:01:44Z
+updated: 2026-09-29T04:24:01Z
+closed: 2026-09-29T04:24:01Z
 +++
 
 World.systemCount reports the registered system count but reads ignored system storage without establishing an observation dependency. Debug views reading only systemCount do not automatically refresh when systems are added or removed. Storage observation does not cover system registration. This was a future consideration in PLAN.md, not part of the completed storage-observation contract.
 
 - `2026-09-23T19:55:27Z`: Related idea #17 evaluates ECS-backed scheduling and its observation contract; system-count observation remains a separate current-API concern.
+- `2026-09-29T04:24:01Z`: Documentation audit found this already resolved by ECS-backed scheduling (#17). World.systemCount reads snapshot(with: SystemDescriptor.self), which establishes storage observation. PipelineTests includes scheduling changes notify storage and system counts, covering registration and removal invalidation. Closed from current source and existing test coverage; no new code changes or test run were needed.
 
 ---
 
@@ -402,13 +406,14 @@ priority: low
 kind: task
 labels: idea
 created: 2026-09-23T19:55:27Z
+updated: 2026-09-29T04:24:01Z
 +++
 
-RFC 0001 proposes world-level singleton components using ordinary entity/component storage rather than a separate global-state store. There is no agreed API or lifecycle contract.
+World-level singleton components remain an exploratory Flecs-inspired idea. There is no agreed API or lifecycle contract for accessing global state through ordinary entity/component storage.
 
-Define singleton identity and uniqueness, creation and removal, query visibility, entity enumeration, and component-event/Swift Observation behavior. Determine whether all singleton components share one entity or use another identity scheme. Compare the value of a library API with application-owned well-known entities.
+The open questions are singleton identity and uniqueness, creation and removal, query visibility, entity enumeration, and component-event/Swift Observation behavior. It is also undecided whether singleton components share one entity or use separate identities, and whether a library API offers enough value over application-owned well-known entities.
 
-This is an exploratory design task, not an implementation commitment. Source: RFCs/0001-borrowing-ideas-from-flecs.md, section 3.
+This is an exploratory design task, not an implementation commitment. The idea is preserved here from the retired Flecs RFC. Inherited component lookup is separate work in #43.
 
 ---
 
@@ -833,6 +838,7 @@ Reproduce with ECS_RUN_MOVEMENT_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c relea
 Expected: type-safe system access should not impose this large per-entity overhead. Profile the actual hot path and retain matching, reference lifetime, observer, and mutation semantics while addressing the regression.
 
 - `2026-09-29T04:02:55Z`: Profiled Release movement with sample. Generic/tuple metadata and repeated exclusivity checks dominated serial access. Bound field accessors once, specialized iteration over resolved output types, and kept lifetime/revision checks in non-Sendable owner-local cells. Three-round 100K median improved from 77.28 to 12.50 ms/frame; raw reference loop measured 14.68 ms. Full-state verification and 260 tests pass. Evidence and reproduction are in Experiments/ParallelMovementProfiling.md.
+- `2026-09-29T04:24:01Z`: Documentation cleanup preserved the profiling evidence here: an 8-second serial sample had 5946 main-thread samples, 5743 beneath movement, with generic/tuple metadata operations prominent under iteration, term resolution, and component access. After specialization, repeated dynamic exclusivity checks on owner-local state became prominent. Current benchmarks and Scripts/profile-movement.fish reproduce the workload; the README retains measurement methodology and before/after results. The retired detailed report remains in version control.
 
 ---
 
@@ -857,6 +863,7 @@ Reproduce with ECS_RUN_MOVEMENT_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c relea
 Expected: disjoint row processing should avoid per-element synchronization overhead that defeats parallel execution. Changes must retain ownership boundaries, deterministic command merges, cancellation cleanup, observer fallback, and race freedom. Validate with profiles, repeated benchmarks, compile-failure checks, and Thread Sanitizer.
 
 - `2026-09-29T04:02:55Z`: The four-job profile confirmed column-lock waits and metadata overhead. Workers now use task-owned buffers with shared per-task query aliases and dirty-only writeback after joining, before structural merges. Failure writeback and command-prefix behavior remain covered. 100K medians improved from 116.59 to 7.97 ms with four jobs and from 153.46 to 6.45 ms with eight. Debug/Release tests, Thread Sanitizer, Address Sanitizer, compile checks, demo tests, macOS/iOS builds, and lint pass. No new unchecked-Sendable buffer or owner-cell wrappers were introduced.
+- `2026-09-29T04:24:01Z`: Documentation cleanup preserved the original four-job profile evidence: top-of-stack sample counts included 1931 in __ulock_wait2, 718 in __ulock_wake, and 1969 in generic tuple-cache lookup/insertion. These are samples across threads, not frame-time percentages. The post-fix profile no longer showed element-lock waits among hot stacks; remaining costs included reference counting, arrays, buffer preparation, and iteration. Scripts/profile-movement.fish waits for a PID file after warm-up and stores raw profiles/logs in its printed /tmp directory. Compare performance using separate unprofiled runs. Further scaling work remains in #39–#41.
 
 ---
 
@@ -907,7 +914,7 @@ Copying and serial writeback are candidates for investigation, not established e
 status: new
 priority: medium
 kind: enhancement
-labels: performance,scheduling,scaling
+labels: performance, scheduling, scaling
 depends: 39
 created: 2026-09-29T04:19:01Z
 +++
@@ -919,5 +926,67 @@ Expected: scaling coverage includes skewed per-entity costs, mixed archetype siz
 Address demonstrated imbalance or excess overhead while keeping active concurrency bounded. Preserve exact row coverage, exclusive writable ownership, query matching, explicit ordering constraints, logical command order, deterministic error selection, cancellation cleanup, and complete joins before storage reuse.
 
 The runtime owns thread and core assignment. More jobs are not evidence of more CPU utilization, and no fixed thread-per-core mapping or universal speedup is assumed.
+
+---
+
+## 42: Large phase graphs have no schedule-resolution cost measurements
+
++++
+status: new
+priority: medium
+kind: task
+labels: performance, scheduling
+created: 2026-09-29T04:23:03Z
++++
+
+The scheduler resolves a fresh schedule for each execution and execution-order inspection. It materializes phase-implied system dependencies, including transitive phase ancestors, and repeatedly scans remaining systems during topological ordering. Large phase graphs can therefore require quadratic work and storage. The existing movement benchmarks do not isolate this case.
+
+Expected: dedicated measurements cover increasing system and phase counts, sparse and dense dependencies, long chains, wide phase DAGs, empty intermediary phases, subset pipelines, and frequent runtime edits. Separate graph construction, ordering, allocation, and callback time. Verify schedule and validation results outside timing.
+
+Preserve registration-order tie breaking, explicit dependency errors, phase reachability, captured schedules, and parallel predecessor constraints. Measurements must establish whether schedule resolution is a material limit before choosing caching or another optimization.
+
+Extracted from the retired phases-and-pipelines notes. Related to #39, which measures full execution phases for movement workloads.
+
+---
+
+## 43: Inherited component lookup has no agreed semantics
+
++++
+status: new
+priority: low
+kind: task
+labels: idea, relationships, queries
+created: 2026-09-29T04:23:03Z
++++
+
+The retired Flecs RFC identified ancestor/inherited component lookup as a possible extension. Current relationship queries select linked entities, but component reads do not inherit values from related entities. There is no agreed use case or lookup contract.
+
+An evaluation needs to establish lookup direction, relationship selection, precedence between local and inherited values, multiple-parent ambiguity, and cycle behavior. It must also account for overrides, writes, removal, query matching, observation, and system access/synchronization metadata. Traversal order alone is not an inheritance policy.
+
+Expected: a bounded design decision that distinguishes useful inherited lookup from explicit application traversal. This is an exploratory idea, not approval to implement inheritance, relationship payloads, or a general graph framework. Singleton state remains separate in #18.
+
+---
+
+## 44: Declared Swift 6.2 compatibility remains unverified
+
++++
+status: new
+priority: medium
+kind: task
+labels: compatibility, testing
+created: 2026-09-29T04:23:03Z
++++
+
+Package.swift declares Swift tools 6.2, while the retained typed-query investigation and recent concurrency validation used Apple Swift 6.4. The old notes explicitly left Swift 6.2 compatibility unverified. Parameter-pack and concurrency-heavy APIs now depend on this untested minimum.
+
+Expected: establish whether the public APIs, Debug/Release suites, and concurrency compile checks work on the declared minimum toolchain. Record actual compiler versions and distinguish compiler defects from supported-API failures. Keep the declared minimum consistent with verified support.
+
+The standalone compiler probe remains at Experiments/TypedQueryPacks/Probe.swift. Run xcrun swift Experiments/TypedQueryPacks/Probe.swift for the working variant. Historical Swift 6.4 negative variants use -D DIRECT_ACCESS and -D SINGLE_ASSIGNMENT. They reported, respectively:
+
+error: failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)
+
+error: cannot assign value of type 'Position' to type 'Position'
+
+Generic read helpers and the variadic setter avoided those errors. These historical observations are not new verification of another compiler. ECS coverage remains in TypedQueryPackTests, and Scripts/check-concurrency.fish checks the parallel API boundaries. This extends the minimum-toolchain gap left by closed investigation #7.
 
 ---

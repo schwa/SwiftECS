@@ -268,7 +268,16 @@ Ready systems run in registration order.
 
 System entities appear in normal queries and entity counts. `systemCount` counts registered systems only.
 `systemExecutionOrder` now requires `try` because invalid schedules throw instead of returning stale results.
-See [Phases and pipelines](Experiments/PhasesAndPipelines.md) for lifecycle, observation, and deletion rules.
+Registration without an explicit phase uses a lazily created `Update` phase. There is no fixed engine phase list.
+`before:`, `after:`, and `dependencies:` permit forward references. Later registration reuses the unresolved entity, which does not count toward `systemCount`.
+Phase ordering includes transitive paths through empty phases. Dependency cycles can exist during editing, but a run rejects invalid reachable schedules before execution.
+Cycle diagnostics can include blocked dependents outside the cycle itself.
+
+`SystemDescriptor` is World-owned registration metadata. Do not copy, replace, or remove it directly.
+Destroying a system removes its registration and calls cleanup once, after the outermost active run finishes.
+`removeAllSystems` also removes unresolved references but preserves phases and pipelines. System entities cannot be cloned.
+Deleting a dependency removes its ordering constraint. Deleting a phase leaves its systems invalid until they receive valid phase membership.
+Registration and removal participate in storage observation, including reads of `systemCount`.
 
 ### Synchronization points
 
@@ -435,10 +444,22 @@ Each mode has three warm-up frames, 60 measured frames, and three rotated rounds
 
 The system modes use the same `.eachParallel` callback, with `Read<Physics>` supplying a value per row.
 The raw baseline retains its original component-reference access. Eight jobs are about 1.94 times faster than the corrected typed serial path.
-See [the profiling report](Experiments/ParallelMovementProfiling.md) for evidence, ownership details, and reproduction commands.
+Issues #37 and #38 retain the profiling findings. Generic metadata and exclusivity checks dominated serial access, while the original worker path also contended on column locks.
+The fixes bind field access once, specialize iteration over resolved output types, and use task-owned buffers with dirty-only writeback.
+Issues #39–#41 track further scaling measurements and overhead.
 
 ```sh
 ECS_RUN_MOVEMENT_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter MovementParallelBenchmarkTests
+fish Scripts/profile-movement.fish 1 600 6
+fish Scripts/profile-movement.fish 4 1600 6
+```
+
+The profiler waits for the benchmark PID after warm-up and writes samples and logs to its printed `/tmp/swiftecs-profile.*` directory.
+Profiled timings are not benchmark comparisons. The earlier query-access and cost-isolation benchmarks remain available separately:
+
+```sh
+ECS_RUN_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter QueryPerformanceTests
+ECS_RUN_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter TypedQueryCostTests
 ```
 
 ### Link entities
@@ -468,11 +489,14 @@ let equipment = player.descendants(via: EquippedBy.self)
 try player.removeRelationship(Likes.self, to: friend)
 ```
 
-Exclusive relationships replace the previous target. Acyclic relationships reject cycles. Writes reject dead entities and cross-world links with `RelationshipError`.
+Exclusive relationships replace the previous target. Acyclic relationships reject cycles before replacement, so rejection preserves the existing link.
+Relationship policies must remain stable. Writes reject dead entities and cross-world links with `RelationshipError`.
+Duplicate additions and absent removals do not invalidate storage. Links occupy separate storage and do not move entities between archetypes or appear in component enumeration.
 
 ### Hierarchies and deletion
 
-`ChildOf` allows one parent and rejects cycles. Traversal is breadth-first, excludes the starting entity, and visits each entity once.
+`ChildOf` allows one parent and rejects cycles. Traversal is breadth-first in link insertion order, excludes the starting entity, and visits each entity once.
+General cyclic or multi-parent traversal follows first-discovery order, not a topological ordering.
 
 ```swift
 let parent = world.createEntity()
@@ -495,7 +519,8 @@ try world.destroyRecursively(child)       // Delete child and grandchild
 try world.destroyRecursively(player, following: EquippedBy.self)
 ```
 
-Deletion removes all incoming and outgoing links. Cloning copies outgoing links with their original targets, but does not clone descendants.
+Deletion removes all incoming and outgoing links. Cloning copies outgoing links with their original targets, but does not clone descendants or incoming links.
+A cloned self-link still targets the original entity. Recursive deletion captures reachable IDs before removal and batches storage invalidation.
 
 Lifecycle methods throw `WorldError.foreignEntity` for a handle from another world. For stale handles, `destroy` returns `false`, `clone` returns `nil`, and recursive deletion returns `0`. Neither case mutates storage.
 
@@ -534,6 +559,8 @@ world.removeObserver(token)
 ```
 
 Callbacks run synchronously. Typed writes also emit component events. These events are separate from Swift Observation and do not describe relationships.
+Creation, cloning, and entity deletion invalidate storage but do not synthesize component events.
+Whole-row writes finish before the first component event. Storage invalidation follows event delivery, and nested batches flush even when execution throws.
 
 ### Use SwiftUI observation
 
