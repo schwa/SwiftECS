@@ -1237,7 +1237,7 @@ Conclusion: the declared swift-tools-version: 6.2 is consistent with the code's 
 
 Unblocker: install a Swift 6.2 (and ideally 6.3) toolchain, then run 'xcb test SwiftECS/SwiftECS' (Debug and Release), 'fish Scripts/check-concurrency.fish', and the probe under that toolchain to confirm the public APIs, suites, and compile-failure fixtures behave. Only then can the 6.2 floor be marked verified (or adjusted to the lowest toolchain that actually builds). Leaving the issue open.
 
-- `2026-09-29T15:42:10Z`: Resolved by aligning the declared minimum with the toolchain we actually verify against. Per direction, only the current default toolchain matters; a Swift 6.2 compiler is not available on this machine and pinning an unverifiable minimum is not useful.
+\- `2026-09-29T15:42:10Z`: Resolved by aligning the declared minimum with the toolchain we actually verify against. Per direction, only the current default toolchain matters; a Swift 6.2 compiler is not available on this machine and pinning an unverifiable minimum is not useful.
 
 Change: Package.swift swift-tools-version 6.2 -> 6.4 (the installed default). README updated to state Swift 6.4 or later as the minimum verified toolchain.
 
@@ -1249,5 +1249,19 @@ Verified on the default toolchain (Apple Swift 6.4, swiftlang-6.4.0.34.1, Xcode 
 - swiftlint clean.
 
 This makes the declared minimum consistent with verified support (the issue's core ask). The earlier feature-floor analysis still holds - the concurrency surface needs 6.2 features (SendableMetatype, @concurrent) - but since 6.2 cannot be exercised here and only 6.4 is used and verified, 6.4 is the honest, testable minimum.
+
+---
+
+## 45: System callbacks cannot read relationship endpoints
+
++++
+status: new
+priority: medium
+kind: enhancement
+labels: area:relationships,area:systems,area:queries
+created: 2026-10-31T16:15:55Z
++++
+
+SwiftECS systems can filter entities by a relationship to a known target, but system inputs do not expose the actual targets or sources of a relationship for a row. Entity.targets(of:) and Entity.sources(of:) require entity handles, which system callbacks do not receive. In Sea Skimmer, projectile guidance needs each projectile’s launcher and target, and unit movement needs each unit’s formation leader or helicopter home. The application must perform relationship projections outside the normal system inputs or construct queries for known targets. Expected: systems can read relationship endpoints within their declared access and scheduling contract.
 
 ---
