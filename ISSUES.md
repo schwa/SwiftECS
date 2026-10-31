@@ -1255,11 +1255,13 @@ This makes the declared minimum consistent with verified support (the issue's co
 ## 45: System callbacks cannot read relationship endpoints
 
 +++
-status: new
+status: closed
 priority: medium
 kind: enhancement
-labels: area:relationships,area:systems,area:queries
+labels: area:relationships, area:systems, area:queries
 created: 2026-10-31T16:15:55Z
+updated: 2026-10-31T16:18:05Z
+closed: 2026-10-31T16:18:05Z
 +++
 
 SwiftECS systems can filter entities by a relationship to a known target, but system inputs do not expose the actual targets or sources of a relationship for a row. Entity.targets(of:) and Entity.sources(of:) require entity handles, which system callbacks do not receive. In Sea Skimmer, projectile guidance needs each projectile’s launcher and target, and unit movement needs each unit’s formation leader or helicopter home. The application must perform relationship projections outside the normal system inputs or construct queries for known targets. Expected: systems can read relationship endpoints within their declared access and scheduling contract.

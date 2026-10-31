@@ -39,6 +39,10 @@ internal final class RelationshipGraph {
         storages[type]?.reaches(from: source, to: target) ?? false
     }
 
+    func snapshot(_ type: RelationshipType) -> (outgoing: [EntityID: [EntityID]], incoming: [EntityID: [EntityID]]) {
+        storages[type]?.snapshot() ?? ([:], [:])
+    }
+
     // MARK: - Writes (pure; callers wrap observation)
 
     func insert(_ type: RelationshipType, source: EntityID, target: EntityID) {

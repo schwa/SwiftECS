@@ -12,6 +12,10 @@ internal final class RelationshipStorage {
         Array(incoming[target] ?? [])
     }
 
+    func snapshot() -> (outgoing: [EntityID: [EntityID]], incoming: [EntityID: [EntityID]]) {
+        (outgoing.mapValues { Array($0) }, incoming.mapValues { Array($0) })
+    }
+
     func contains(source: EntityID, target: EntityID?) -> Bool {
         guard let targets = outgoing[source] else {
             return false
