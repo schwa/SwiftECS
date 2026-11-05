@@ -10,8 +10,23 @@ public enum ComponentEvent<T: Component> {
 
 /// Token returned when registering an observer. Use to unregister.
 public struct ObservationToken: Hashable {
+    enum Kind: Hashable {
+        case component
+        case destroy
+        case relationship
+    }
+
     let id: UInt64
+    // The component or relationship type observed; unused for destroy observers.
     let componentType: ObjectIdentifier
+    var kind: Kind = .component
+}
+
+/// A relationship edge added or removed. Not reported: edges removed because an entity was destroyed (observe that
+/// with `World.observeDestroyed(_:)`) and edges copied by `World.clone(_:)`.
+public enum RelationshipEvent: Hashable, Sendable {
+    case added(source: EntityID, target: EntityID)
+    case removed(source: EntityID, target: EntityID)
 }
 
 /// Type-erased observer handler.

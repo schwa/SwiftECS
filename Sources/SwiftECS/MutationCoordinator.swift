@@ -88,9 +88,63 @@ internal final class MutationCoordinator: Observable {
 
     func removeObserver(_ token: ObservationToken) {
         checkAccessible()
-        handlers[token.componentType]?.removeValue(forKey: token.id)
-        if handlers[token.componentType]?.isEmpty == true {
-            handlers.removeValue(forKey: token.componentType)
+        switch token.kind {
+        case .component:
+            handlers[token.componentType]?.removeValue(forKey: token.id)
+            if handlers[token.componentType]?.isEmpty == true {
+                handlers.removeValue(forKey: token.componentType)
+            }
+        case .destroy:
+            destroyHandlers.removeValue(forKey: token.id)
+        case .relationship:
+            relationshipHandlers[token.componentType]?.removeValue(forKey: token.id)
+            if relationshipHandlers[token.componentType]?.isEmpty == true {
+                relationshipHandlers.removeValue(forKey: token.componentType)
+            }
+        }
+    }
+
+    // MARK: - Destroy and relationship observers (#47)
+
+    private var destroyHandlers: [UInt64: (EntityID) -> Void] = [:]
+    private var relationshipHandlers: [ObjectIdentifier: [UInt64: (RelationshipEvent) -> Void]] = [:]
+
+    var hasDestroyObservers: Bool {
+        !destroyHandlers.isEmpty
+    }
+
+    func hasRelationshipObservers(_ type: RelationshipType) -> Bool {
+        relationshipHandlers[type.id] != nil
+    }
+
+    func observeDestroyed(_ handler: @escaping (EntityID) -> Void) -> ObservationToken {
+        checkAccessible()
+        let tokenID = nextTokenID
+        nextTokenID += 1
+        destroyHandlers[tokenID] = handler
+        return ObservationToken(id: tokenID, componentType: ObjectIdentifier(EntityID.self), kind: .destroy)
+    }
+
+    func observeRelationship(_ type: RelationshipType, handler: @escaping (RelationshipEvent) -> Void) -> ObservationToken {
+        checkAccessible()
+        let tokenID = nextTokenID
+        nextTokenID += 1
+        relationshipHandlers[type.id, default: [:]][tokenID] = handler
+        return ObservationToken(id: tokenID, componentType: type.id, kind: .relationship)
+    }
+
+    func destroyed(_ entityID: EntityID) {
+        for handler in destroyHandlers.values {
+            handler(entityID)
+        }
+    }
+
+    func relationshipChanged(_ type: RelationshipType, _ event: RelationshipEvent) {
+        guard let subscribers = relationshipHandlers[type.id] else {
+            return
+        }
+        for handler in subscribers.values {
+            handler(event)
         }
     }
 

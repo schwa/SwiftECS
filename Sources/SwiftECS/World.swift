@@ -139,7 +139,7 @@ public final class World {
             return false
         }
         let implementation = component(SystemDescriptor.self, for: id)?.implementation
-        mutations.perform {
+        mutations.perform({
             entityLocations.removeValue(forKey: id)
             structuralRevision &+= 1
             relationshipGraph.removeEntity(id)
@@ -147,7 +147,11 @@ public final class World {
                 entityLocations[movedEntity]?.index = location.index
             }
             reclaimIfEmpty(archetype)
-        }
+        }, events: {
+            if mutations.hasDestroyObservers {
+                mutations.destroyed(id)
+            }
+        })
         if let implementation {
             if pipelineExecutionDepth > 0 {
                 pendingSystemCleanup.append(implementation)
@@ -223,6 +227,22 @@ public final class World {
         handler: @escaping (ComponentEvent<T>) -> Void
     ) -> ObservationToken {
         mutations.observe(type, handler: handler)
+    }
+
+    /// Register an observer that runs after an entity is destroyed. Component observers get no events for the
+    /// destroyed entity's components.
+    @discardableResult
+    public func observeDestroyed(_ handler: @escaping (EntityID) -> Void) -> ObservationToken {
+        mutations.observeDestroyed(handler)
+    }
+
+    /// Register an observer for edges of one relationship type being added or removed.
+    @discardableResult
+    public func observeRelationship<R: Relationship>(
+        _ type: R.Type,
+        handler: @escaping (RelationshipEvent) -> Void
+    ) -> ObservationToken {
+        mutations.observeRelationship(RelationshipType(type), handler: handler)
     }
 
     /// Unregister an observer.

@@ -16,9 +16,14 @@ extension Entity {
             guard world.relationshipGraph.contains(type, source: id, target: nil) else {
                 return
             }
-            world.mutations.perform {
+            let removed = world.relationshipGraph.targets(type, from: id)
+            world.mutations.perform({
                 world.relationshipGraph.removeOutgoing(type, source: id)
-            }
+            }, events: {
+                for target in removed {
+                    world.mutations.relationshipChanged(type, .removed(source: id, target: target))
+                }
+            })
         }
     }
 
@@ -33,12 +38,19 @@ extension Entity {
         if R.isAcyclic, graph.reaches(relationshipType, from: target.id, to: id) {
             throw RelationshipError.cycleDetected(relationshipType)
         }
-        world.mutations.perform {
+        let removed = R.isExclusive && world.mutations.hasRelationshipObservers(relationshipType)
+            ? graph.targets(relationshipType, from: id) : []
+        world.mutations.perform({
             if R.isExclusive {
                 graph.removeOutgoing(relationshipType, source: id)
             }
             graph.insert(relationshipType, source: id, target: target.id)
-        }
+        }, events: {
+            for previous in removed {
+                world.mutations.relationshipChanged(relationshipType, .removed(source: id, target: previous))
+            }
+            world.mutations.relationshipChanged(relationshipType, .added(source: id, target: target.id))
+        })
     }
 
     @discardableResult
@@ -49,9 +61,11 @@ extension Entity {
         guard world.relationshipGraph.contains(relationshipType, source: id, target: target.id) else {
             return false
         }
-        world.mutations.perform {
+        world.mutations.perform({
             world.relationshipGraph.remove(relationshipType, source: id, target: target.id)
-        }
+        }, events: {
+            world.mutations.relationshipChanged(relationshipType, .removed(source: id, target: target.id))
+        })
         return true
     }
 

@@ -1291,11 +1291,13 @@ Found while profiling SceneSprockets (its #270) with Time Profiler: Hasher.combi
 ## 47: Entity destruction and relationship changes cannot be observed
 
 +++
-status: new
+status: closed
 priority: low
 kind: feature
 labels: effort:m, area:observation, area:relationships
 created: 2026-11-05T22:18:05Z
+updated: 2026-11-05T22:32:39Z
+closed: 2026-11-05T22:32:39Z
 +++
 
 Observers get component .added/.changed/.removed events only. Destroying an entity, and adding or removing a relationship (for example setParent with ChildOf), notifies storage observation but emits no event an observer can register for. Removal without component events on destroy is deliberate (MutationBoundaryTests: 'entity lifecycle changes notify storage without synthesizing component events').
