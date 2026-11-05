@@ -30,6 +30,7 @@ struct ArchetypeSignature: Hashable {
 /// Entity location within archetype storage.
 struct EntityLocation {
     let signature: ArchetypeSignature
+    let archetypeSerial: UInt64
     var index: Int
 }
 
@@ -124,11 +125,14 @@ extension Column: @unchecked Sendable where T: ConcurrentComponent {}
 @usableFromInline
 final class Archetype {
     let signature: ArchetypeSignature
+    // Never reused in a World, unlike the object's address after the archetype is reclaimed.
+    let serial: UInt64
     @usableFromInline private(set) var entities: [EntityID] = []
     internal var columns: [ComponentType: AnyColumn] = [:]
 
-    init(signature: ArchetypeSignature) {
+    init(signature: ArchetypeSignature, serial: UInt64) {
         self.signature = signature
+        self.serial = serial
     }
 
     func addEntity(_ entityID: EntityID) -> Int {

@@ -22,7 +22,9 @@ public final class World {
     @ObservationIgnored
     @usableFromInline internal let revisionCell = OwnerCell<UInt64>(0)
 
-    @inlinable internal var structuralRevision: UInt64 {
+    // Changes whenever an entity is created, destroyed, or gains or loses a component type, so a cached
+    // ComponentRef may point at the wrong row. Value writes do not change it.
+    @inlinable public internal(set) var structuralRevision: UInt64 {
         get { revisionCell.value }
         set { revisionCell.value = newValue }
     }
@@ -62,8 +64,11 @@ public final class World {
 
     /// Create an empty world.
     public init() {
-        archetypes[emptySignature] = Archetype(signature: emptySignature)
+        archetypes[emptySignature] = Archetype(signature: emptySignature, serial: 0)
     }
+
+    @ObservationIgnored
+    private var lastArchetypeSerial: UInt64 = 0
 
     // MARK: - Entity Management
 
@@ -74,7 +79,7 @@ public final class World {
         mutations.perform {
             let archetype = archetypes[emptySignature]!
             let index = archetype.addEntity(id)
-            entityLocations[id] = EntityLocation(signature: emptySignature, index: index)
+            entityLocations[id] = EntityLocation(signature: emptySignature, archetypeSerial: archetype.serial, index: index)
             structuralRevision &+= 1
         }
         return Entity(id: id, world: self)
@@ -86,8 +91,9 @@ public final class World {
         createEntity(id: generateUniqueEntityID(), repeat each components)
     }
 
+    // Traps if `id` is already in use.
     @discardableResult
-    internal func createEntity<each T: Component>(id: EntityID, _ components: repeat each T) -> Entity {
+    public func createEntity<each T: Component>(id: EntityID, _ components: repeat each T) -> Entity {
         precondition(entityLocations[id] == nil, "Entity ID already exists")
         var typeIDs = Set<ComponentType>()
         for typeID in repeat ComponentType((each T).self) {
@@ -98,10 +104,32 @@ public final class World {
             let archetype = getOrCreateArchetype(signature)
             let index = archetype.addEntity(id)
             repeat archetype.setComponent(each components, at: index)
-            entityLocations[id] = EntityLocation(signature: signature, index: index)
+            entityLocations[id] = EntityLocation(signature: signature, archetypeSerial: archetype.serial, index: index)
             structuralRevision &+= 1
         }
         return Entity(id: id, world: self)
+    }
+
+    // For callers that only know their components at run time. Traps if `id` is in use or a type repeats.
+    @discardableResult
+    public func createEntity(id: EntityID, components: [any Component]) -> Entity {
+        precondition(entityLocations[id] == nil, "Entity ID already exists")
+        let signature = ArchetypeSignature(Set(components.map { Self.componentType(of: $0) }))
+        precondition(signature.types.count == components.count, "Component types must be unique")
+        mutations.perform {
+            let archetype = getOrCreateArchetype(signature)
+            let index = archetype.addEntity(id)
+            for component in components {
+                archetype.setComponent(component, at: index)
+            }
+            entityLocations[id] = EntityLocation(signature: signature, archetypeSerial: archetype.serial, index: index)
+            structuralRevision &+= 1
+        }
+        return Entity(id: id, world: self)
+    }
+
+    private static func componentType<T: Component>(of _: T) -> ComponentType {
+        ComponentType(T.self)
     }
 
     /// Remove an entity.
@@ -141,7 +169,9 @@ public final class World {
             let targetArchetype = getOrCreateArchetype(location.signature)
             let newIndex = targetArchetype.addEntity(newID)
             sourceArchetype.copyComponents(at: location.index, to: targetArchetype, targetIndex: newIndex)
-            entityLocations[newID] = EntityLocation(signature: location.signature, index: newIndex)
+            entityLocations[newID] = EntityLocation(
+                signature: location.signature, archetypeSerial: targetArchetype.serial, index: newIndex
+            )
             structuralRevision &+= 1
             relationshipGraph.copyOutgoing(from: id, to: newID)
         }
@@ -243,6 +273,29 @@ public final class World {
         return archetype.getComponent(type, at: location.index)
     }
 
+    // Where an entity's components are stored. While it is unchanged, ComponentRefs made for the entity stay valid,
+    // even if `structuralRevision` changed because of other entities. Nil if the entity does not exist.
+    public struct StorageLocation: Equatable, Sendable {
+        let archetypeSerial: UInt64
+        let index: Int
+    }
+
+    public func storageLocation(of entityID: EntityID) -> StorageLocation? {
+        mutations.checkAccessible()
+        guard let location = entityLocations[entityID] else {
+            return nil
+        }
+        return StorageLocation(archetypeSerial: location.archetypeSerial, index: location.index)
+    }
+
+    // Valid until `structuralRevision` changes. Finding the ref is not observed; reading `value` is.
+    public func componentRef<T: Component>(_ type: T.Type, for entityID: EntityID) -> ComponentRef<T>? {
+        mutations.checkAccessible()
+        guard let location = entityLocations[entityID],
+              let column = archetypes[location.signature]?.column(for: type) else { return nil }
+        return ComponentRef(world: self, entityID: entityID, column: column, index: location.index)
+    }
+
     /// Get all components for an entity.
     public func allComponents(for entityID: EntityID) -> [any Component] {
         trackStorageAccess()
@@ -290,7 +343,8 @@ public final class World {
         if let existing = archetypes[signature] {
             return existing
         }
-        let archetype = Archetype(signature: signature)
+        lastArchetypeSerial += 1
+        let archetype = Archetype(signature: signature, serial: lastArchetypeSerial)
         archetypes[signature] = archetype
 
         // Invalidate all registered query caches when a new archetype is created
@@ -330,7 +384,7 @@ public final class World {
             entityLocations[movedEntity]?.index = oldLocation.index
         }
 
-        entityLocations[entityID] = EntityLocation(signature: newSignature, index: newIndex)
+        entityLocations[entityID] = EntityLocation(signature: newSignature, archetypeSerial: newArchetype.serial, index: newIndex)
         structuralRevision &+= 1
         reclaimIfEmpty(oldArchetype)
     }
@@ -351,7 +405,7 @@ public final class World {
             entityLocations[movedEntity]?.index = oldLocation.index
         }
 
-        entityLocations[entityID] = EntityLocation(signature: newSignature, index: newIndex)
+        entityLocations[entityID] = EntityLocation(signature: newSignature, archetypeSerial: newArchetype.serial, index: newIndex)
         structuralRevision &+= 1
         reclaimIfEmpty(oldArchetype)
     }

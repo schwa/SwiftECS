@@ -12,6 +12,13 @@ public struct ComponentRef<Value: Component> {
         self.index = index
     }
 
+    // Reads without registering Observation access on the World, for callers that do their own observation.
+    @inlinable
+    public var untrackedValue: Value {
+        world.mutations.checkAccessible()
+        return column.value(at: index)
+    }
+
     @inlinable
     public var value: Value {
         get {
