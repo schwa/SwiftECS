@@ -1267,3 +1267,69 @@ closed: 2026-10-31T16:18:05Z
 SwiftECS systems can filter entities by a relationship to a known target, but system inputs do not expose the actual targets or sources of a relationship for a row. Entity.targets(of:) and Entity.sources(of:) require entity handles, which system callbacks do not receive. In Sea Skimmer, projectile guidance needs each projectile’s launcher and target, and unit movement needs each unit’s formation leader or helicopter home. The application must perform relationship projections outside the normal system inputs or construct queries for known targets. Expected: systems can read relationship endpoints within their declared access and scheduling contract.
 
 ---
+
+## 46: ComponentType hashing and equality include the type name string
+
++++
+status: new
+priority: medium
+kind: bug
+labels: effort:s, area:storage, area:performance
+created: 2026-11-05T22:18:05Z
++++
+
+ComponentType's derived Hashable and Equatable cover both id and name, so every hash or comparison also hashes or compares a String. ComponentType.init<T>(_:) builds that name with String(describing:) each time, which goes through Mirror and dynamic casts.
+
+Archetype dictionaries are keyed by ArchetypeSignature, a Set<ComponentType>, so each archetype lookup hashes every type name in the signature. Archetype.column(for:) builds a new ComponentType on each call.
+
+Found while profiling SceneSprockets (its #270) with Time Profiler: Hasher.combine via String.hash(into:) under ComponentType.hash(into:), String(describing:) under ComponentType.init, and ArchetypeSignature equality in __RawDictionaryStorage.find were among the top self-time symbols. That was mostly in entity creation and componentRef(_:for:) lookups, on entities with about 24 component types.
+
+---
+
+## 47: Entity destruction and relationship changes cannot be observed
+
++++
+status: new
+priority: low
+kind: feature
+labels: effort:m, area:observation, area:relationships
+created: 2026-11-05T22:18:05Z
++++
+
+Observers get component .added/.changed/.removed events only. Destroying an entity, and adding or removing a relationship (for example setParent with ChildOf), notifies storage observation but emits no event an observer can register for. Removal without component events on destroy is deliberate (MutationBoundaryTests: 'entity lifecycle changes notify storage without synthesizing component events').
+
+Effect: code that mirrors entities in its own objects cannot learn about these changes when they happen; it has to scan or check lazily. SceneSprockets needs this to remove a node when its entity is destroyed outside the scene graph (its #271) and to follow direct ChildOf edits (its #273). Whether SceneSprockets wants this is still an open question there.
+
+---
+
+## 48: Component change events do not carry the previous value
+
++++
+status: new
+priority: low
+kind: feature
+labels: effort:m, area:observation
+created: 2026-11-05T22:18:05Z
++++
+
+ComponentEvent.changed(Entity, T) carries only the new value. An observer that needs the value before the write (for example to animate from it) cannot get it.
+
+SceneSprockets would need this to animate direct World writes in Transaction.animate (its #272). Whether SceneSprockets wants that is an open question there, likely no.
+
+---
+
+## 49: Serial ComponentRef reads and writes always take the column lock
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: effort:m,area:storage,area:performance
+created: 2026-11-05T22:18:05Z
++++
+
+ComponentRef.value, ComponentRef.untrackedValue and their setters go through Column.withLock (an unfair lock) on every access, including on the World's own thread when no parallel run is active.
+
+SceneSprockets reads node fields through cached ComponentRefs on every traversal step. Its steady-state per-node cost is about 2-3x what it was before the ECS port (its #270). The lock is one part of that cost; it was not measured on its own.
+
+---
