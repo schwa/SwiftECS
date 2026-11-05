@@ -27,10 +27,14 @@ public struct ComponentRef<Value: Component> {
             return column.serialValue(at: index)
         }
         nonmutating set {
+            var oldValue: Value?
             world.mutations.perform({
+                if world.mutations.hasChangeObservers(Value.self) {
+                    oldValue = column.serialValue(at: index)
+                }
                 column.setSerialValue(newValue, at: index)
             }, events: {
-                world.notifyChanged(entityID: entityID, component: newValue)
+                world.notifyChanged(entityID: entityID, component: newValue, oldValue: oldValue)
             })
         }
     }

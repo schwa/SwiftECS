@@ -39,10 +39,14 @@ internal final class SystemFieldAccess<Value: Component> {
         }
         let world = scope.world
         if world.structuralRevision == revision {
+            var oldValue: Value?
             world.mutations.perform({
+                if world.mutations.hasChangeObservers(Value.self) {
+                    oldValue = column.value(at: index)
+                }
                 column.setValue(value, at: index)
             }, events: {
-                world.notifyChanged(entityID: entityID, component: value)
+                world.notifyChanged(entityID: entityID, component: value, oldValue: oldValue)
             })
         } else {
             precondition(world.hasComponent(Value.self, for: entityID), "System writes cannot add missing components")

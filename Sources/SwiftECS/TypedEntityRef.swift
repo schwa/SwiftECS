@@ -28,15 +28,25 @@ public struct TypedEntityRef<each Value: Component> {
         guard storage.hasComponents else {
             return
         }
+        // Read only when a change observer exists; which types it watches is checked per value below.
+        var oldValues: (repeat each Value)?
         world.mutations.perform({
+            if world.mutations.hasChangeObservers {
+                oldValues = (repeat read(each storage.columns))
+            }
             for (column, value) in repeat (each storage.columns, each values) {
                 column.setValue(value, at: index)
             }
         }, events: {
             // Complete all writes before event handlers can change entity storage.
-            guard world.mutations.hasObservers else { return }
-            for value in repeat each values {
-                world.notifyChanged(entityID: entityID, component: value)
+            if let oldValues {
+                for (oldValue, value) in repeat (each oldValues, each values) {
+                    world.notifyChanged(entityID: entityID, component: value, oldValue: oldValue)
+                }
+            } else if world.mutations.hasObservers {
+                for value in repeat each values {
+                    world.notifyChanged(entityID: entityID, component: value)
+                }
             }
         })
     }

@@ -12,6 +12,7 @@ public enum ComponentEvent<T: Component> {
 public struct ObservationToken: Hashable {
     enum Kind: Hashable {
         case component
+        case change
         case destroy
         case relationship
     }
@@ -20,6 +21,13 @@ public struct ObservationToken: Hashable {
     // The component or relationship type observed; unused for destroy observers.
     let componentType: ObjectIdentifier
     var kind: Kind = .component
+}
+
+/// A component value replaced by a serial write. Parallel write-back is not reported, as with `ComponentEvent`.
+public struct ComponentChange<T: Component> {
+    public let entity: Entity
+    public let oldValue: T
+    public let newValue: T
 }
 
 /// A relationship edge added or removed. Not reported: edges removed because an entity was destroyed (observe that

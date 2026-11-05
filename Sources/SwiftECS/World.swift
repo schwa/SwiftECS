@@ -229,22 +229,6 @@ public final class World {
         mutations.observe(type, handler: handler)
     }
 
-    /// Register an observer that runs after an entity is destroyed. Component observers get no events for the
-    /// destroyed entity's components.
-    @discardableResult
-    public func observeDestroyed(_ handler: @escaping (EntityID) -> Void) -> ObservationToken {
-        mutations.observeDestroyed(handler)
-    }
-
-    /// Register an observer for edges of one relationship type being added or removed.
-    @discardableResult
-    public func observeRelationship<R: Relationship>(
-        _ type: R.Type,
-        handler: @escaping (RelationshipEvent) -> Void
-    ) -> ObservationToken {
-        mutations.observeRelationship(RelationshipType(type), handler: handler)
-    }
-
     /// Unregister an observer.
     public func removeObserver(_ token: ObservationToken) {
         mutations.removeObserver(token)
@@ -252,9 +236,13 @@ public final class World {
 
     /// Notify observers of a component change.
     @inlinable
-    internal func notifyChanged<T: Component>(entityID: EntityID, component: T) {
-        guard mutations.hasObservers else { return }
-        mutations.changed(entity: Entity(id: entityID, world: self), component: component)
+    internal func notifyChanged<T: Component>(entityID: EntityID, component: T, oldValue: T? = nil) {
+        if mutations.hasObservers {
+            mutations.changed(entity: Entity(id: entityID, world: self), component: component)
+        }
+        if let oldValue {
+            mutations.changed(entity: Entity(id: entityID, world: self), oldValue: oldValue, newValue: component)
+        }
     }
 
     // MARK: - Component Access (Internal)
@@ -266,12 +254,16 @@ public final class World {
         }
         let typeID = ComponentType(T.self)
         let isNewComponent = !location.signature.contains(typeID)
+        var oldValue: T?
         mutations.perform({
             if isNewComponent {
                 let newSignature = location.signature.adding(typeID)
                 moveEntity(entityID, from: location, to: newSignature, addingComponent: component)
             } else {
                 // Update existing component
+                if mutations.hasChangeObservers(T.self) {
+                    oldValue = archetype.getComponent(T.self, at: location.index)
+                }
                 archetype.setComponent(component, at: location.index)
             }
         }, events: {
@@ -280,7 +272,7 @@ public final class World {
                 mutations.added(entity: Entity(id: entityID, world: self), component: component)
             } else {
                 // Notify observers of change
-                mutations.changed(entity: Entity(id: entityID, world: self), component: component)
+                notifyChanged(entityID: entityID, component: component, oldValue: oldValue)
             }
         })
     }

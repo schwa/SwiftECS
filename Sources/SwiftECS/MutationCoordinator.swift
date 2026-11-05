@@ -94,6 +94,11 @@ internal final class MutationCoordinator: Observable {
             if handlers[token.componentType]?.isEmpty == true {
                 handlers.removeValue(forKey: token.componentType)
             }
+        case .change:
+            changeHandlers[token.componentType]?.removeValue(forKey: token.id)
+            if changeHandlers[token.componentType]?.isEmpty == true {
+                changeHandlers.removeValue(forKey: token.componentType)
+            }
         case .destroy:
             destroyHandlers.removeValue(forKey: token.id)
         case .relationship:
@@ -101,6 +106,43 @@ internal final class MutationCoordinator: Observable {
             if relationshipHandlers[token.componentType]?.isEmpty == true {
                 relationshipHandlers.removeValue(forKey: token.componentType)
             }
+        }
+    }
+
+    // MARK: - Change observers with old values (#48)
+
+    // Values are `(ComponentChange<T>) -> Void` for the key's T.
+    private var changeHandlers: [ObjectIdentifier: [UInt64: Any]] = [:]
+
+    @usableFromInline
+    var hasChangeObservers: Bool {
+        !changeHandlers.isEmpty
+    }
+
+    // Writers read the old value only when this is true.
+    @usableFromInline
+    func hasChangeObservers<T: Component>(_ type: T.Type) -> Bool {
+        !changeHandlers.isEmpty && changeHandlers[ObjectIdentifier(type)] != nil
+    }
+
+    func observeChanges<T: Component>(_ type: T.Type, handler: @escaping (ComponentChange<T>) -> Void) -> ObservationToken {
+        checkAccessible()
+        let tokenID = nextTokenID
+        nextTokenID += 1
+        let typeID = ObjectIdentifier(type)
+        changeHandlers[typeID, default: [:]][tokenID] = handler
+        return ObservationToken(id: tokenID, componentType: typeID, kind: .change)
+    }
+
+    @usableFromInline
+    func changed<T: Component>(entity: Entity, oldValue: T, newValue: T) {
+        guard let subscribers = changeHandlers[ObjectIdentifier(T.self)] else {
+            return
+        }
+        let change = ComponentChange(entity: entity, oldValue: oldValue, newValue: newValue)
+        for handler in subscribers.values {
+            // swiftlint:disable:next force_cast
+            (handler as! (ComponentChange<T>) -> Void)(change)
         }
     }
 

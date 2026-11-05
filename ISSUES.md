@@ -1309,11 +1309,13 @@ Effect: code that mirrors entities in its own objects cannot learn about these c
 ## 48: Component change events do not carry the previous value
 
 +++
-status: new
+status: closed
 priority: low
 kind: feature
 labels: effort:m, area:observation
 created: 2026-11-05T22:18:05Z
+updated: 2026-11-05T22:35:40Z
+closed: 2026-11-05T22:35:40Z
 +++
 
 ComponentEvent.changed(Entity, T) carries only the new value. An observer that needs the value before the write (for example to animate from it) cannot get it.
