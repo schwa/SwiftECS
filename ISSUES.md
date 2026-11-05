@@ -1271,11 +1271,13 @@ SwiftECS systems can filter entities by a relationship to a known target, but sy
 ## 46: ComponentType hashing and equality include the type name string
 
 +++
-status: new
+status: closed
 priority: medium
 kind: bug
 labels: effort:s, area:storage, area:performance
 created: 2026-11-05T22:18:05Z
+updated: 2026-11-05T22:24:24Z
+closed: 2026-11-05T22:24:24Z
 +++
 
 ComponentType's derived Hashable and Equatable cover both id and name, so every hash or comparison also hashes or compares a String. ComponentType.init<T>(_:) builds that name with String(describing:) each time, which goes through Mirror and dynamic casts.
@@ -1324,7 +1326,7 @@ SceneSprockets would need this to animate direct World writes in Transaction.ani
 status: new
 priority: low
 kind: enhancement
-labels: effort:m,area:storage,area:performance
+labels: effort:m, area:storage, area:performance
 created: 2026-11-05T22:18:05Z
 +++
 
