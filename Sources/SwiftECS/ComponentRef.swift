@@ -16,18 +16,19 @@ public struct ComponentRef<Value: Component> {
     @inlinable
     public var untrackedValue: Value {
         world.mutations.checkAccessible()
-        return column.value(at: index)
+        return column.serialValue(at: index)
     }
 
+    // Both accessors check that no parallel run is active first, so they skip the column lock (#49).
     @inlinable
     public var value: Value {
         get {
             world.trackStorageAccess()
-            return column.value(at: index)
+            return column.serialValue(at: index)
         }
         nonmutating set {
             world.mutations.perform({
-                column.setValue(newValue, at: index)
+                column.setSerialValue(newValue, at: index)
             }, events: {
                 world.notifyChanged(entityID: entityID, component: newValue)
             })

@@ -67,6 +67,20 @@ final class Column<T: Component>: AnyColumn {
         withLock { storage[index] = value }
     }
 
+    // Without the lock. Only for serial World access after checkAccessible(): parallel jobs run only while the
+    // World is suspended, so no other thread can touch the column then (#49).
+    @inlinable
+    @inline(__always)
+    func serialValue(at index: Int) -> T {
+        storage[index]
+    }
+
+    @inlinable
+    @inline(__always)
+    func setSerialValue(_ value: T, at index: Int) {
+        storage[index] = value
+    }
+
     func snapshot() -> ContiguousArray<T> {
         withLock { storage }
     }

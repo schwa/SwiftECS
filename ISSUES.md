@@ -1323,11 +1323,13 @@ SceneSprockets would need this to animate direct World writes in Transaction.ani
 ## 49: Serial ComponentRef reads and writes always take the column lock
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
 labels: effort:m, area:storage, area:performance
 created: 2026-11-05T22:18:05Z
+updated: 2026-11-05T22:30:56Z
+closed: 2026-11-05T22:30:56Z
 +++
 
 ComponentRef.value, ComponentRef.untrackedValue and their setters go through Column.withLock (an unfair lock) on every access, including on the World's own thread when no parallel run is active.
