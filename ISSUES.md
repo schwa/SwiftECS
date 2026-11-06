@@ -1348,7 +1348,9 @@ SceneSprockets reads node fields through cached ComponentRefs on every traversal
 status: new
 priority: low
 kind: enhancement
+labels: deferred
 created: 2026-11-06T03:22:34Z
+updated: 2026-11-06T03:42:07Z
 +++
 
 Question: would SwiftECS benefit from a `@Component` macro?
@@ -1367,7 +1369,7 @@ Open questions:
 
 Expected: a decision, with reasons, on whether to add a macro.
 
-- `2026-11-06T03:42:07Z`: Possible gains from a macro (not measured):
+\- `2026-11-06T03:42:07Z`: Possible gains from a macro (not measured):
 
 - Compile-time rejection of class components. Detection of reference-type stored properties is partial, because macros read syntax and cannot resolve types.
 - One attribute instead of separate `Component`, `ConcurrentComponent`, and `Sendable` conformances.
