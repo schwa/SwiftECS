@@ -1341,3 +1341,30 @@ ComponentRef.value, ComponentRef.untrackedValue and their setters go through Col
 SceneSprockets reads node fields through cached ComponentRefs on every traversal step. Its steady-state per-node cost is about 2-3x what it was before the ECS port (its #270). The lock is one part of that cost; it was not measured on its own.
 
 ---
+
+## 50: Evaluate whether a Component macro would reduce boilerplate
+
++++
+status: new
+priority: low
+kind: enhancement
+created: 2026-11-06T03:22:34Z
++++
+
+Question: would SwiftECS benefit from a `@Component` macro?
+
+Today a component is a plain type that conforms to `Component` (and `ConcurrentComponent` for parallel use). Several rules are only checked at run time or by convention:
+
+- System components must have value semantics. Class components are rejected at registration (`SystemError.referenceComponent`), not at compile time.
+- Nested references inside a component must also behave as values. Swift cannot prove this.
+- Parallel use needs a separate `ConcurrentComponent` conformance plus `Sendable`.
+
+Open questions:
+
+- Which of these checks could move to compile time?
+- Is there per-component boilerplate in tests and demos that a macro would remove?
+- What does a macro cost: build time, the swift-syntax dependency, and debugging difficulty?
+
+Expected: a decision, with reasons, on whether to add a macro.
+
+---
