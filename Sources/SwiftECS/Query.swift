@@ -74,7 +74,7 @@ extension QueryPredicate {
         case .none:
             return .all
         case let .not(inner):
-            return inner // Double negation
+            return inner
         default:
             return .not(predicate)
         }

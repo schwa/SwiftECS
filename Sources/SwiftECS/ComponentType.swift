@@ -41,8 +41,7 @@ public struct ComponentType: Hashable, Equatable, Sendable {
         self.source = .type(type)
     }
 
-    // Identity is the type alone; `name` is for debugging. Hashing the name made every archetype lookup hash
-    // strings (#46).
+    // Identity is the type alone; `name` is for debugging (#46).
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id
     }

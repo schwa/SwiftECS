@@ -59,7 +59,6 @@ import Testing
     #expect(world.entityCount == 2)
     #expect(e2.exists == false)
 
-    // Other entities still exist
     #expect(e1.exists)
     #expect(e3.exists)
     #expect(e1[Position.self]?.x == 1)
@@ -70,7 +69,6 @@ import Testing
     let world = World()
     let fakeID = EntityID()
 
-    // Use subscript to try to get entity
     let entity = world[fakeID]
     #expect(entity == nil)
 }
@@ -99,10 +97,8 @@ import Testing
 
     let cloned = try world.clone(original)!
 
-    // Modify original
     original.set(Position(x: 100, y: 200))
 
-    // Clone should be unaffected
     #expect(original[Position.self]?.x == 100)
     #expect(cloned[Position.self]?.x == 10)
 }
@@ -219,7 +215,6 @@ import Testing
     let entity = world.createEntity()
     try world.destroy(entity)
 
-    // Should not crash - entity no longer exists
     entity.set(Position(x: 0, y: 0))
     #expect(entity[Position.self] == nil)
 }
@@ -411,8 +406,7 @@ import Testing
     try world.addSystem(cleanupMovementSystem())
     world.removeAllSystems()
 
-    // Verify systems were removed
-    try world.update(deltaTime: 1.0)  // Should do nothing
+    try world.update(deltaTime: 1.0)
 }
 
 // MARK: - Entity Handle Tests
@@ -466,7 +460,6 @@ import Testing
 
     #expect(entity.contains(Position.self) == false)
     #expect(entity[Position.self] == nil)
-    // Other components unaffected
     #expect(entity[Velocity.self]?.dx == 1)
 }
 
@@ -474,7 +467,6 @@ import Testing
     let world = World()
     let entity = world.createEntity(Position(x: 10, y: 20))
 
-    // Should not crash when removing component that doesn't exist
     entity[Velocity.self] = nil
 
     #expect(entity.contains(Position.self) == true)
@@ -532,7 +524,6 @@ import Testing
     let world = World()
     let entity = world.createEntity(Position(x: 10, y: 20))
 
-    // Request a component that doesn't exist
     let composite = entity.get(Position.self, Velocity.self)
     #expect(composite == nil)
 }
@@ -544,11 +535,9 @@ import Testing
         Health(current: 50)
     )
 
-    // Request Position and Velocity, but entity only has Position and Health
     let composite = entity.get(Position.self, Velocity.self)
     #expect(composite == nil)
 
-    // Request Position and Health - should work
     let validComposite = entity.get(Position.self, Health.self)
     #expect(validComposite != nil)
 
@@ -579,7 +568,6 @@ import Testing
 
     let entity2 = world.createEntity()
 
-    // Get components from entity1 and set on entity2
     if let composite = entity1.get(Position.self, Velocity.self) {
         entity2.set(composite)
     }
@@ -695,7 +683,7 @@ import Testing
 
     let entity2 = world.createEntity()
     entity2.set(Position(x: 2, y: 2))
-    #expect(addedCount == 1)  // Should not have incremented
+    #expect(addedCount == 1)
 }
 
 @Test func testMultipleObserversForSameType() {
@@ -758,12 +746,10 @@ import Testing
     #expect(addedCount == 1)
     #expect(changedCount == 0)
 
-    // Update existing component - should trigger change event
     entity.set(Position(x: 100, y: 200))
     #expect(addedCount == 1)
     #expect(changedCount == 1)
 
-    // Another update
     entity.set(Position(x: 500, y: 600))
     #expect(addedCount == 1)
     #expect(changedCount == 2)
@@ -854,21 +840,18 @@ import Testing
     let world = World()
     let entity = world.createEntity()
 
-    // Entity conforms to Identifiable
     let id: EntityID = entity.id
     #expect(id == entity.id)
 
-    // Can be used in contexts requiring Identifiable
     let entities = [
         world.createEntity(Position(x: 0, y: 0)),
         world.createEntity(Position(x: 1, y: 1)),
         world.createEntity(Position(x: 2, y: 2))
     ]
 
-    // Identifiable allows use with SwiftUI ForEach, etc.
     let ids = entities.map(\.id)
     #expect(ids.count == 3)
-    #expect(Set(ids).count == 3)  // All unique
+    #expect(Set(ids).count == 3)
 }
 
 // MARK: - SystemID Tests
@@ -899,7 +882,7 @@ import Testing
     var set = Set<SystemID>()
     set.insert(id1)
     set.insert(id2)
-    set.insert(id1)  // Duplicate
+    set.insert(id1)
 
     #expect(set.count == 2)
 }
@@ -1105,15 +1088,12 @@ final class SharedOrder: @unchecked Sendable {
     let query = Query(with: Position.self)
     world.register(query)
 
-    // First iteration - builds cache
     var count = 0
     for _ in world.entities(matching: query) { count += 1 }
     #expect(count == 1)
 
-    // Add entity with new archetype combination
     world.createEntity(Position(x: 2, y: 2), Velocity(dx: 1, dy: 1))
 
-    // Cache should be invalidated, should find both
     count = 0
     for _ in world.entities(matching: query) { count += 1 }
     #expect(count == 2)
@@ -1130,7 +1110,6 @@ final class SharedOrder: @unchecked Sendable {
     world.unregister(query)
     #expect(!world.isRegistered(query))
 
-    // entities() still works (just slower without cache)
     var count = 0
     for _ in world.entities(matching: query) { count += 1 }
     #expect(count == 1)
@@ -1141,7 +1120,6 @@ final class SharedOrder: @unchecked Sendable {
     world.createEntity(Position(x: 1, y: 1))
     world.createEntity(Position(x: 2, y: 2))
 
-    // entities() works without registration (just no caching)
     let query = Query(with: Position.self)
     var sum = 0.0
     for entity in world.entities(matching: query) {

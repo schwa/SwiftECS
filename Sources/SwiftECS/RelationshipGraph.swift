@@ -1,10 +1,4 @@
-// Single internal owner of relationship index state.
-//
-// It owns the per-type `RelationshipStorage` map and the only forward/reverse
-// index mutations, so callers never create storage or reach into the map. The
-// `Entity` API expresses cardinality and cycle policy on top of these
-// primitives, and observation is wrapped by callers through the mutation
-// coordinator. Reads and pure writes here perform no observation of their own.
+// Sole owner of relationship index state. Writes do no observation; callers wrap them through the mutation coordinator.
 internal final class RelationshipGraph {
     private var storages: [RelationshipType: RelationshipStorage] = [:]
 
@@ -58,14 +52,14 @@ internal final class RelationshipGraph {
         storages[type]?.removeOutgoing(from: source)
     }
 
-    // Remove all incident links of an entity across every relationship type.
+    // Removes all incident links of an entity across every relationship type.
     func removeEntity(_ entity: EntityID) {
         for storage in storages.values {
             storage.removeEntity(entity)
         }
     }
 
-    // Copy an entity's outgoing links to a clone, preserving original targets.
+    // Copies an entity's outgoing links to a clone, preserving original targets.
     func copyOutgoing(from source: EntityID, to destination: EntityID) {
         for storage in storages.values {
             for target in storage.targets(from: source) {

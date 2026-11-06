@@ -51,7 +51,7 @@ public struct TypedEntityRef<each Value: Component> {
         })
     }
 
-    // Direct array subscripting in a pack expansion fails on Swift 6.4.
+    // Direct array subscripting in a pack expansion fails as of Swift 6.4.
     @inlinable
     @inline(__always)
     internal func read<T: Component>(_ column: Column<T>) -> T {

@@ -2,11 +2,10 @@ import Foundation
 @testable import SwiftECS
 import Testing
 
-// Helper function to measure execution time
 func measureTime(_ block: () throws -> Void) rethrows -> Double {
     let start = CFAbsoluteTimeGetCurrent()
     try block()
-    return (CFAbsoluteTimeGetCurrent() - start) * 1_000  // Convert to milliseconds
+    return (CFAbsoluteTimeGetCurrent() - start) * 1_000
 }
 
 // MARK: - Additional Test Components
@@ -297,7 +296,6 @@ struct StressTests {
         let world = World()
         var entities: [Entity] = []
 
-        // Create
         let createTime = measureTime {
             for i in 0..<50_000 {
                 let entity = world.createEntity(
@@ -308,7 +306,6 @@ struct StressTests {
             }
         }
 
-        // Update (30 frames)
         let updateTime = measureTime {
             for _ in 0..<30 {
                 for entity in world.snapshot(with: Position.self, Velocity.self) {
@@ -320,14 +317,12 @@ struct StressTests {
             }
         }
 
-        // Remove half
         let removeTime = try measureTime {
             for i in stride(from: 0, to: entities.count, by: 2) {
                 try world.destroy(entities[i])
             }
         }
 
-        // Add new entities
         let addTime = measureTime {
             for i in 0..<25_000 {
                 world.createEntity(

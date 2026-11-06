@@ -57,7 +57,6 @@ struct QueryTests {
         let query = Query(!.contains(Position.self))
         let results = world.snapshot(matching: query)
         #expect(results.count == 1)
-        // Should only have entity with just Velocity
         #expect(results[0].contains(Velocity.self))
         #expect(!results[0].contains(Position.self))
     }
@@ -165,7 +164,6 @@ struct QueryTests {
         world.createEntity(Position(x: 1, y: 1))
         world.createEntity(Velocity(dx: 1, dy: 1), Enemy())
 
-        // Entities with Position but NOT Enemy
         let query = Query(.contains(Position.self) && !.contains(Enemy.self))
         let results = world.snapshot(matching: query)
         #expect(results.count == 1)
@@ -182,7 +180,6 @@ struct QueryTests {
         world.createEntity(Velocity(dx: 0, dy: 0))
         world.createEntity(Health(current: 25))
 
-        // Entities with (Position OR Velocity) AND Health
         let query = Query((.contains(Position.self) || .contains(Velocity.self)) && .contains(Health.self))
         let results = world.snapshot(matching: query)
         #expect(results.count == 2)
@@ -191,18 +188,12 @@ struct QueryTests {
     @Test("Complex query: flying enemies or poisoned units")
     func testComplexQueryGameScenario() {
         let world = World()
-        // Flying enemy
         world.createEntity(Position(x: 0, y: 0), Enemy(), Flying())
-        // Ground enemy
         world.createEntity(Position(x: 1, y: 1), Enemy())
-        // Poisoned ally
         world.createEntity(Position(x: 2, y: 2), Poisoned())
-        // Healthy ally
         world.createEntity(Position(x: 3, y: 3))
-        // Flying ally
         world.createEntity(Position(x: 4, y: 4), Flying())
 
-        // Flying enemies OR poisoned units
         let query = Query((.contains(Enemy.self) && .contains(Flying.self)) || .contains(Poisoned.self))
         let results = world.snapshot(matching: query)
         #expect(results.count == 2)

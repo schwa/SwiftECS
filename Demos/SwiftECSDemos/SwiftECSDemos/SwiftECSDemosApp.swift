@@ -1,10 +1,3 @@
-//
-//  SwiftECSDemosApp.swift
-//  SwiftECSDemos
-//
-//  Created by Jonathan Wight.
-//
-
 import SwiftUI
 
 @main

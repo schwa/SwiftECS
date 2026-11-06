@@ -34,7 +34,7 @@ private struct TypedQueryPackProbe<each Value: Component> {
     var values: (repeat each Value) {
         get {
             world.trackStorageAccess()
-            // Direct array subscripting inside this expansion fails on Swift 6.4.
+            // Direct array subscripting inside this expansion fails as of Swift 6.4.
             return (repeat probeValue(each columns, at: index))
         }
         nonmutating set {

@@ -64,7 +64,6 @@ extension World {
         lines.append("===========")
         lines.append("")
 
-        // Group entities by archetype for cleaner output
         for (signature, archetype) in archetypes.sorted(by: { $0.value.entities.count > $1.value.entities.count }) {
             guard !archetype.entities.isEmpty else { continue }
 
@@ -78,7 +77,6 @@ extension World {
             lines.append("")
         }
 
-        // Summary
         lines.append("Summary:")
         lines.append("  Total Entities: \(entityCount)")
         lines.append("  Total Archetypes: \(archetypes.count)")

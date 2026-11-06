@@ -60,13 +60,11 @@ public struct Entity: Identifiable {
     /// Get multiple components as a Composite.
     /// Returns nil if any of the requested components are missing.
     public func get<each T: Component>(_ types: repeat (each T).Type) -> Composite<repeat each T>? {
-        // Check all components exist first
         for type in repeat (each types) {
             guard world.hasComponent(type, for: id) else {
                 return nil
             }
         }
-        // Safe to force unwrap since we verified all exist
         return Composite(repeat world.component((each T).self, for: id)!)
     }
 

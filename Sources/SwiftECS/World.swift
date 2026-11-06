@@ -265,7 +265,6 @@ public final class World {
                 let newSignature = location.signature.adding(typeID)
                 moveEntity(entityID, from: location, to: newSignature, addingComponent: component)
             } else {
-                // Update existing component
                 if mutations.hasChangeObservers(T.self) {
                     oldValue = archetype.getComponent(T.self, at: location.index)
                 }
@@ -273,10 +272,8 @@ public final class World {
             }
         }, events: {
             if isNewComponent {
-                // Notify observers of addition
                 mutations.added(entity: Entity(id: entityID, world: self), component: component)
             } else {
-                // Notify observers of change
                 notifyChanged(entityID: entityID, component: component, oldValue: oldValue)
             }
         })
@@ -332,7 +329,6 @@ public final class World {
             let newSignature = location.signature.removing(typeID)
             moveEntity(entityID, from: location, to: newSignature, removingType: typeID)
         }, events: {
-            // Notify observers of removal
             mutations.removed(entity: Entity(id: entityID, world: self), component: value)
         })
 
@@ -362,18 +358,13 @@ public final class World {
         let archetype = Archetype(signature: signature, serial: lastArchetypeSerial)
         archetypes[signature] = archetype
 
-        // Invalidate all registered query caches when a new archetype is created
         queries.invalidateArchetypes()
 
         return archetype
     }
 
-    // Drop an archetype once its last entity leaves. The base empty-signature
-    // archetype is kept because it is the reusable home for component-less
-    // entities. Removal is result-invariant (an empty archetype matches nothing)
-    // and bumps the query generation so cached selections rebuild without it.
-    // Lazy sequences, snapshots, and typed references hold the archetype class
-    // directly, so a concurrent iteration keeps its own reference alive.
+    // Drops an archetype once its last entity leaves; the empty-signature base archetype is kept for component-less entities.
+    // Lazy sequences, snapshots, and typed references hold the archetype directly, so in-flight iteration stays valid.
     private func reclaimIfEmpty(_ archetype: Archetype) {
         guard archetype.signature != emptySignature, archetype.entities.isEmpty else {
             return
@@ -467,7 +458,7 @@ public final class World {
                 }
                 lastRunStatistics = execution.statistics
             }
-            // Advance time BEFORE systems run, so simulationTime represents "now"
+            // Time advances before systems run, so simulationTime is "now".
             if advancesTime {
                 simulationTime += deltaTime
             }

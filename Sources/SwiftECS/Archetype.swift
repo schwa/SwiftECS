@@ -27,8 +27,7 @@ struct ArchetypeSignature: Hashable {
     }
 }
 
-// Holds the archetype itself: looking it up by signature hashes and compares a Set of every component type, which
-// dominated per-entity access for entities with many components.
+// Holds the archetype so access skips hashing the full signature.
 /// Entity location within archetype storage.
 struct EntityLocation {
     let archetype: Archetype

@@ -1,10 +1,3 @@
-//
-//  ContentView.swift
-//  SwiftECSDemos
-//
-//  Created by Jonathan Wight.
-//
-
 import SwiftUI
 
 struct ContentView: View {
