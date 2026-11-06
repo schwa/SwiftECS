@@ -29,10 +29,13 @@ internal final class ParallelTaskState: Sendable {
     }
 
     func finish(error: (any Error)?) -> ParallelJobResult {
-        state.withLock {
-            $0.active = false
-            defer { $0.commands.removeAll(); $0.reservedIDs.removeAll() }
-            return ParallelJobResult(commands: error == nil ? $0.commands : [], reservedIDs: error == nil ? $0.reservedIDs : [], didWrite: false, error: error)
+        state.withLock { state in
+            state.active = false
+            defer {
+                state.commands.removeAll()
+                state.reservedIDs.removeAll()
+            }
+            return ParallelJobResult(commands: error == nil ? state.commands : [], reservedIDs: error == nil ? state.reservedIDs : [], didWrite: false, error: error)
         }
     }
 }
