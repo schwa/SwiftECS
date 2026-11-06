@@ -56,8 +56,22 @@ protocol AnyColumn: AnyObject {
 /// Typed column storage for one component type.
 @usableFromInline
 final class Column<T: Component>: AnyColumn {
-    @usableFromInline
-    init() {}
+    // Made in the inlinable init, so it is specialized for T wherever the column is created. swapRemove is called
+    // through AnyColumn, where the generic body would look up T's metadata on every call.
+    @usableFromInline let swapRemoveImplementation: (Column<T>, Int) -> Void
+
+    @inlinable
+    init() {
+        swapRemoveImplementation = { column, index in
+            column.withLock {
+                let last = column.storage.count - 1
+                if index < last {
+                    column.storage[index] = column.storage[last]
+                }
+                column.storage.removeLast()
+            }
+        }
+    }
 
     @usableFromInline
     var count: Int {
@@ -123,12 +137,7 @@ final class Column<T: Component>: AnyColumn {
 
     @usableFromInline
     func swapRemove(at index: Int) {
-        withLock {
-            if index < storage.count - 1 {
-                storage[index] = storage[storage.count - 1]
-            }
-            storage.removeLast()
-        }
+        swapRemoveImplementation(self, index)
     }
 
     @usableFromInline
