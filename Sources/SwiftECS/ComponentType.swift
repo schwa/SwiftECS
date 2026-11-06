@@ -7,7 +7,8 @@ public struct ComponentType: Hashable, Equatable, Sendable {
     // paths, so init does no string work.
     private let source: Source
 
-    private enum Source: Sendable {
+    // Metatypes are immutable, so sharing one across isolation domains is safe.
+    private enum Source: @unchecked Sendable {
         case type(any Component.Type)
         case name(String)
     }
