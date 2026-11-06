@@ -34,6 +34,27 @@ func createEntityFromRuntimeComponents() throws {
 }
 
 @Test
+func createEntityWithTypedInitializer() throws {
+    let world = World()
+    let types = [ComponentType(StableValue.self), ComponentType(StableTag.self)]
+    let first = EntityID()
+    let second = EntityID()
+    world.createEntity(id: first, types: types) { initializer in
+        initializer.set(StableValue(x: 1))
+        initializer.set(StableTag())
+    }
+    world.createEntity(id: second, types: types) { initializer in
+        initializer.set(StableTag())
+        initializer.set(StableValue(x: 2))
+    }
+    #expect(world[first]?[StableValue.self]?.x == 1)
+    #expect(world[second]?[StableValue.self]?.x == 2)
+    #expect(Set(world.snapshot(with: StableValue.self, StableTag.self).map(\.id)) == [first, second])
+    _ = try world.destroy(try #require(world[first]))
+    #expect(world[second]?[StableValue.self]?.x == 2)
+}
+
+@Test
 func componentRefReadsAndWritesTheEntity() throws {
     let world = World()
     let entity = world.createEntity(StableValue(x: 1))

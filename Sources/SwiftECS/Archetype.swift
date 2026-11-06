@@ -44,16 +44,26 @@ struct EntityLocation {
 }
 
 /// Type-erased column storage.
+@usableFromInline
 protocol AnyColumn: AnyObject {
     func swapRemove(at index: Int)
     func makeEmptyColumn() -> AnyColumn
     func copyValue(at sourceIndex: Int, to target: AnyColumn, at targetIndex: Int)
     func getValue(at index: Int) -> (any Component)?
+    var count: Int { get }
 }
 
 /// Typed column storage for one component type.
 @usableFromInline
 final class Column<T: Component>: AnyColumn {
+    @usableFromInline
+    init() {}
+
+    @usableFromInline
+    var count: Int {
+        withLock { storage.count }
+    }
+
     // ABI-visible for generic specialization; storage access goes through withLock.
     @usableFromInline let lock = ScopedLock()
     @usableFromInline var storage: ContiguousArray<T> = []
@@ -111,6 +121,7 @@ final class Column<T: Component>: AnyColumn {
         }
     }
 
+    @usableFromInline
     func swapRemove(at index: Int) {
         withLock {
             if index < storage.count - 1 {
@@ -120,15 +131,18 @@ final class Column<T: Component>: AnyColumn {
         }
     }
 
+    @usableFromInline
     func makeEmptyColumn() -> AnyColumn {
         Column<T>()
     }
 
+    @usableFromInline
     func copyValue(at sourceIndex: Int, to target: AnyColumn, at targetIndex: Int) {
         guard let targetColumn = target as? Column<T> else { return }
         targetColumn.insert(value(at: sourceIndex), at: targetIndex)
     }
 
+    @usableFromInline
     func getValue(at index: Int) -> (any Component)? {
         valueIfPresent(at: index)
     }
@@ -151,7 +165,7 @@ final class Archetype {
     // Never reused in a World, unlike the object's address after the archetype is reclaimed.
     let serial: UInt64
     @usableFromInline private(set) var entities: [EntityID] = []
-    internal var columns: [ComponentType: AnyColumn] = [:]
+    @usableFromInline internal var columns: [ComponentType: AnyColumn] = [:]
 
     init(signature: ArchetypeSignature, serial: UInt64) {
         self.signature = signature
@@ -162,6 +176,28 @@ final class Archetype {
         let index = entities.count
         entities.append(entityID)
         return index
+    }
+
+    // For serial World access only (no column lock), specialized at the caller; see World.createEntity(id:types:_:).
+    @inlinable
+    func setSerialComponent<T: Component>(_ value: T, at index: Int) {
+        let typeID = ComponentType(T.self)
+        let column: Column<T>
+        if let existing = columns[typeID] {
+            // swiftlint:disable:next force_cast
+            column = existing as! Column<T>
+        } else {
+            column = Column<T>()
+            columns[typeID] = column
+        }
+        if column.storage.count == index {
+            column.storage.append(value)
+        } else {
+            while column.storage.count <= index {
+                column.storage.append(value)
+            }
+            column.storage[index] = value
+        }
     }
 
     func setComponent<T: Component>(_ value: T, at index: Int) {

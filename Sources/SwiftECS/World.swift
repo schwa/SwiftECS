@@ -349,7 +349,7 @@ public final class World {
 
     // MARK: - Archetype Management (Private)
 
-    private func getOrCreateArchetype(_ signature: ArchetypeSignature) -> Archetype {
+    internal func getOrCreateArchetype(_ signature: ArchetypeSignature) -> Archetype {
         if let existing = archetypes[signature] {
             return existing
         }
