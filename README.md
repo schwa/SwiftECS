@@ -51,7 +51,27 @@ try world.addSystem(System("movement")
 try world.update(deltaTime: 1.0 / 60)
 ```
 
-See the [documentation](https://schwa.github.io/SwiftECS/documentation/swiftecs/) for queries, systems, parallel execution, relationships, and observation.
+## Performance
+
+The benchmark runs one movement system over 100,000 entities. Each cell is the time for one `world.update` in milliseconds. Lower is better.
+
+- **Rows:** the extra work that the system does for each entity, in addition to the movement. This work is a loop of `sin` and `cos` that stands in for real logic, such as steering or collision. One loop iteration takes about 10 ns.
+- **Columns:** "Serial" runs the system on one thread. The other columns run it as a parallel system with that many worker tasks.
+
+| Extra work per entity | Serial | 4 workers | 6 workers | 12 workers | 18 workers |
+|---|---:|---:|---:|---:|---:|
+| None | 8.6 | 9.7 | 5.8 | 5.4 | 4.2 |
+| ~0.1 µs (10 iterations) | 19.4 | 11.1 | 7.5 | 6.1 | 4.9 |
+| ~0.5 µs (50 iterations) | 59.4 | 19.2 | 13.1 | 9.8 | 7.7 |
+| ~2 µs (200 iterations) | 214.3 | 58.5 | 42.0 | 22.9 | 19.8 |
+
+Release build on an Apple M5 Max (6 performance cores and 12 efficiency cores).
+
+Parallel systems help when each entity does real work. For very light work, serial is about as fast. Run `just benchmark` to measure on your machine.
+
+## Documentation
+
+[SwiftECS documentation](https://schwa.github.io/SwiftECS/documentation/swiftecs/)
 
 ## License
 
