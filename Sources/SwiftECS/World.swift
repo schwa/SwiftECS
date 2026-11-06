@@ -79,7 +79,7 @@ public final class World {
         mutations.perform {
             let archetype = archetypes[emptySignature]!
             let index = archetype.addEntity(id)
-            entityLocations[id] = EntityLocation(signature: emptySignature, archetypeSerial: archetype.serial, index: index)
+            entityLocations[id] = EntityLocation(archetype: archetype, index: index)
             structuralRevision &+= 1
         }
         return Entity(id: id, world: self)
@@ -104,7 +104,7 @@ public final class World {
             let archetype = getOrCreateArchetype(signature)
             let index = archetype.addEntity(id)
             repeat archetype.setComponent(each components, at: index)
-            entityLocations[id] = EntityLocation(signature: signature, archetypeSerial: archetype.serial, index: index)
+            entityLocations[id] = EntityLocation(archetype: archetype, index: index)
             structuralRevision &+= 1
         }
         return Entity(id: id, world: self)
@@ -122,7 +122,7 @@ public final class World {
             for component in components {
                 archetype.setComponent(component, at: index)
             }
-            entityLocations[id] = EntityLocation(signature: signature, archetypeSerial: archetype.serial, index: index)
+            entityLocations[id] = EntityLocation(archetype: archetype, index: index)
             structuralRevision &+= 1
         }
         return Entity(id: id, world: self)
@@ -135,9 +135,10 @@ public final class World {
     /// Remove an entity.
     @discardableResult
     internal func removeEntity(_ id: EntityID) -> Bool {
-        guard let location = entityLocations[id], let archetype = archetypes[location.signature] else {
+        guard let location = entityLocations[id] else {
             return false
         }
+        let archetype = location.archetype
         let implementation = component(SystemDescriptor.self, for: id)?.implementation
         mutations.perform({
             entityLocations.removeValue(forKey: id)
@@ -165,17 +166,15 @@ public final class World {
     /// Clone an entity, creating a new entity with copies of all components.
     @discardableResult
     internal func cloneEntity(_ id: EntityID) -> Entity? {
-        guard component(SystemDescriptor.self, for: id) == nil, let location = entityLocations[id],
-              let sourceArchetype = archetypes[location.signature] else { return nil }
+        guard component(SystemDescriptor.self, for: id) == nil, let location = entityLocations[id] else { return nil }
+        let sourceArchetype = location.archetype
 
         let newID = generateUniqueEntityID()
         mutations.perform {
             let targetArchetype = getOrCreateArchetype(location.signature)
             let newIndex = targetArchetype.addEntity(newID)
             sourceArchetype.copyComponents(at: location.index, to: targetArchetype, targetIndex: newIndex)
-            entityLocations[newID] = EntityLocation(
-                signature: location.signature, archetypeSerial: targetArchetype.serial, index: newIndex
-            )
+            entityLocations[newID] = EntityLocation(archetype: targetArchetype, index: newIndex)
             structuralRevision &+= 1
             relationshipGraph.copyOutgoing(from: id, to: newID)
         }
@@ -249,9 +248,10 @@ public final class World {
 
     @usableFromInline
     internal func addComponent<T: Component>(_ component: T, to entityID: EntityID) {
-        guard let location = entityLocations[entityID], let archetype = archetypes[location.signature] else {
+        guard let location = entityLocations[entityID] else {
             return
         }
+        let archetype = location.archetype
         let typeID = ComponentType(T.self)
         let isNewComponent = !location.signature.contains(typeID)
         var oldValue: T?
@@ -280,9 +280,8 @@ public final class World {
     @usableFromInline
     internal func component<T: Component>(_ type: T.Type, for entityID: EntityID) -> T? {
         trackStorageAccess()
-        guard let location = entityLocations[entityID],
-              let archetype = archetypes[location.signature] else { return nil }
-        return archetype.getComponent(type, at: location.index)
+        guard let location = entityLocations[entityID] else { return nil }
+        return location.archetype.getComponent(type, at: location.index)
     }
 
     // Where an entity's components are stored. While it is unchanged, ComponentRefs made for the entity stay valid,
@@ -304,16 +303,15 @@ public final class World {
     public func componentRef<T: Component>(_ type: T.Type, for entityID: EntityID) -> ComponentRef<T>? {
         mutations.checkAccessible()
         guard let location = entityLocations[entityID],
-              let column = archetypes[location.signature]?.column(for: type) else { return nil }
+              let column = location.archetype.column(for: type) else { return nil }
         return ComponentRef(world: self, entityID: entityID, column: column, index: location.index)
     }
 
     /// Get all components for an entity.
     public func allComponents(for entityID: EntityID) -> [any Component] {
         trackStorageAccess()
-        guard let location = entityLocations[entityID],
-              let archetype = archetypes[location.signature] else { return [] }
-        return archetype.allComponents(at: location.index)
+        guard let location = entityLocations[entityID] else { return [] }
+        return location.archetype.allComponents(at: location.index)
     }
 
     @discardableResult
@@ -322,7 +320,7 @@ public final class World {
         let typeID = ComponentType(T.self)
 
         guard location.signature.contains(typeID) else { return nil }
-        guard let value = archetypes[location.signature]?.getComponent(type, at: location.index) else {
+        guard let value = location.archetype.getComponent(type, at: location.index) else {
             return nil
         }
         mutations.perform({
@@ -385,7 +383,7 @@ public final class World {
         to newSignature: ArchetypeSignature,
         addingComponent newComponent: T
     ) {
-        guard let oldArchetype = archetypes[oldLocation.signature] else { return }
+        let oldArchetype = oldLocation.archetype
         let newArchetype = getOrCreateArchetype(newSignature)
 
         let newIndex = newArchetype.addEntity(entityID)
@@ -396,7 +394,7 @@ public final class World {
             entityLocations[movedEntity]?.index = oldLocation.index
         }
 
-        entityLocations[entityID] = EntityLocation(signature: newSignature, archetypeSerial: newArchetype.serial, index: newIndex)
+        entityLocations[entityID] = EntityLocation(archetype: newArchetype, index: newIndex)
         structuralRevision &+= 1
         reclaimIfEmpty(oldArchetype)
     }
@@ -407,7 +405,7 @@ public final class World {
         to newSignature: ArchetypeSignature,
         removingType: ComponentType
     ) {
-        guard let oldArchetype = archetypes[oldLocation.signature] else { return }
+        let oldArchetype = oldLocation.archetype
         let newArchetype = getOrCreateArchetype(newSignature)
 
         let newIndex = newArchetype.addEntity(entityID)
@@ -417,7 +415,7 @@ public final class World {
             entityLocations[movedEntity]?.index = oldLocation.index
         }
 
-        entityLocations[entityID] = EntityLocation(signature: newSignature, archetypeSerial: newArchetype.serial, index: newIndex)
+        entityLocations[entityID] = EntityLocation(archetype: newArchetype, index: newIndex)
         structuralRevision &+= 1
         reclaimIfEmpty(oldArchetype)
     }

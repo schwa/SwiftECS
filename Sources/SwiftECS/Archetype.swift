@@ -27,11 +27,20 @@ struct ArchetypeSignature: Hashable {
     }
 }
 
+// Holds the archetype itself: looking it up by signature hashes and compares a Set of every component type, which
+// dominated per-entity access for entities with many components.
 /// Entity location within archetype storage.
 struct EntityLocation {
-    let signature: ArchetypeSignature
-    let archetypeSerial: UInt64
+    let archetype: Archetype
     var index: Int
+
+    var signature: ArchetypeSignature {
+        archetype.signature
+    }
+
+    var archetypeSerial: UInt64 {
+        archetype.serial
+    }
 }
 
 /// Type-erased column storage.
