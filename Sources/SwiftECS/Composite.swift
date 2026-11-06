@@ -39,10 +39,13 @@ extension Composite: Sendable where repeat each T: Sendable {
 extension Composite: Comparable where repeat each T: Comparable {
     public static func < (lhs: Self, rhs: Self) -> Bool {
         for (left, right) in repeat (each lhs.values, each rhs.values) {
-            guard left < right else {
+            if left < right {
+                return true
+            }
+            if right < left {
                 return false
             }
         }
-        return true
+        return false
     }
 }
