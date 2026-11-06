@@ -64,7 +64,9 @@ private func signature(_ types: ComponentType...) -> ArchetypeSignature {
     move.set(Velocity(dx: 1, dy: 0))
     // {Position} still holds `keep`, so it is not reclaimed.
     #expect(world.archetypes[signature(ComponentType(Position.self))] != nil)
-    #expect(world.snapshot(with: Position.self).map(\.id).sorted { $0 < $1 } == [keep.id, move.id].sorted { $0 < $1 })
+    let positionIDs: [EntityID] = world.snapshot(with: Position.self).map(\.id).sorted()
+    let expectedIDs: [EntityID] = [keep.id, move.id].sorted()
+    #expect(positionIDs == expectedIDs)
 }
 
 @Test func `registered queries stay correct across reclamation`() {

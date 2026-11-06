@@ -13,7 +13,9 @@ private enum Likes: Relationship {}
     try a.addRelationship(Likes.self, to: c)
     try c.addRelationship(Likes.self, to: b)
     #expect(a.targets(of: Likes.self).map(\.id) == [b.id, c.id])
-    #expect(b.sources(of: Likes.self).map(\.id).sorted { $0 < $1 } == [a.id, c.id].sorted { $0 < $1 })
+    let sources: [EntityID] = b.sources(of: Likes.self).map(\.id).sorted()
+    let expectedSources: [EntityID] = [a.id, c.id].sorted()
+    #expect(sources == expectedSources)
     // Removing one link updates both directions.
     #expect(try a.removeRelationship(Likes.self, to: b))
     #expect(a.targets(of: Likes.self).map(\.id) == [c.id])

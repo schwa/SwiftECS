@@ -24,7 +24,7 @@ A ``World`` stores entities. Each ``Entity`` holds a set of ``Component`` values
 - ``ComponentRef``
 - ``TypedEntityRef``
 
-### Systems
+### Systems and Scheduling
 
 - <doc:Systems>
 - ``System``
@@ -41,13 +41,13 @@ A ``World`` stores entities. Each ``Entity`` holds a set of ``Component`` values
 - ``ConcurrentComponent``
 - ``ParallelSystemInput``
 
-### Relationships
+### Entity Relationships
 
 - <doc:Relationships>
 - ``Relationship``
 - ``ChildOf``
 
-### Observation
+### Observing Changes
 
 - <doc:Observation>
 - ``ComponentEvent``
@@ -55,6 +55,6 @@ A ``World`` stores entities. Each ``Entity`` holds a set of ``Component`` values
 - ``RelationshipEvent``
 - ``ObservationToken``
 
-### Performance
+### Measurements
 
 - <doc:Performance>
