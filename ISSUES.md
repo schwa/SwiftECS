@@ -1385,3 +1385,27 @@ Timing: a macro that only adds to plain `Component` conformance can come after r
 Deferred: no current need. Struct-of-arrays is the only item that can change performance in a measurable way.
 
 ---
+
+## 51: No way for callers to see where update time is spent
+
++++
+status: new
+priority: medium
+kind: feature
+created: 2026-11-06T04:33:16Z
++++
+
+Calling code cannot find out where time goes during `world.update`. The only data available is `World.lastRunStatistics`, which counts systems, merges, commands, parallel batches, and tasks. It reports no durations.
+
+Questions an application cannot answer today:
+
+- How long each system takes per update.
+- How long schedule resolution takes compared with system execution.
+- How much of a parallel run goes to dispatch, worker execution, join, write-back, and command merges.
+- How long index or snapshot work takes compared with the main per-entity work.
+
+Example: the Boids demo shows only a total time per update. It cannot show which system, or which phase of the parallel run, is the slow part.
+
+Existing related notes: phase-level timing for parallel runs is mentioned as missing in #40 and #41, and in the Performance article.
+
+---
