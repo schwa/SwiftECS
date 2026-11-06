@@ -1,21 +1,32 @@
 import Foundation
 import SwiftECS
 
-struct Transform: Component {
+struct Transform: ConcurrentComponent {
     var x: Double
     var y: Double
     var z: Double
 }
 
-struct Physics: Component {
+struct Physics: ConcurrentComponent {
     var velocityX: Double
     var velocityY: Double
     var velocityZ: Double
 }
 
-func movementSystem(matching query: Query) -> System {
+// Stands in for per-entity logic such as steering or collision. Only x changes, so verification still holds.
+@inline(never)
+func simulatedWork(_ seed: Double, iterations: Int) -> Double {
+    var accumulator = seed
+    for _ in 0..<iterations {
+        accumulator = sin(accumulator) * 0.5 + cos(accumulator) * 0.5
+    }
+    return accumulator * 1e-12
+}
+
+func movementSystem(matching query: Query, work: Int) -> System {
     System("MovementSystem").query(Write<Transform>(), Read<Physics>(), matching: query).each { context, transform, physics in
         var value = transform.value
+        value.x += simulatedWork(value.x, iterations: work)
         value.x += physics.velocityX * context.deltaTime
         value.y += physics.velocityY * context.deltaTime
         value.z += physics.velocityZ * context.deltaTime
@@ -23,11 +34,25 @@ func movementSystem(matching query: Query) -> System {
     }
 }
 
-@MainActor func run() throws {
+func parallelMovementSystem(matching query: Query, work: Int) -> System {
+    System("MovementSystem").query(Write<Transform>(), Read<Physics>(), matching: query).eachParallel(minimumRowsPerTask: 4_096) { context, row in
+        let (transform, physics) = row.fields
+        var value = transform.value
+        value.x += simulatedWork(value.x, iterations: work)
+        value.x += physics.velocityX * context.deltaTime
+        value.y += physics.velocityY * context.deltaTime
+        value.z += physics.velocityZ * context.deltaTime
+        transform.value = value
+    }
+}
+
+@MainActor func run() async throws {
     let entityCount = Int(ProcessInfo.processInfo.environment["ECS_ENTITIES"] ?? "1000000") ?? 1_000_000
     let warmupFrames = 3
     let measuredFrames = Int(ProcessInfo.processInfo.environment["ECS_FRAMES"] ?? "20") ?? 20
     let rounds = Int(ProcessInfo.processInfo.environment["ECS_ROUNDS"] ?? "5") ?? 5
+    let parallelism = Int(ProcessInfo.processInfo.environment["ECS_PARALLELISM"] ?? "0") ?? 0
+    let work = Int(ProcessInfo.processInfo.environment["ECS_WORK"] ?? "0") ?? 0
     let deltaTime = 1.0 / 60
     precondition(entityCount > 0 && measuredFrames > 0 && rounds > 0)
 
@@ -39,19 +64,26 @@ func movementSystem(matching query: Query) -> System {
     }
     let query = Query(with: Transform.self, Physics.self)
     world.register(query)
-    try world.addSystem(movementSystem(matching: query))
+    try world.addSystem(parallelism > 0 ? parallelMovementSystem(matching: query, work: work) : movementSystem(matching: query, work: work))
+    func step() async throws {
+        if parallelism > 0 {
+            try await world.update(deltaTime: deltaTime, parallelism: parallelism)
+        } else {
+            try world.update(deltaTime: deltaTime)
+        }
+    }
     for _ in 0..<warmupFrames {
-        try world.update(deltaTime: deltaTime)
+        try await step()
     }
 
     let clock = ContinuousClock()
     var samples: [Double] = []
     for _ in 0..<rounds {
-        let duration = try clock.measure {
-            for _ in 0..<measuredFrames {
-                try world.update(deltaTime: deltaTime)
-            }
+        let start = clock.now
+        for _ in 0..<measuredFrames {
+            try await step()
         }
+        let duration = clock.now - start
         let seconds = Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
         samples.append(seconds * 1_000 / Double(measuredFrames))
     }
@@ -84,4 +116,4 @@ func verify(world: World, elapsed: Double, entityCount: Int) {
     precondition(correct, "verification failed")
 }
 
-try run()
+try await run()
