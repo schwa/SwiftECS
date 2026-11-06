@@ -1,5 +1,20 @@
 # SwiftECS
 
+A type-safe, archetype-based Entity Component System for Swift 6, with strict concurrency and parallel systems.
+
+## Features
+
+- Archetype storage with cached, typed queries built on parameter packs
+- Composable query predicates (`&&`, `||`, `!`), including relationship-based queries
+- Systems with phases, pipelines, dependencies, and deferred commands
+- Opt-in parallel systems, checked for data races at compile time
+- Entity relationships with hierarchies, cycle checks, and recursive deletion
+- Component, destroy, and relationship observers that report old and new values
+- SwiftUI Observation support, with batched notifications
+- Stable typed component references for hot loops
+
+## Requirements
+
 The package requires Swift 6.2 or later. Declared Apple deployment targets are macOS, iOS, and visionOS 26 or later.
 
 ## Usage
