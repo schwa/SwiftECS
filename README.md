@@ -1,6 +1,6 @@
 # SwiftECS
 
-The package requires Swift 6.4 or later, the minimum verified toolchain. Declared Apple deployment targets are macOS 14 and iOS 26 or later.
+The package requires Swift 6.2 or later. Declared Apple deployment targets are macOS, iOS, and visionOS 26 or later.
 
 ## Usage
 
@@ -455,12 +455,9 @@ Issues #39–#41 track further scaling measurements and overhead.
 
 ```sh
 ECS_RUN_MOVEMENT_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter MovementParallelBenchmarkTests
-fish Scripts/profile-movement.fish 1 600 6
-fish Scripts/profile-movement.fish 4 1600 6
 ```
 
-The profiler waits for the benchmark PID after warm-up and writes samples and logs to its printed `/tmp/swiftecs-profile.*` directory.
-Profiled timings are not benchmark comparisons. The earlier query-access and cost-isolation benchmarks remain available separately:
+The earlier query-access and cost-isolation benchmarks remain available separately:
 
 ```sh
 ECS_RUN_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter QueryPerformanceTests
