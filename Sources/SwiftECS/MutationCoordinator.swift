@@ -6,6 +6,9 @@ internal final class MutationCoordinator: Observable {
     private var revision: UInt64 = 0
     private var batchDepth = 0
     private var isDirty = false
+    // Observation trackers are one-shot and only registered through access(), so a publish with no access since the
+    // last one has nobody to notify and can skip the registrar.
+    private var accessedSincePublish = false
     private var nextTokenID: UInt64 = 0
     @usableFromInline var handlers: [ObjectIdentifier: [UInt64: AnyObserverHandler]] = [:]
     @usableFromInline let suspended = OwnerCell(false)
@@ -27,6 +30,7 @@ internal final class MutationCoordinator: Observable {
     @usableFromInline
     func access() {
         checkAccessible()
+        accessedSincePublish = true
         registrar.access(self, keyPath: \.revision)
     }
 
@@ -72,6 +76,11 @@ internal final class MutationCoordinator: Observable {
     }
 
     private func publish() {
+        guard accessedSincePublish else {
+            revision &+= 1
+            return
+        }
+        accessedSincePublish = false
         registrar.withMutation(of: self, keyPath: \.revision) {
             revision &+= 1
         }

@@ -111,6 +111,35 @@ func storageLocationChangesOnlyWhenTheEntityMoves() throws {
     #expect(world.storageLocation(of: second.id) == nil)
 }
 
+// Publishing skips the registrar when nothing accessed the World since the last publish; trackers must still fire.
+@Test
+func storageObservationStillFiresAfterSkippedPublishes() throws {
+    let world = World()
+    let entity = world.createEntity(StableValue(x: 1))
+    let ref = try #require(world.componentRef(StableValue.self, for: entity.id))
+    // Writes with nobody tracking.
+    ref.value.x = 2
+    ref.value.x = 3
+    let changes = ChangeCount()
+    withObservationTracking {
+        _ = entity[StableValue.self]
+    } onChange: {
+        changes.value += 1
+    }
+    ref.value.x = 4
+    #expect(changes.value == 1)
+    // The tracker is one-shot: later writes stay quiet until something tracks again.
+    ref.value.x = 5
+    #expect(changes.value == 1)
+    withObservationTracking {
+        _ = ref.value
+    } onChange: {
+        changes.value += 1
+    }
+    ref.value.x = 6
+    #expect(changes.value == 2)
+}
+
 @Test
 func structuralRevisionChangesOnlyOnStructuralChanges() {
     let world = World()
