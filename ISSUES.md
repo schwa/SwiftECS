@@ -1367,4 +1367,19 @@ Open questions:
 
 Expected: a decision, with reasons, on whether to add a macro.
 
+- `2026-11-06T03:42:07Z`: Possible gains from a macro (not measured):
+
+- Compile-time rejection of class components. Detection of reference-type stored properties is partial, because macros read syntax and cannot resolve types.
+- One attribute instead of separate `Component`, `ConcurrentComponent`, and `Sendable` conformances.
+- Stable component name strings, useful for debugging and for possible save/load or networking.
+- Struct-of-arrays storage with generated per-field columns. This could help memory-bandwidth-bound loops such as movement, but it is a large design change and the gain is unproven.
+- Per-field change tracking through generated accessors.
+- No expected gain for component type lookup. Type IDs are already `ObjectIdentifier` values, and a macro cannot assign sequential IDs across modules at compile time.
+
+Costs: a swift-syntax dependency for every user, more build time, and harder debugging.
+
+Timing: a macro that only adds to plain `Component` conformance can come after release without a breaking change. A macro that replaces the current way to declare components must be decided before the first public tag.
+
+Deferred: no current need. Struct-of-arrays is the only item that can change performance in a measurable way.
+
 ---
