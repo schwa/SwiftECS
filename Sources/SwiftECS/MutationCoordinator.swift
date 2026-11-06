@@ -7,7 +7,7 @@ internal final class MutationCoordinator: Observable {
     private var batchDepth = 0
     private var isDirty = false
     private var nextTokenID: UInt64 = 0
-    private var handlers: [ObjectIdentifier: [UInt64: AnyObserverHandler]] = [:]
+    @usableFromInline var handlers: [ObjectIdentifier: [UInt64: AnyObserverHandler]] = [:]
     @usableFromInline let suspended = OwnerCell(false)
     @inlinable var isParallelSuspended: Bool {
         get { suspended.value }
@@ -200,13 +200,16 @@ internal final class MutationCoordinator: Observable {
         notify(T.self) { $0.handler(.removed(entity, component)) }
     }
 
-    @usableFromInline
+    // Inlinable, so the per-write path (ComponentRef.value) dispatches with code specialized for T instead of looking
+    // up generic metadata on every write.
+    @inlinable
     func changed<T: Component>(entity: Entity, component: T) {
         notify(T.self) { $0.handler(.changed(entity, component)) }
     }
 
+    @inlinable
     @inline(__always)
-    private func notify<T: Component>(_ type: T.Type, _ body: (ObserverHandler<T>) -> Void) {
+    func notify<T: Component>(_ type: T.Type, _ body: (ObserverHandler<T>) -> Void) {
         guard !handlers.isEmpty, let subscribers = handlers[ObjectIdentifier(type)] else {
             return
         }

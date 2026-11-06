@@ -38,6 +38,7 @@ public enum RelationshipEvent: Hashable, Sendable {
 }
 
 /// Type-erased observer handler.
+@usableFromInline
 protocol AnyObserverHandler: AnyObject {
     func notifyAdded(entity: Entity, component: any Component)
     func notifyRemoved(entity: Entity, component: any Component)
@@ -45,23 +46,27 @@ protocol AnyObserverHandler: AnyObject {
 }
 
 /// Typed observer handler.
+@usableFromInline
 final class ObserverHandler<T: Component>: AnyObserverHandler {
-    let handler: (ComponentEvent<T>) -> Void
+    @usableFromInline let handler: (ComponentEvent<T>) -> Void
 
     init(handler: @escaping (ComponentEvent<T>) -> Void) {
         self.handler = handler
     }
 
+    @usableFromInline
     func notifyAdded(entity: Entity, component: any Component) {
         guard let typed = component as? T else { return }
         handler(.added(entity, typed))
     }
 
+    @usableFromInline
     func notifyRemoved(entity: Entity, component: any Component) {
         guard let typed = component as? T else { return }
         handler(.removed(entity, typed))
     }
 
+    @usableFromInline
     func notifyChanged(entity: Entity, component: any Component) {
         guard let typed = component as? T else { return }
         handler(.changed(entity, typed))
