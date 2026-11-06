@@ -190,31 +190,30 @@ internal final class MutationCoordinator: Observable {
         }
     }
 
+    // Handlers are stored by T's type id, so each is an ObserverHandler<T>. A class downcast to it avoids boxing the
+    // component as `any Component` and casting it back, which allocated for large components on every write.
     func added<T: Component>(entity: Entity, component: T) {
-        guard !handlers.isEmpty, let subscribers = handlers[ObjectIdentifier(T.self)] else {
-            return
-        }
-        for handler in subscribers.values {
-            handler.notifyAdded(entity: entity, component: component)
-        }
+        notify(T.self) { $0.handler(.added(entity, component)) }
     }
 
     func removed<T: Component>(entity: Entity, component: T) {
-        guard !handlers.isEmpty, let subscribers = handlers[ObjectIdentifier(T.self)] else {
-            return
-        }
-        for handler in subscribers.values {
-            handler.notifyRemoved(entity: entity, component: component)
-        }
+        notify(T.self) { $0.handler(.removed(entity, component)) }
     }
 
     @usableFromInline
     func changed<T: Component>(entity: Entity, component: T) {
-        guard !handlers.isEmpty, let subscribers = handlers[ObjectIdentifier(T.self)] else {
+        notify(T.self) { $0.handler(.changed(entity, component)) }
+    }
+
+    @inline(__always)
+    private func notify<T: Component>(_ type: T.Type, _ body: (ObserverHandler<T>) -> Void) {
+        guard !handlers.isEmpty, let subscribers = handlers[ObjectIdentifier(type)] else {
             return
         }
         for handler in subscribers.values {
-            handler.notifyChanged(entity: entity, component: component)
+            if let typed = handler as? ObserverHandler<T> {
+                body(typed)
+            }
         }
     }
 }
