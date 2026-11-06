@@ -113,3 +113,84 @@ import Testing
     world.dump()
     #expect(world.dumpString().contains("Position"))
 }
+
+@Test func `predicate operators flatten nested groups`() {
+    let position = QueryPredicate.contains(Position.self)
+    let velocity = QueryPredicate.contains(Velocity.self)
+    let health = QueryPredicate.contains(Health.self)
+    #expect(((position && velocity) && (health && position)) == .and([position, velocity, health, position]))
+    #expect((position && (velocity && health)) == .and([position, velocity, health]))
+    #expect(((position || velocity) || (health || position)) == .or([position, velocity, health, position]))
+    #expect((position || (velocity || health)) == .or([position, velocity, health]))
+}
+
+@Test func `removed relationship observers stop receiving events`() throws {
+    let world = World()
+    var events: [RelationshipEvent] = []
+    let token = world.observeRelationship(ChildOf.self) { events.append($0) }
+    let parent = world.createEntity()
+    let first = world.createEntity()
+    let second = world.createEntity()
+    try first.setParent(parent)
+    world.removeObserver(token)
+    try second.setParent(parent)
+    #expect(events == [.added(source: first.id, target: parent.id)])
+}
+
+@Test func `dependencies on non-system entities are rejected`() throws {
+    let world = World()
+    let system = try world.addSystem(System("system").run { _ in })
+    let stranger = world.createEntity()
+    try system.addRelationship(DependsOn.self, to: stranger)
+    let expected = SystemError.invalidDependency(source: system.id, target: stranger.id)
+    #expect(throws: expected) { try world.update(deltaTime: 0) }
+    #expect(expected.description.contains("Invalid scheduling dependency"))
+}
+
+private final class ReferenceComponent: Component {}
+
+@Test func `system commands reject reference components`() throws {
+    let world = World()
+    let entity = world.createEntity()
+    #expect(throws: SystemError.referenceComponent(ComponentType(ReferenceComponent.self))) {
+        try world.run(System("set").run(Commands()) { _, commands in
+            try commands.set(ReferenceComponent(), on: entity.id)
+        }, deltaTime: 0)
+    }
+    #expect(throws: SystemError.referenceComponent(ComponentType(ReferenceComponent.self))) {
+        try world.run(System("create").run(Commands()) { _, commands in
+            try commands.create(ReferenceComponent())
+        }, deltaTime: 0)
+    }
+}
+
+@Test func `parallel component commands fail for destroyed targets`() async throws {
+    let world = World()
+    world.createEntity(ConcurrentHealth(value: 0))
+    let missing = EntityID()
+    let system = System("set").query(Read<ConcurrentHealth>()).eachParallel(EditComponent<ConcurrentHealth>()) { _, _, health in
+        try health.set(ConcurrentHealth(value: 1), on: missing)
+    }
+    await #expect(throws: SystemError.missingCommandEntity(missing)) {
+        try await world.run(system, deltaTime: 0, parallelism: 2)
+    }
+}
+
+@Test func `removing a component from a non-last entity keeps the moved entity addressable`() {
+    let world = World()
+    let first = world.createEntity(Position(x: 1, y: 0), Health(current: 1))
+    let second = world.createEntity(Position(x: 2, y: 0), Health(current: 2))
+    #expect(first.remove(Health.self)?.current == 1)
+    #expect(second[Health.self]?.current == 2)
+    #expect(second[Position.self]?.x == 2)
+    #expect(first[Position.self]?.x == 1)
+}
+
+@Test func `typed creation keeps the last value when a component is set twice`() {
+    let world = World()
+    let entity = world.createEntity(id: EntityID(), types: [ComponentType(Health.self)]) { initializer in
+        initializer.set(Health(current: 1))
+        initializer.set(Health(current: 2))
+    }
+    #expect(entity[Health.self]?.current == 2)
+}

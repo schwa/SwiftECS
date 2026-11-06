@@ -94,15 +94,14 @@ extension World {
         let selectedIDs = Set(selected.map(\.id))
         var dependencies: [EntityID: Set<EntityID>] = [:]
         var phaseMembers: [EntityID: Set<EntityID>] = [:]
-        for entity in selected {
-            guard let descriptor = entity[SystemDescriptor.self] else {
-                continue
-            }
+        var phases: [(entityID: EntityID, phase: Entity)] = []
+        for (entity, descriptor) in selected.compactMap({ entity in entity[SystemDescriptor.self].map { (entity, $0) } }) {
             let memberships = entity.targets(of: InPhase.self)
             guard let phase = memberships.first, memberships.count == 1 else {
                 throw SystemError.missingPhase(descriptor.id)
             }
             try validatePhase(phase)
+            phases.append((entity.id, phase))
             phaseMembers[phase.id, default: []].insert(entity.id)
             dependencies[entity.id] = []
             for target in entity.targets(of: DependsOn.self) {
@@ -122,12 +121,9 @@ extension World {
         var visited: Set<EntityID> = []
         var active: Set<EntityID> = []
         var ancestors: [EntityID: Set<EntityID>] = [:]
-        for entity in selected {
-            guard let phase = entity.targets(of: InPhase.self).first else {
-                continue
-            }
+        for (entityID, phase) in phases {
             for predecessor in try phaseAncestors(of: phase, visited: &visited, active: &active, ancestors: &ancestors) {
-                dependencies[entity.id, default: []].formUnion(phaseMembers[predecessor] ?? [])
+                dependencies[entityID, default: []].formUnion(phaseMembers[predecessor] ?? [])
             }
         }
 

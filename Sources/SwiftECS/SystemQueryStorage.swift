@@ -14,8 +14,6 @@ internal struct SystemQueryStorage<each Value: Component> {
         self.usesDenseIndices = usesDenseIndices
     }
 
-    @inlinable var count: Int { matchingIndices?.count ?? ids.count }
-
     init(archetype: Archetype, filter: QueryPredicate?, world: World) {
         buffers = (repeat Optional<TaskColumn<each Value>>.none)
         usesDenseIndices = false
