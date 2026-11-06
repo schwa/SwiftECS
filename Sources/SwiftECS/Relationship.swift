@@ -11,6 +11,8 @@ public protocol Relationship {
 }
 
 extension Relationship {
+    /// By default, a source can link to many targets.
     public static var isExclusive: Bool { false }
+    /// By default, cycles are allowed.
     public static var isAcyclic: Bool { false }
 }

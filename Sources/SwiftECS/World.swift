@@ -85,7 +85,9 @@ public final class World {
     public func createEntity() -> Entity {
         let id = generateUniqueEntityID()
         mutations.perform {
-            let archetype = archetypes[emptySignature]!
+            guard let archetype = archetypes[emptySignature] else {
+                preconditionFailure("The empty-signature archetype is never reclaimed")
+            }
             let index = archetype.addEntity(id)
             entityLocations[id] = EntityLocation(archetype: archetype, index: index)
             structuralRevision &+= 1

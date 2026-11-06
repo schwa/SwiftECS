@@ -1,0 +1,3 @@
+disabled_rules:
+  # A failed unwrap in a test is a test failure.
+  - force_unwrapping

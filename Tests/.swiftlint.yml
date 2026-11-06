@@ -1,5 +1,7 @@
 disabled_rules:
   # Tests assert exact counts, including scalar notification counters.
   - empty_count
+  # A failed unwrap in a test is a test failure.
+  - force_unwrapping
   # Suites group related cases; their total size is not a useful limit.
   - type_body_length

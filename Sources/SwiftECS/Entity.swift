@@ -65,7 +65,14 @@ public struct Entity: Identifiable {
                 return nil
             }
         }
-        return Composite(repeat world.component((each T).self, for: id)!)
+        return Composite(repeat requiredComponent((each T).self))
+    }
+
+    private func requiredComponent<T: Component>(_ type: T.Type) -> T {
+        guard let component = world.component(type, for: id) else {
+            preconditionFailure("Component \(type) is missing after the existence check")
+        }
+        return component
     }
 
     /// Set multiple components from a Composite.

@@ -11,11 +11,7 @@ public struct EntityID: Hashable, Equatable, Sendable {
 
     /// Create a new random entity ID.
     public init() {
-        var value: UInt64 = 0
-        withUnsafeMutableBytes(of: &value) { buffer in
-            arc4random_buf(buffer.baseAddress!, buffer.count)
-        }
-        self.value = value
+        value = UInt64.random(in: .min ... .max)
     }
 }
 

@@ -267,7 +267,7 @@ struct StressTests {
         let world = World()
 
         for i in 0..<100_000 {
-            if i % 2 == 0 {
+            if i.isMultiple(of: 2) {
                 world.createEntity(Position(x: Double(i), y: 0))
             } else {
                 world.createEntity(
