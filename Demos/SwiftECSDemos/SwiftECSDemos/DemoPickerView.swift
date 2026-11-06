@@ -1,9 +1,10 @@
+import BoidsSupport
 import SurvivalSupport
 import SwiftUI
 
 struct DemoPickerView: View {
     private enum Demo: Hashable {
-        case survivors
+        case survivors, boids
     }
 
     var body: some View {
@@ -20,6 +21,14 @@ struct DemoPickerView: View {
                     .frame(maxWidth: .infinity)
                     .padding()
                 }
+                NavigationLink(value: Demo.boids) {
+                    VStack {
+                        Text("Boids").font(.title2.bold())
+                        Text("Thousands of flocking boids, updated by a parallel system.")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                }
             }
             .buttonStyle(.bordered)
             .tint(.mint)
@@ -32,6 +41,9 @@ struct DemoPickerView: View {
                 case .survivors:
                     SurvivalView()
                         .navigationTitle("Midnight Survivors")
+                case .boids:
+                    BoidsView()
+                        .navigationTitle("Boids")
                 }
             }
         }

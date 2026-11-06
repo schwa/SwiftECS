@@ -7,12 +7,24 @@ let package = Package(
     platforms: [.macOS(.v26), .iOS(.v26), .visionOS(.v26)],
     products: [
         .library(
+            name: "BoidsSupport",
+            targets: ["BoidsSupport"]
+        ),
+        .library(
             name: "SurvivalSupport",
             targets: ["SurvivalSupport"]
         )
     ],
     dependencies: [.package(name: "SwiftECS", path: "../../../..")],
     targets: [
+        .target(
+            name: "BoidsSupport",
+            dependencies: [.product(name: "SwiftECS", package: "SwiftECS")]
+        ),
+        .testTarget(
+            name: "BoidsSupportTests",
+            dependencies: ["BoidsSupport"]
+        ),
         .target(
             name: "SurvivalSupport",
             dependencies: [.product(name: "SwiftECS", package: "SwiftECS")]

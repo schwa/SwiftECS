@@ -4,3 +4,6 @@ container = "SwiftECS"
 
 [defaults.test]
 scheme = "SwiftECS"
+
+[defaults.run]
+scheme = "SwiftECSDemos"
