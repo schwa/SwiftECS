@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		451594952F64AAE8005F944D /* StarfallSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 451594942F64AAE8005F944D /* StarfallSupport */; };
 		AF30CB7991F1472583FE9470 /* SurvivalSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 1A1D817CF67F45EDAD709A28 /* SurvivalSupport */; };
 /* End PBXBuildFile section */
 
@@ -66,7 +65,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				451594952F64AAE8005F944D /* StarfallSupport in Frameworks */,
 				AF30CB7991F1472583FE9470 /* SurvivalSupport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -114,7 +112,6 @@
 			);
 			name = SwiftECSDemos;
 			packageProductDependencies = (
-				451594942F64AAE8005F944D /* StarfallSupport */,
 				1A1D817CF67F45EDAD709A28 /* SurvivalSupport */,
 			);
 			productName = SwiftECSDemos;
@@ -234,10 +231,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		451594942F64AAE8005F944D /* StarfallSupport */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = StarfallSupport;
-		};
 		1A1D817CF67F45EDAD709A28 /* SurvivalSupport */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SurvivalSupport;

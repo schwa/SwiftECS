@@ -409,7 +409,7 @@ Successful batches merge in schedule order, never completion order. An earlier m
 
 ### Parallel validation and measurements
 
-Starfall movement and collision opt into parallel eligibility. Its stateful spawner and Survival stages retain serial fallback.
+The Survival demo stages retain serial fallback.
 Demo UI ticks remain synchronous because their views read the live world. Async UI simulation needs isolated render snapshots, tracked separately in issue #15.
 
 ```sh

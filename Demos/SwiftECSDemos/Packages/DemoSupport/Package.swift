@@ -7,10 +7,6 @@ let package = Package(
     platforms: [.macOS(.v26), .iOS(.v26), .visionOS(.v26)],
     products: [
         .library(
-            name: "StarfallSupport",
-            targets: ["StarfallSupport"]
-        ),
-        .library(
             name: "SurvivalSupport",
             targets: ["SurvivalSupport"]
         )
@@ -18,16 +14,8 @@ let package = Package(
     dependencies: [.package(name: "SwiftECS", path: "../../../..")],
     targets: [
         .target(
-            name: "StarfallSupport",
-            dependencies: [.product(name: "SwiftECS", package: "SwiftECS")]
-        ),
-        .target(
             name: "SurvivalSupport",
             dependencies: [.product(name: "SwiftECS", package: "SwiftECS")]
-        ),
-        .testTarget(
-            name: "StarfallSupportTests",
-            dependencies: ["StarfallSupport"]
         ),
         .testTarget(
             name: "SurvivalSupportTests",

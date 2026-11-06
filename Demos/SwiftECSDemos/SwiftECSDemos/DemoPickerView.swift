@@ -1,10 +1,9 @@
-import StarfallSupport
 import SurvivalSupport
 import SwiftUI
 
 struct DemoPickerView: View {
     private enum Demo: Hashable {
-        case starfall, survivors
+        case survivors
     }
 
     var body: some View {
@@ -12,15 +11,6 @@ struct DemoPickerView: View {
             VStack {
                 Text("ECS Arcade").font(.largeTitle.bold())
                 Text("Pick a game").foregroundStyle(.secondary)
-                NavigationLink(value: Demo.starfall) {
-                    VStack {
-                        Text("🌠").font(.largeTitle)
-                        Text("Starfall").font(.title2.bold())
-                        Text("Catch stars. Dodge meteors.")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                }
                 NavigationLink(value: Demo.survivors) {
                     VStack {
                         Text("🧙✨🧟").font(.largeTitle)
@@ -39,9 +29,6 @@ struct DemoPickerView: View {
             .background(Color(red: 0.025, green: 0.035, blue: 0.07))
             .navigationDestination(for: Demo.self) { demo in
                 switch demo {
-                case .starfall:
-                    StarfallView()
-                        .navigationTitle("Starfall")
                 case .survivors:
                     SurvivalView()
                         .navigationTitle("Midnight Survivors")
