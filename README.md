@@ -19,6 +19,12 @@ A type-safe, archetype-based Entity Component System for Swift 6, with strict co
 
 The package requires Swift 6.2 or later. Declared Apple deployment targets are macOS, iOS, and visionOS 26 or later.
 
+## Installation
+
+```swift
+.package(url: "https://github.com/schwa/SwiftECS", from: "0.1.0")
+```
+
 ## Usage
 
 Components are plain structs. Entities hold components. Systems query entities and update them each frame.
@@ -45,7 +51,7 @@ try world.addSystem(System("movement")
 try world.update(deltaTime: 1.0 / 60)
 ```
 
-See the DocC catalog in `Sources/SwiftECS/Documentation.docc` for queries, systems, parallel execution, relationships, and observation.
+See the [documentation](https://schwa.github.io/SwiftECS/documentation/swiftecs/) for queries, systems, parallel execution, relationships, and observation.
 
 ## License
 
