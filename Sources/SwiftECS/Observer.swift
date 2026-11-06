@@ -23,17 +23,22 @@ public struct ObservationToken: Hashable {
     var kind: Kind = .component
 }
 
-/// A component value replaced by a serial write. Parallel write-back is not reported, as with `ComponentEvent`.
+/// A component value replaced by a serial write. Parallel write-back is not reported, as with ``ComponentEvent``.
 public struct ComponentChange<T: Component> {
+    /// The entity whose component changed.
     public let entity: Entity
+    /// The value before the write.
     public let oldValue: T
+    /// The value after the write.
     public let newValue: T
 }
 
 /// A relationship edge added or removed. Not reported: edges removed because an entity was destroyed (observe that
-/// with `World.observeDestroyed(_:)`) and edges copied by `World.clone(_:)`.
+/// with ``World/observeDestroyed(_:)``) and edges copied by ``World/clone(_:)``.
 public enum RelationshipEvent: Hashable, Sendable {
+    /// A link from the source to the target was added.
     case added(source: EntityID, target: EntityID)
+    /// A link from the source to the target was removed.
     case removed(source: EntityID, target: EntityID)
 }
 

@@ -1,4 +1,8 @@
+/// A cached reference to one component of one entity, for fast repeated access.
+///
+/// A reference is valid until ``World/structuralRevision`` changes. Get one with ``World/componentRef(_:for:)``.
 public struct ComponentRef<Value: Component> {
+    /// The entity that owns the component.
     public let entityID: EntityID
     @usableFromInline internal let world: World
     @usableFromInline internal let column: Column<Value>
@@ -12,7 +16,7 @@ public struct ComponentRef<Value: Component> {
         self.index = index
     }
 
-    // Reads without registering Observation access on the World, for callers that do their own observation.
+    /// The component value, read without registering Observation access on the world.
     @inlinable
     public var untrackedValue: Value {
         world.mutations.checkAccessible()
@@ -20,6 +24,7 @@ public struct ComponentRef<Value: Component> {
     }
 
     // Both accessors check that no parallel run is active first, so they skip the column lock (#49).
+    /// The component value. Reads register Observation access, and writes notify change observers.
     @inlinable
     public var value: Value {
         get {

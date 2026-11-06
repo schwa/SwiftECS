@@ -1,3 +1,4 @@
+/// An iterator over system query rows.
 public struct SystemOutputIterator<each Output>: IteratorProtocol {
     @usableFromInline internal let storage: [BoundSystemBatch<repeat each Output>]
     @usableFromInline internal let scope: SystemScope

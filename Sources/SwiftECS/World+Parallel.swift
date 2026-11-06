@@ -1,4 +1,11 @@
 extension World {
+    /// Runs the default pipeline with parallel-eligible systems on worker tasks, then advances simulation time.
+    ///
+    /// - Parameters:
+    ///   - deltaTime: The time step, in seconds.
+    ///   - parallelism: The maximum number of concurrent worker tasks. Must be positive.
+    ///   - isolation: The actor that owns the world.
+    /// - Throws: ``SystemError`` for an invalid schedule or parallelism, or an error from a system callback.
     public func update(deltaTime: Double, parallelism: Int, isolation: isolated (any Actor)? = #isolation) async throws {
         try validateParallelRun(parallelism)
         let pipeline = defaultPipeline
@@ -7,6 +14,7 @@ extension World {
         try await executeParallel(schedule, configuration: configuration, isolation: isolation)
     }
 
+    /// Runs the pipeline with parallel-eligible systems on worker tasks. Does not advance simulation time.
     public func run(_ pipeline: Pipeline, deltaTime: Double, parallelism: Int, isolation: isolated (any Actor)? = #isolation) async throws {
         try validateParallelRun(parallelism)
         let schedule = try resolveSchedule(pipeline)
@@ -14,6 +22,7 @@ extension World {
         try await executeParallel(schedule, configuration: configuration, isolation: isolation)
     }
 
+    /// Runs one unregistered system, on worker tasks if it is parallel-eligible.
     public func run(_ system: System, deltaTime: Double, parallelism: Int, isolation: isolated (any Actor)? = #isolation) async throws {
         try validateParallelRun(parallelism)
         try system.validate()
@@ -23,6 +32,9 @@ extension World {
         try await executeParallel([entry], configuration: configuration, isolation: isolation)
     }
 
+    /// Runs the pipeline stored on the entity with parallel-eligible systems on worker tasks.
+    ///
+    /// - Throws: ``SystemError/invalidPipeline(_:)`` if the entity has no ``Pipeline``.
     public func run(_ pipeline: Entity, deltaTime: Double, parallelism: Int, isolation: isolated (any Actor)? = #isolation) async throws {
         try validateParallelRun(parallelism)
         try validateRelationshipEntity(pipeline)

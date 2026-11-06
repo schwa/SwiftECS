@@ -1,3 +1,4 @@
+/// The entities that match a typed query. Created by ``World/query(_:matching:)``.
 public struct TypedQuerySequence<each Value: Component>: Sequence {
     internal let world: World
     internal let storage: [TypedQueryStorage<repeat each Value>]
@@ -36,6 +37,9 @@ internal final class TypedQueryStorage<each Value: Component> {
 extension World {
     // Pack expansions use types; SwiftLint does not recognize the reference.
     // swiftlint:disable unused_parameter
+    /// Returns the entities that have all the given component types and match the filter.
+    ///
+    /// Component types must be distinct.
     public func query<each Value: Component>(_ types: repeat (each Value).Type, matching query: Query = .all) -> TypedQuerySequence<repeat each Value> {
         trackStorageAccess()
         var requiredTypes = Set<ComponentType>()

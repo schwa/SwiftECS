@@ -1,4 +1,6 @@
+/// An input that permits deferred sets and removals of one component type.
 public struct EditComponent<Value: Component>: SystemInput {
+    /// Creates the input.
     public init() {}
 
     public var binding: SystemBinding<ComponentCommands<Value>> {

@@ -15,6 +15,7 @@ public final class World {
     internal var parallelRunActive = false
     @ObservationIgnored
     internal var reservedCommandIDs: Set<EntityID> = []
+    /// Counts from the most recent completed run. Not observable.
     @ObservationIgnored
     public internal(set) var lastRunStatistics = PipelineRunStatistics()
     @ObservationIgnored
@@ -22,8 +23,9 @@ public final class World {
     @ObservationIgnored
     @usableFromInline internal let revisionCell = OwnerCell<UInt64>(0)
 
-    // Changes whenever an entity is created, destroyed, or gains or loses a component type, so a cached
-    // ComponentRef may point at the wrong row. Value writes do not change it.
+    /// A counter that changes when an entity is created, destroyed, or gains or loses a component type.
+    ///
+    /// A ``ComponentRef`` may point at the wrong row after it changes. Value writes do not change it.
     @inlinable public internal(set) var structuralRevision: UInt64 {
         get { revisionCell.value }
         set { revisionCell.value = newValue }
@@ -60,6 +62,7 @@ public final class World {
     /// This is observable and updates once per `update()` call.
     public private(set) var simulationTime: Double = 0.0
 
+    /// The pipeline that `update(deltaTime:)` runs.
     public var defaultPipeline = Pipeline()
 
     /// Create an empty world.
@@ -96,7 +99,9 @@ public final class World {
         createEntity(id: generateUniqueEntityID(), repeat each components)
     }
 
-    // Traps if `id` is already in use.
+    /// Creates an entity with the given ID and components.
+    ///
+    /// - Precondition: `id` is not in use.
     @discardableResult
     public func createEntity<each T: Component>(id: EntityID, _ components: repeat each T) -> Entity {
         precondition(entityLocations[id] == nil, "Entity ID already exists")
@@ -115,7 +120,9 @@ public final class World {
         return Entity(id: id, world: self)
     }
 
-    // For callers that only know their components at run time. Traps if `id` is in use or a type repeats.
+    /// Creates an entity from components known only at run time.
+    ///
+    /// - Precondition: `id` is not in use, and no component type repeats.
     @discardableResult
     public func createEntity(id: EntityID, components: [any Component]) -> Entity {
         precondition(entityLocations[id] == nil, "Entity ID already exists")
@@ -286,13 +293,16 @@ public final class World {
         return location.archetype.getComponent(type, at: location.index)
     }
 
-    // Where an entity's components are stored. While it is unchanged, ComponentRefs made for the entity stay valid,
-    // even if `structuralRevision` changed because of other entities. Nil if the entity does not exist.
+    /// Where an entity's components are stored.
+    ///
+    /// While it is unchanged, ``ComponentRef`` values for the entity stay valid, even if `structuralRevision` changed
+    /// because of other entities.
     public struct StorageLocation: Equatable, Sendable {
         let archetypeSerial: UInt64
         let index: Int
     }
 
+    /// Returns where the entity's components are stored, or `nil` if it does not exist.
     public func storageLocation(of entityID: EntityID) -> StorageLocation? {
         mutations.checkAccessible()
         guard let location = entityLocations[entityID] else {
@@ -301,7 +311,9 @@ public final class World {
         return StorageLocation(archetypeSerial: location.archetypeSerial, index: location.index)
     }
 
-    // Valid until `structuralRevision` changes. Finding the ref is not observed; reading `value` is.
+    /// Returns a reference to the entity's component, or `nil` if either is absent.
+    ///
+    /// The reference is valid until `structuralRevision` changes. Getting it is not observed; reading its value is.
     public func componentRef<T: Component>(_ type: T.Type, for entityID: EntityID) -> ComponentRef<T>? {
         mutations.checkAccessible()
         guard let location = entityLocations[entityID],
@@ -420,7 +432,7 @@ public final class World {
     // MARK: - System Management
 
     /// Update all systems in dependency order.
-    /// - Throws: `SystemError` if dependencies cannot be resolved.
+    /// - Throws: ``SystemError`` if dependencies cannot be resolved.
     public func update(deltaTime: Double) throws {
         try execute(defaultPipeline, deltaTime: deltaTime, advancesTime: true)
     }

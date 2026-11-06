@@ -1,8 +1,12 @@
 extension World {
+    /// Returns the entity for the system ID, including unresolved forward references.
     public func systemEntity(for id: SystemID) -> Entity? {
         snapshot(with: SystemDescriptor.self).first { $0[SystemDescriptor.self]?.id == id }
     }
 
+    /// Creates a phase that runs after the given phases.
+    ///
+    /// - Throws: ``SystemError/invalidPhase(_:)`` if a predecessor is not a phase.
     @discardableResult
     public func createPhase(_ name: String, after predecessors: [Entity] = []) throws -> Entity {
         for predecessor in predecessors {
@@ -17,6 +21,19 @@ extension World {
         }
     }
 
+    /// Registers a system and calls its initialize hook.
+    ///
+    /// `dependencies`, `before`, and `after` may name systems that are not registered yet.
+    ///
+    /// - Parameters:
+    ///   - system: The system to register.
+    ///   - id: The registration ID. Defaults to the system's ID.
+    ///   - dependencies: Systems that must run first. Same as `after`.
+    ///   - phase: The phase to run in. Defaults to a lazily created phase named `Update`.
+    ///   - before: Systems that must run after this one.
+    ///   - after: Systems that must run before this one.
+    /// - Returns: The system entity.
+    /// - Throws: ``SystemError`` if the ID is taken, the phase is invalid, or an input is invalid.
     @discardableResult
     public func addSystem(_ system: System, id: SystemID? = nil, dependencies: [SystemID] = [], phase: Entity? = nil, before: [SystemID] = [], after: [SystemID] = []) throws -> Entity {
         try system.validate()
@@ -50,6 +67,7 @@ extension World {
         }
     }
 
+    /// Removes every system and unresolved system reference. Phases and pipelines remain.
     public func removeAllSystems() {
         mutations.batch {
             let entities = snapshot(with: SystemDescriptor.self)
@@ -60,16 +78,23 @@ extension World {
         }
     }
 
+    /// Runs one system without registering it or calling its lifecycle hooks. Does not advance simulation time.
     public func run(_ system: System, deltaTime: Double) throws {
         try synchronizeBeforeRun()
         try system.validate()
         try executeSystems([system], deltaTime: deltaTime, advancesTime: false, synchronization: .automatic)
     }
 
+    /// Runs the systems the pipeline selects. Does not advance simulation time.
+    ///
+    /// - Throws: ``SystemError`` for an invalid schedule, or an error from a system callback.
     public func run(_ pipeline: Pipeline, deltaTime: Double) throws {
         try execute(pipeline, deltaTime: deltaTime, advancesTime: false)
     }
 
+    /// Runs the pipeline stored on the entity. Does not advance simulation time.
+    ///
+    /// - Throws: ``SystemError/invalidPipeline(_:)`` if the entity has no ``Pipeline``.
     public func run(_ pipeline: Entity, deltaTime: Double) throws {
         try synchronizeBeforeRun()
         try validateRelationshipEntity(pipeline)
@@ -79,6 +104,9 @@ extension World {
         try run(configuration, deltaTime: deltaTime)
     }
 
+    /// Returns the order in which the pipeline would run its systems.
+    ///
+    /// - Throws: ``SystemError`` if the schedule is invalid.
     public func executionOrder(for pipeline: Pipeline) throws -> [SystemID] {
         try resolve(pipeline).map(\.id)
     }

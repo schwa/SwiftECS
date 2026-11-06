@@ -1,3 +1,7 @@
+/// The rows a system query matches for one callback.
+///
+/// Membership is fixed for the callback. Iteration skips entities that lost a required component. The sequence
+/// expires when the callback returns.
 public struct SystemOutputRows<each Output>: Sequence {
     @usableFromInline internal let storage: [BoundSystemBatch<repeat each Output>]
     @usableFromInline internal let scope: SystemScope

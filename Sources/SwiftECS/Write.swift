@@ -1,4 +1,6 @@
+/// A query term that supplies a writable ``SystemComponent`` handle.
 public struct Write<Value: Component>: SystemTerm, Sendable {
+    /// Creates the term.
     public init() {}
 
     @inlinable

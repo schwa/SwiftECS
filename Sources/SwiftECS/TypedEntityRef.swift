@@ -1,4 +1,6 @@
+/// One entity in a typed query, with direct access to the queried components.
 public struct TypedEntityRef<each Value: Component> {
+    /// The entity's ID.
     public let entityID: EntityID
     @usableFromInline internal let world: World
     @usableFromInline internal let index: Int
@@ -12,17 +14,20 @@ public struct TypedEntityRef<each Value: Component> {
         self.storage = storage
     }
 
+    /// References to the queried components, for repeated access.
     @inlinable
     public var components: (repeat ComponentRef<each Value>) {
         (repeat ComponentRef(world: world, entityID: entityID, column: each storage.columns, index: index))
     }
 
+    /// The queried component values.
     @inlinable
     public var values: (repeat each Value) {
         world.trackStorageAccess()
         return (repeat read(each storage.columns))
     }
 
+    /// Writes all queried components and notifies change observers after the writes finish.
     @inlinable
     public func set(_ values: repeat each Value) {
         guard storage.hasComponents else {

@@ -1,7 +1,9 @@
+/// A query input for ``System/run(_:body:)``. Each query in a system matches independently.
 public struct SystemQuery<each Term: SystemTerm>: SystemInput {
     @usableFromInline internal let terms: (repeat each Term)
     @usableFromInline internal let filter: Query
 
+    /// Creates a query from component terms and an optional filter.
     public init(_ terms: repeat each Term, matching filter: Query = .all) {
         self.terms = (repeat each terms)
         self.filter = filter

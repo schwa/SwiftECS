@@ -13,6 +13,7 @@ internal struct PartitionPlan {
 // Swift 6 capture checking is required, not a Swift 5 compatibility warning.
 // swiftlint:disable incompatible_concurrency_annotation
 extension SystemQueryBuilder where repeat each Term: ParallelSystemTerm {
+    /// Returns a system whose callback receives all matching rows on one worker task.
     public func runParallel(_ body: @escaping @Sendable (SystemContext, SystemRows<repeat each Term>) throws -> Void) -> System {
         system.runParallel(query, body: body)
     }

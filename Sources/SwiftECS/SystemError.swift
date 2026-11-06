@@ -6,17 +6,29 @@ public enum SystemError: Error, Equatable {
     case dependencyNotFound(system: SystemID, dependency: SystemID)
     /// A cyclic dependency was detected.
     case cyclicDependency([SystemID])
+    /// A system depends on a system that the pipeline does not select.
     case excludedDependency(system: SystemID, dependency: SystemID)
+    /// A ``DependsOn`` link connects entities that are not both systems or both phases.
     case invalidDependency(source: EntityID, target: EntityID)
+    /// A system does not belong to exactly one phase.
     case missingPhase(SystemID)
+    /// The entity is not a phase.
     case invalidPhase(EntityID)
+    /// Phase dependencies form a cycle.
     case phaseCycle(EntityID)
+    /// The entity has no ``Pipeline`` component.
     case invalidPipeline(EntityID)
+    /// A system component is a class. System components must have value semantics.
     case referenceComponent(ComponentType)
+    /// A query names the same component type twice.
     case duplicateTerm(ComponentType)
+    /// A deferred set targets an entity that no longer exists.
     case missingCommandEntity(EntityID)
+    /// The parallelism is not positive.
     case invalidParallelism
+    /// The minimum rows per task is not positive.
     case invalidPartitionSize
+    /// Another run already owns the world.
     case parallelRunInProgress
 }
 

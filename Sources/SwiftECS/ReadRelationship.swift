@@ -1,4 +1,6 @@
+/// An input that reads links of one relationship type.
 public struct ReadRelationship<Link: Relationship>: SystemInput {
+    /// Creates the input.
     public init() {}
 
     public var binding: SystemBinding<RelationshipReader<Link>> {
@@ -32,6 +34,7 @@ extension ReadRelationship: ParallelSystemInput where Link: ConcurrentRelationsh
     }
 }
 
+/// Reads links of one relationship type during a system callback. Supplied by ``ReadRelationship``.
 public struct RelationshipReader<Link: Relationship> {
     internal let scope: SystemScope
     internal let targetsOf: (EntityID) -> [EntityID]
@@ -43,20 +46,24 @@ public struct RelationshipReader<Link: Relationship> {
         sourcesOf = sources
     }
 
+    /// Returns the entities the source links to.
     public func targets(of source: EntityID) -> [EntityID] {
         scope.checkActive()
         return targetsOf(source)
     }
 
+    /// Returns the first entity the source links to. Use for exclusive relationships.
     public func target(of source: EntityID) -> EntityID? {
         targets(of: source).first
     }
 
+    /// Returns the entities that link to the target.
     public func sources(of target: EntityID) -> [EntityID] {
         scope.checkActive()
         return sourcesOf(target)
     }
 
+    /// Whether the source links to the target.
     public func contains(from source: EntityID, to target: EntityID) -> Bool {
         targets(of: source).contains(target)
     }

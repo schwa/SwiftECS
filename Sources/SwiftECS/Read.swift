@@ -1,4 +1,6 @@
+/// A query term that supplies a component value.
 public struct Read<Value: Component>: SystemTerm, Sendable {
+    /// Creates the term.
     public init() {}
 
     @inlinable

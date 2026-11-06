@@ -1,6 +1,9 @@
 // Swift 6 capture checking is required, not a Swift 5 compatibility warning.
 // swiftlint:disable incompatible_concurrency_annotation
 extension System {
+    /// Returns a system whose callback can run on a worker task.
+    ///
+    /// All inputs must be parallel-eligible, and the body must be `@Sendable`.
     public func runParallel<each Input: ParallelSystemInput>(_ inputs: repeat each Input, body: @escaping @Sendable (SystemContext, repeat (each Input).Value) throws -> Void) -> System {
         let bindings = (repeat (each inputs).parallelBinding)
         var system = bind(repeat (each bindings).binding, body: body)

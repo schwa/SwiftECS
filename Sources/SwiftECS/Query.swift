@@ -3,7 +3,9 @@ public indirect enum QueryPredicate: Hashable, Sendable {
     /// Match entities that contain a specific component type.
     case contains(ComponentType)
 
+    /// Match entities with an outgoing link of the given type, to the given target or to any target if `nil`.
     case relationship(RelationshipType, EntityID?)
+    /// Match entities that reach the given root by following links of the given type.
     case descendant(RelationshipType, EntityID)
 
     /// Match entities that do NOT match the inner predicate.

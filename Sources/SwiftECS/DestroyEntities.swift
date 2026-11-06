@@ -1,4 +1,6 @@
+/// An input that permits deferred entity destruction.
 public struct DestroyEntities: SystemInput {
+    /// Creates the input.
     public init() {}
 
     public var binding: SystemBinding<EntityDestroyer> {

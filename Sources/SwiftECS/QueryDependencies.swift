@@ -1,6 +1,10 @@
+/// A system query's matching predicate and the types it depends on.
 public struct QueryDependencies: Hashable, Sendable {
+    /// The complete matching query, including the terms' component types.
     public let query: Query
+    /// The component types the predicate mentions.
     public let components: Set<ComponentType>
+    /// The relationship types the predicate mentions.
     public let relationships: Set<RelationshipType>
 
     internal init(query: Query) {

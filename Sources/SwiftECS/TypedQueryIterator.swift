@@ -1,3 +1,4 @@
+/// An iterator over a typed query.
 public struct TypedQueryIterator<each Value: Component>: IteratorProtocol {
     @usableFromInline internal let world: World
     @usableFromInline internal let storage: [TypedQueryStorage<repeat each Value>]

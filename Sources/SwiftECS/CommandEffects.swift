@@ -1,10 +1,17 @@
+/// The structural changes a system's deferred commands may make.
 public struct CommandEffects: Equatable, Sendable {
+    /// The component sets of entities the system may create.
     public internal(set) var creationSignatures: Set<Set<ComponentType>> = []
+    /// The component types the system may set or remove.
     public internal(set) var components: Set<ComponentType> = []
+    /// The relationship types the system may add or remove.
     public internal(set) var relationships: Set<RelationshipType> = []
+    /// Whether the system may destroy entities.
     public internal(set) var destroysEntities = false
+    /// Whether the system uses unrestricted ``Commands``.
     public internal(set) var isUnrestricted = false
 
+    /// Whether the system makes no deferred structural changes.
     public var isEmpty: Bool {
         creationSignatures.isEmpty && components.isEmpty && relationships.isEmpty && !destroysEntities && !isUnrestricted
     }

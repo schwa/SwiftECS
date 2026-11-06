@@ -1,5 +1,9 @@
+/// A writable handle to a component in a system query row. Supplied by ``Write``.
+///
+/// The handle expires when the callback returns.
 @frozen
 public struct SystemComponent<Value: Component> {
+    /// The entity that owns the component.
     public let entityID: EntityID
     @usableFromInline internal let index: Int
     @usableFromInline internal let access: SystemFieldAccess<Value>
@@ -12,6 +16,7 @@ public struct SystemComponent<Value: Component> {
         self.access = access
     }
 
+    /// The component value. Writes apply immediately.
     @inlinable
     public var value: Value {
         get { access.read(entityID: entityID, index: index) }

@@ -4,14 +4,18 @@ extension World {
         @usableFromInline let archetype: Archetype
         @usableFromInline let index: Int
 
+        /// Sets one component of the new entity.
         @inlinable
         public func set<T: Component>(_ component: T) {
             archetype.setSerialComponent(component, at: index)
         }
     }
 
-    // Like createEntity(id:components:), but `fill` sets each component through a typed call, so no component goes
-    // through `any Component`. `fill` must set exactly the components in `types`, once each; this traps otherwise.
+    /// Creates an entity from component types known only at run time, setting each component through a typed call.
+    ///
+    /// Unlike `createEntity(id:components:)`, no component is boxed as `any Component`.
+    ///
+    /// - Precondition: `id` is not in use, and `fill` sets exactly the components in `types`, once each.
     @discardableResult
     public func createEntity(
         id: EntityID, types: [ComponentType], _ fill: (EntityInitializer) -> Void

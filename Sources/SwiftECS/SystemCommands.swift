@@ -1,6 +1,13 @@
+/// Unrestricted deferred commands. Supplied by ``Commands``.
+///
+/// Commands run in order when the system's commands merge. They are discarded if the callback throws.
 public struct SystemCommands {
     internal let scope: SystemScope
 
+    /// Reserves an ID and creates an entity with the given components when commands merge.
+    ///
+    /// - Returns: The new entity's ID, usable as a target in later commands.
+    /// - Throws: ``SystemError/referenceComponent(_:)`` if a component is a class.
     @discardableResult
     public func create<each Value: Component>(_ components: repeat each Value) throws -> EntityID {
         scope.checkActive()
@@ -21,6 +28,7 @@ public struct SystemCommands {
         return id
     }
 
+    /// Destroys an entity. Does nothing if it no longer exists.
     public func destroy(_ id: EntityID) {
         scope.checkActive()
         scope.commands.append { world in
@@ -28,6 +36,10 @@ public struct SystemCommands {
         }
     }
 
+    /// Sets a component on an entity.
+    ///
+    /// - Throws: ``SystemError/referenceComponent(_:)`` if the component is a class, or
+    ///   ``SystemError/missingCommandEntity(_:)`` during the merge if the entity no longer exists.
     public func set<Value: Component>(_ value: Value, on id: EntityID) throws {
         scope.checkActive()
         guard !(Value.self is AnyObject.Type) else {
@@ -41,6 +53,7 @@ public struct SystemCommands {
         }
     }
 
+    /// Removes a component from an entity. Does nothing if it is absent.
     public func remove<Value: Component>(_ type: Value.Type, from id: EntityID) {
         scope.checkActive()
         scope.commands.append { world in
@@ -48,6 +61,7 @@ public struct SystemCommands {
         }
     }
 
+    /// Adds a relationship link.
     public func addRelationship<R: Relationship>(_ type: R.Type, from source: EntityID, to target: EntityID) {
         scope.checkActive()
         scope.commands.append { world in
@@ -55,6 +69,7 @@ public struct SystemCommands {
         }
     }
 
+    /// Removes a relationship link.
     public func removeRelationship<R: Relationship>(_ type: R.Type, from source: EntityID, to target: EntityID) {
         scope.checkActive()
         scope.commands.append { world in

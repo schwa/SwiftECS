@@ -1,4 +1,6 @@
+/// An input that permits deferred creation of entities with exactly the given component types.
 public struct CreateEntities<each Value: Component>: SystemInput {
+    /// Creates the input for the given component types.
     public init(_: repeat (each Value).Type) {}
 
     public var binding: SystemBinding<EntityCreator<repeat each Value>> {
