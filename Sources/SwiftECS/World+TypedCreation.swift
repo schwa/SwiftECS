@@ -17,10 +17,16 @@ extension World {
         id: EntityID, types: [ComponentType], _ fill: (EntityInitializer) -> Void
     ) -> Entity {
         precondition(entityLocations[id] == nil, "Entity ID already exists")
-        let signature = ArchetypeSignature(Set(types))
-        precondition(signature.types.count == types.count, "Component types must be unique")
+        let archetype: Archetype
+        if let cached = lastTypedCreation, !cached.archetype.isReclaimed, cached.types == types {
+            archetype = cached.archetype
+        } else {
+            let signature = ArchetypeSignature(Set(types))
+            precondition(signature.types.count == types.count, "Component types must be unique")
+            archetype = getOrCreateArchetype(signature)
+            lastTypedCreation = (types, archetype)
+        }
         mutations.perform {
-            let archetype = getOrCreateArchetype(signature)
             let index = archetype.addEntity(id)
             fill(EntityInitializer(archetype: archetype, index: index))
             precondition(

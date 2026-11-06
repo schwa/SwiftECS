@@ -52,6 +52,16 @@ func createEntityWithTypedInitializer() throws {
     #expect(Set(world.snapshot(with: StableValue.self, StableTag.self).map(\.id)) == [first, second])
     _ = try world.destroy(try #require(world[first]))
     #expect(world[second]?[StableValue.self]?.x == 2)
+
+    // Emptying the archetype reclaims it; creating again with the same types must not reuse the dropped one.
+    _ = try world.destroy(try #require(world[second]))
+    let third = EntityID()
+    world.createEntity(id: third, types: types) { initializer in
+        initializer.set(StableValue(x: 3))
+        initializer.set(StableTag())
+    }
+    #expect(world.snapshot(with: StableValue.self, StableTag.self).map(\.id) == [third])
+    #expect(world[third]?[StableValue.self]?.x == 3)
 }
 
 @Test

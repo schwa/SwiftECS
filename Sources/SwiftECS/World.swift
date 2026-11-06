@@ -70,6 +70,11 @@ public final class World {
     @ObservationIgnored
     private var lastArchetypeSerial: UInt64 = 0
 
+    // The archetype for the last createEntity(id:types:_:) call, so creating many entities with the same types does
+    // not hash the whole signature each time.
+    @ObservationIgnored
+    internal var lastTypedCreation: (types: [ComponentType], archetype: Archetype)?
+
     // MARK: - Entity Management
 
     /// Create an entity with no components.
@@ -374,6 +379,7 @@ public final class World {
             return
         }
         archetypes.removeValue(forKey: archetype.signature)
+        archetype.isReclaimed = true
         queries.invalidateArchetypes()
     }
 

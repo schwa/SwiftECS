@@ -175,6 +175,8 @@ final class Archetype {
     let serial: UInt64
     @usableFromInline private(set) var entities: [EntityID] = []
     @usableFromInline internal var columns: [ComponentType: AnyColumn] = [:]
+    // Set when the World drops this archetype, so cached references to it are not reused.
+    var isReclaimed = false
 
     init(signature: ArchetypeSignature, serial: UInt64) {
         self.signature = signature
