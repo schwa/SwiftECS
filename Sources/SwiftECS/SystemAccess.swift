@@ -4,12 +4,12 @@ public struct SystemAccess: Equatable, Sendable {
     public internal(set) var reads: Set<ComponentType> = []
     /// The component types the system writes in place.
     public internal(set) var writes: Set<ComponentType> = []
-    /// The structural changes the system's deferred commands may make.
+    /// The structural changes that the system's deferred commands can make.
     public internal(set) var commandEffects = CommandEffects()
     /// The complete matching predicates of the system's queries.
     public internal(set) var queries: Set<QueryDependencies> = []
 
-    /// Whether the system may make deferred structural changes.
+    /// Whether the system can make deferred structural changes.
     public var changesStructure: Bool { !commandEffects.isEmpty }
 
     /// Whether the two systems cannot safely run at the same time.

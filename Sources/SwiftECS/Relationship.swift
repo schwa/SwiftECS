@@ -6,7 +6,7 @@
 public protocol Relationship {
     /// Whether a source can link to at most one target. Adding a new link replaces the old one.
     static var isExclusive: Bool { get }
-    /// Whether adding a link that would create a cycle throws ``RelationshipError/cycleDetected(_:)``.
+    /// Whether adding a link that makes a cycle throws ``RelationshipError/cycleDetected(_:)``.
     static var isAcyclic: Bool { get }
 }
 

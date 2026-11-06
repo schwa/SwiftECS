@@ -23,7 +23,7 @@ extension World {
 
     /// Registers a system and calls its initialize hook.
     ///
-    /// `dependencies`, `before`, and `after` may name systems that are not registered yet.
+    /// `dependencies`, `before`, and `after` can name systems that are not registered yet.
     ///
     /// - Parameters:
     ///   - system: The system to register.
@@ -104,7 +104,7 @@ extension World {
         try run(configuration, deltaTime: deltaTime)
     }
 
-    /// Returns the order in which the pipeline would run its systems.
+    /// Returns the order in which the pipeline runs its systems.
     ///
     /// - Throws: ``SystemError`` if the schedule is invalid.
     public func executionOrder(for pipeline: Pipeline) throws -> [SystemID] {

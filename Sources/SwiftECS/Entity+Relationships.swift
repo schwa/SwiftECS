@@ -12,7 +12,7 @@ extension Entity {
     /// Sets or clears the entity's parent.
     ///
     /// - Parameter parent: The new parent, or `nil` to remove the current one.
-    /// - Throws: ``RelationshipError`` if an entity is missing, from another world, or the link would create a cycle.
+    /// - Throws: ``RelationshipError`` if an entity is missing, from another world, or the link makes a cycle.
     public func setParent(_ parent: Entity?) throws {
         if let parent {
             try addRelationship(ChildOf.self, to: parent)
@@ -37,7 +37,7 @@ extension Entity {
     ///
     /// For an exclusive relationship, the new link replaces the current one.
     ///
-    /// - Throws: ``RelationshipError`` if an entity is missing, from another world, or the link would create a cycle in
+    /// - Throws: ``RelationshipError`` if an entity is missing, from another world, or the link makes a cycle in
     ///   an acyclic relationship.
     public func addRelationship<R: Relationship>(_ type: R.Type, to target: Entity) throws {
         try world.validateRelationshipEntity(self)

@@ -25,7 +25,7 @@ public final class World {
 
     /// A counter that changes when an entity is created, destroyed, or gains or loses a component type.
     ///
-    /// A ``ComponentRef`` may point at the wrong row after it changes. Value writes do not change it.
+    /// After it changes, a ``ComponentRef`` can point at the wrong row. Value writes do not change it.
     @inlinable public internal(set) var structuralRevision: UInt64 {
         get { revisionCell.value }
         set { revisionCell.value = newValue }
@@ -313,7 +313,7 @@ public final class World {
 
     /// Returns a reference to the entity's component, or `nil` if either is absent.
     ///
-    /// The reference is valid until `structuralRevision` changes. Getting it is not observed; reading its value is.
+    /// The reference is valid until `structuralRevision` changes. Getting the reference does not register Observation access. Reading its value does.
     public func componentRef<T: Component>(_ type: T.Type, for entityID: EntityID) -> ComponentRef<T>? {
         mutations.checkAccessible()
         guard let location = entityLocations[entityID],

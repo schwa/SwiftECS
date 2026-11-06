@@ -1,12 +1,12 @@
-/// The structural changes a system's deferred commands may make.
+/// The structural changes that a system's deferred commands can make.
 public struct CommandEffects: Equatable, Sendable {
-    /// The component sets of entities the system may create.
+    /// The component sets of entities that the system can create.
     public internal(set) var creationSignatures: Set<Set<ComponentType>> = []
-    /// The component types the system may set or remove.
+    /// The component types that the system can set or remove.
     public internal(set) var components: Set<ComponentType> = []
-    /// The relationship types the system may add or remove.
+    /// The relationship types that the system can add or remove.
     public internal(set) var relationships: Set<RelationshipType> = []
-    /// Whether the system may destroy entities.
+    /// Whether the system can destroy entities.
     public internal(set) var destroysEntities = false
     /// Whether the system uses unrestricted ``Commands``.
     public internal(set) var isUnrestricted = false

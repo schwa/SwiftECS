@@ -6,7 +6,7 @@ extension World {
     /// invalidation when the outermost scope exits, so a per-frame simulation loop
     /// with multiple substeps notifies SwiftUI once instead of once per substep.
     ///
-    /// Component-event observers are unaffected; they still fire synchronously.
+    /// This scope does not change component-event observers. They still run synchronously.
     /// A thrown error still flushes the pending invalidation as the scope unwinds.
     /// This is a serial API: it cannot bracket the async parallel `update` overloads.
     public func batchingObservation<Result>(_ body: () throws -> Result) rethrows -> Result {

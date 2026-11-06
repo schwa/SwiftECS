@@ -4,6 +4,6 @@ public enum RelationshipError: Error, Equatable {
     case differentWorlds
     /// The entity no longer exists.
     case missingEntity(EntityID)
-    /// The link would create a cycle in an acyclic relationship.
+    /// The link makes a cycle in an acyclic relationship.
     case cycleDetected(RelationshipType)
 }

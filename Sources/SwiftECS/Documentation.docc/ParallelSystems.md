@@ -36,7 +36,7 @@ The concurrency limit bounds active jobs across the entire group, not separately
 `.eachParallel` partitions one query into disjoint row ranges across its matching archetypes.
 Its callback receives `SystemContext`, a typed `SystemRow`, and any declared command capabilities.
 Empty queries launch no jobs. Small queries use fewer partitions according to `minimumRowsPerTask`.
-By default one partition is created per worker. `tasksPerWorker` over-decomposes the query into up to `parallelism * tasksPerWorker` partitions (still bounded by `minimumRowsPerTask`), so the bounded worker pool can load-balance skewed per-row work instead of waiting on a straggling equal-sized range. It preserves exact row coverage, disjoint writable ownership, and prepared-order command merging; the default of one keeps current behavior.
+By default, the query has one partition per worker. `tasksPerWorker` splits the query into up to `parallelism * tasksPerWorker` partitions. `minimumRowsPerTask` still limits the partition size. More partitions let the worker pool balance uneven per-row work. Without them, all workers wait for the slowest range. Each row is still covered once, each writable row has one owner, and commands merge in prepared order. The default value of one keeps one partition per worker.
 
 ```swift
 struct Trail: ConcurrentComponent { let source: EntityID }
@@ -62,7 +62,7 @@ World columns remain lock-protected. Workers read snapshots and edit task-owned 
 Partitions copy only their selected rows. Overlapping queries within a whole-system callback share one buffer per column.
 After jobs join, dirty values are written back before dependent systems or structural commands run.
 The buffers and owner-local lifetime cells are not Sendable. Only immutable update payloads cross back to the owner.
-Only the lock-protected implementation types require `@unchecked Sendable`; worlds and callbacks do not.
+Only the lock-protected implementation types require `@unchecked Sendable`. Worlds and callbacks do not.
 Raw ECS APIs do not become thread-safe. References cannot escape into another task. They expire when their owning system callback or partition finishes.
 
 **Ownership during an async run:** the world remains on its calling actor or task.

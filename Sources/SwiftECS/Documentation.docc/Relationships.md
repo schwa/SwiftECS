@@ -64,7 +64,9 @@ A cloned self-link still targets the original entity. Recursive deletion capture
 
 Lifecycle methods throw `WorldError.foreignEntity` for a handle from another world. For stale handles, `destroy` returns `false`, `clone` returns `nil`, and recursive deletion returns `0`. Neither case mutates storage.
 
-Inherited component lookup is explicit application traversal, not a library semantic. Resolve an inherited value by walking `ancestors(via:)` (nearest first) and taking the first entity that holds the component locally. The application chooses precedence and how to break ties among multiple parents. Components are not inherited implicitly: `query`/`snapshot` match only entities that hold a component locally, writes and removal act on the concrete entity, and observation fires per storage. A library inheritance model would have to resolve multi-parent ambiguity, define override/write/removal semantics, and participate in query matching, observation, and parallel access metadata — a separate opt-in proposal rather than part of the relationship API.
+The library does not give inherited components. The application finds an inherited value itself. To find one, walk `ancestors(via:)` (nearest first) and use the first entity that holds the component. The application decides the order of precedence and what to do when an entity has more than one parent.
+
+Components are not inherited automatically. `query` and `snapshot` match only entities that hold the component. Writes and removals change only the given entity. Observation reports changes for each entity separately. A library inheritance model must resolve the choice between many parents. It must also define how overrides, writes, and removals work. Queries, observation, and parallel access must all support it. For these reasons, inheritance is not part of the relationship API.
 
 ## Query relationships
 

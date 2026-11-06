@@ -1,7 +1,7 @@
 /// A unit of logic that runs over declared inputs.
 ///
-/// Build a system from an ID, then add inputs with `query(_:matching:)` or `run(_:body:)`. Systems are values;
-/// each builder method returns a new system.
+/// Build a system from an ID, then add inputs with `query(_:matching:)` or `run(_:body:)`. Systems are values.
+/// Each builder method returns a new system.
 public struct System {
     /// The system's identifier.
     public let id: SystemID
@@ -24,7 +24,7 @@ public struct System {
     /// Starts a system that runs over one query.
     ///
     /// - Parameters:
-    ///   - terms: The component terms, such as ``Read`` and ``Write``. Each component type may appear once.
+    ///   - terms: The component terms, such as ``Read`` and ``Write``. Each component type can appear only once.
     ///   - filter: Additional matching conditions.
     /// - Returns: A builder. Finish it with ``SystemQueryBuilder/each(_:)`` or ``SystemQueryBuilder/run(_:)``.
     public func query<each Term: SystemTerm>(_ terms: repeat each Term, matching filter: Query = .all) -> SystemQueryBuilder<repeat each Term> {

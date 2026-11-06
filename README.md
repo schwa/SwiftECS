@@ -26,17 +26,22 @@ Components are plain structs. Entities hold components. Systems query entities a
 ```swift
 import SwiftECS
 
+// A component is a plain struct.
 struct Position: Component { var x, y: Double }
 struct Velocity: Component { var x, y: Double }
 
+// Make a world and add one entity with two components.
 let world = World()
 world.createEntity(Position(x: 0, y: 0), Velocity(x: 1, y: 0))
 
+// Add a system that moves each entity that has both components.
 try world.addSystem(System("movement")
     .query(Write<Position>(), Read<Velocity>())
     .each { context, position, velocity in
         position.value.x += velocity.x * context.deltaTime
     })
+
+// Run all systems for one frame.
 try world.update(deltaTime: 1.0 / 60)
 ```
 

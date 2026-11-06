@@ -81,7 +81,7 @@ ECS_RUN_RELATIONSHIP_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --fil
 ECS_RUN_SCHEDULE_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter ScheduleResolutionBenchmarkTests
 ```
 
-Each run resolves a fresh schedule with no cache. Resolution is superlinear (about O(N^2)) in the selected system count: sub-millisecond for typical small schedules, but tens of milliseconds once schedules reach hundreds to thousands of systems. Dependency chains and system-bearing phase chains cost the most; a no-op run is dominated by resolution, not dispatch.
+Each run resolves a new schedule with no cache. Resolution time grows faster than linearly (about O(N^2)) with the number of selected systems. Small schedules take less than 1 ms. Schedules with hundreds to thousands of systems take tens of milliseconds. Dependency chains and phase chains that hold systems cost the most. In a run with no work, resolution takes most of the time, not dispatch.
 
 `ParallelPartitionBenchmarkTests` isolates tail latency under skewed per-row work and the parallel dispatch break-even:
 
@@ -89,7 +89,7 @@ Each run resolves a fresh schedule with no cache. Resolution is superlinear (abo
 ECS_RUN_PARTITION_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter ParallelPartitionBenchmarkTests
 ```
 
-With skewed work, fixed equal partitions leave the heaviest range as a straggler; over-decomposition (`tasksPerWorker` above one) lets the bounded pool load-balance. On Apple M5 Max (limit 8, 100k skewed rows) it improved 3.87x to 5.50x speedup, cutting frame time from about 31.5 to 22.2 ms. Parallel dispatch has a fixed floor near 0.7 ms per frame, so serial wins below roughly 16k uniform rows; over-decomposition helps skewed or compute-heavy work, not small or purely memory-bound work.
+With uneven work, equal fixed partitions make the heaviest range finish last. A `tasksPerWorker` value above one lets the worker pool balance the load. On Apple M5 Max (limit 8, 100k uneven rows), the speedup increased from 3.87x to 5.50x. Frame time decreased from about 31.5 ms to 22.2 ms. Parallel dispatch costs about 0.7 ms per frame. As a result, serial execution is faster below about 16k uniform rows. More partitions help uneven or compute-heavy work. They do not help small or memory-bound work.
 
 `ParallelBufferBenchmarkTests` isolates snapshot copy, dirty-mask, and writeback costs across component size, write density, archetype count, and job count:
 
@@ -97,14 +97,14 @@ With skewed work, fixed equal partitions leave the heaviest range as a straggler
 ECS_RUN_BUFFER_BENCHMARKS=1 xcb test SwiftECS/SwiftECS -c release -- --filter ParallelBufferBenchmarkTests
 ```
 
-Workers snapshot the whole column once, copy their partition slice, then write dirty values back after joining. That triple-copy is cheap for small components (parallel still beats serial) but makes large components regress against serial in-place writes: at 200k rows a 64-byte component measured 9.6 ms parallel versus 8.9 ms serial, while an 8-byte component measured 7.9 ms versus 8.9 ms. Dirty-only writeback keeps sparse writes cheap. Removing the redundant whole-column snapshot (a bulk per-partition copy from the live column) is the identified follow-up for large-component workloads.
+Workers copy the whole column once and then copy their partition slice. After the join, they write changed values back. These three copies cost little for small components, and parallel is still faster than serial. For large components, serial in-place writes are faster. At 200k rows, a 64-byte component took 9.6 ms parallel and 8.9 ms serial. An 8-byte component took 7.9 ms parallel and 8.9 ms serial. Because only changed values are written back, sparse writes stay fast. A copy per partition directly from the live column can remove the whole-column copy. This change is the next step for large components.
 
 Acyclic chain construction is quadratic (a cycle check walks toward the root before each link), so deep hierarchies are the costly case. Descendant-predicate queries evaluate per candidate and cost far more than a single breadth-first traversal from the root. Registered and unregistered direct-child queries measure the same, because registration caches archetypes, not relationship matches.
 
-Storage observation publishes once per frame regardless of observer count; each armed observer is notified once and recomputes its read (world-wide invalidation). On the fast typed path this per-observer recompute is measurable as observer count rises, while it is negligible against heavier entity-handle work.
+Storage observation publishes once per frame for any number of observers. The world notifies each armed observer once, and each observer reads its value again. On the fast typed path, this repeated read has a measurable cost as the observer count increases. Compared with slower entity-handle work, the cost is very small.
 
 Movement is memory-bandwidth bound. On Apple M5 Max (18 processors, macOS 27.0, Swift 6.4, Release), light movement scaled to about 1.26x at 18 jobs for 100,000 entities.
 One million entities peaked near 1.89x at four jobs and regressed beyond it. Raising per-entity work (`ECS_SCALING_ITERATIONS=200`) reached about 2.11x at 16 jobs.
-Parallel efficiency falls as jobs increase; more jobs do not approach linear speedup. Phase-level timing (dispatch, join, writeback, merge) needs core instrumentation and is tracked in #40 and #41.
+Parallel efficiency decreases as the job count increases. More jobs do not give a linear speedup. Phase-level timing (dispatch, join, writeback, merge) needs core instrumentation and is tracked in #40 and #41.
 Override the sweep with `ECS_SCALING_ENTITIES`, `ECS_SCALING_LIMITS`, `ECS_SCALING_ROUNDS`, `ECS_SCALING_FRAMES`, and `ECS_SCALING_ITERATIONS`.
 
