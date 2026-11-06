@@ -4,16 +4,18 @@ A type-safe, archetype-based Entity Component System for Swift 6, with strict co
 
 ![Midnight Survivors, the SwiftECS demo game](Images/midnight-survivors.png)
 
+*Midnight Survivors, a demo game built with SwiftECS. The source is in `Demos/SwiftECSDemos`.*
+
 ## Features
 
-- Archetype storage with cached, typed queries built on parameter packs
-- Composable query predicates (`&&`, `||`, `!`), including relationship-based queries
-- Systems with phases, pipelines, dependencies, and deferred commands
-- Opt-in parallel systems, checked for data races at compile time
-- Entity relationships with hierarchies, cycle checks, and recursive deletion
-- Component, destroy, and relationship observers that report old and new values
-- SwiftUI Observation support, with batched notifications
-- Stable typed component references for hot loops
+- Archetype storage with cached, [typed queries](https://schwa.github.io/SwiftECS/documentation/swiftecs/gettingstarted/) built on parameter packs
+- Composable [query predicates](https://schwa.github.io/SwiftECS/documentation/swiftecs/query/) (`&&`, `||`, `!`), including relationship-based queries
+- [Systems](https://schwa.github.io/SwiftECS/documentation/swiftecs/systems/) with phases, pipelines, dependencies, and deferred commands
+- Opt-in [parallel systems](https://schwa.github.io/SwiftECS/documentation/swiftecs/parallelsystems/), checked for data races at compile time
+- Entity [relationships](https://schwa.github.io/SwiftECS/documentation/swiftecs/relationships/) with hierarchies, cycle checks, and recursive deletion
+- Component, destroy, and relationship [observers](https://schwa.github.io/SwiftECS/documentation/swiftecs/observation/) that report old and new values
+- SwiftUI [Observation](https://schwa.github.io/SwiftECS/documentation/swiftecs/observation/) support, with batched notifications
+- Stable typed [component references](https://schwa.github.io/SwiftECS/documentation/swiftecs/componentref/) for hot loops
 
 ## Requirements
 
