@@ -5,3 +5,6 @@ disabled_rules:
   - force_unwrapping
   # Suites group related cases; their total size is not a useful limit.
   - type_body_length
+  # Benchmarks are long linear setup-and-measure scripts.
+  - cyclomatic_complexity
+  - function_body_length

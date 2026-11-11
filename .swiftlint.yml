@@ -252,5 +252,5 @@ only_rules:
   - yoda_condition
 
 type_body_length:
-  warning: 400
+  warning: 450
   error: 600
