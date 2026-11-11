@@ -1409,3 +1409,31 @@ Example: the Boids demo shows only a total time per update. It cannot show which
 Existing related notes: phase-level timing for parallel runs is mentioned as missing in #40 and #41, and in the Performance article.
 
 ---
+
+## 52: Reading a component through ComponentRef costs retain/release of the world and column on every access
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: area:performance,effort:m
+created: 2026-11-11T16:14:59Z
++++
+
+SceneSprockets keeps a ComponentRef per node field and reads node properties (transform, visibility, pivot, ...) through it during scene traversal. After two optimization passes in SceneSprockets (SceneSprockets #270, #283), the remaining per-node cost is mostly retain/release traffic from ComponentRef, which holds strong references to the World and the Column and is copied on each read.
+
+Measured in SceneSprockets (Release, 100k nodes, ns per node):
+
+| | Through SwiftECS | Before SwiftECS |
+|---|---|---|
+| Traversal | ~142 | ~100 |
+| Property read | ~38 | ~30 |
+| Property write | ~192 | ~180 |
+
+Time Profiler on the traversal benchmark attributes most of the gap to swift_retain/swift_release on ComponentRef's world and column references, plus exclusivity checks.
+
+Expected: a repeated read of one component through a cached reference costs close to a plain stored-property read.
+
+Reported from SceneSprockets #270.
+
+---
