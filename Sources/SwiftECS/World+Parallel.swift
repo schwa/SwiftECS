@@ -9,17 +9,21 @@ extension World {
     public func update(deltaTime: Double, parallelism: Int, isolation: isolated (any Actor)? = #isolation) async throws {
         try validateParallelRun(parallelism)
         let pipeline = defaultPipeline
+        let start = ContinuousClock.now
         let schedule = try resolveSchedule(pipeline)
+        let resolveDuration = ContinuousClock.now - start
         let configuration = ParallelRunConfiguration(deltaTime: deltaTime, advancesTime: true, synchronization: pipeline.synchronization, parallelism: parallelism)
-        try await executeParallel(schedule, configuration: configuration, isolation: isolation)
+        try await executeParallel(schedule, configuration: configuration, start: start, resolveDuration: resolveDuration, isolation: isolation)
     }
 
     /// Runs the pipeline with parallel-eligible systems on worker tasks. Does not advance simulation time.
     public func run(_ pipeline: Pipeline, deltaTime: Double, parallelism: Int, isolation: isolated (any Actor)? = #isolation) async throws {
         try validateParallelRun(parallelism)
+        let start = ContinuousClock.now
         let schedule = try resolveSchedule(pipeline)
+        let resolveDuration = ContinuousClock.now - start
         let configuration = ParallelRunConfiguration(deltaTime: deltaTime, advancesTime: false, synchronization: pipeline.synchronization, parallelism: parallelism)
-        try await executeParallel(schedule, configuration: configuration, isolation: isolation)
+        try await executeParallel(schedule, configuration: configuration, start: start, resolveDuration: resolveDuration, isolation: isolation)
     }
 
     /// Runs one unregistered system, on worker tasks if it is parallel-eligible.
@@ -29,7 +33,7 @@ extension World {
         let descriptor = SystemDescriptor(id: system.id, implementation: system, registrationOrder: 0)
         let entry = ScheduledSystem(entityID: EntityID(), descriptor: descriptor, predecessors: [])
         let configuration = ParallelRunConfiguration(deltaTime: deltaTime, advancesTime: false, synchronization: .automatic, parallelism: parallelism)
-        try await executeParallel([entry], configuration: configuration, isolation: isolation)
+        try await executeParallel([entry], configuration: configuration, start: .now, resolveDuration: .zero, isolation: isolation)
     }
 
     /// Runs the pipeline stored on the entity with parallel-eligible systems on worker tasks.
@@ -54,10 +58,11 @@ extension World {
         try Task.checkCancellation()
     }
 
-    private func executeParallel(_ schedule: [ScheduledSystem], configuration: ParallelRunConfiguration, isolation: isolated (any Actor)?) async throws {
+    private func executeParallel(_ schedule: [ScheduledSystem], configuration: ParallelRunConfiguration, start: ContinuousClock.Instant, resolveDuration: Duration, isolation: isolated (any Actor)?) async throws {
         let execution = PipelineExecution()
+        execution.statistics.resolveDuration = resolveDuration
         beginParallelRun(execution, deltaTime: configuration.deltaTime, advancesTime: configuration.advancesTime)
-        defer { endParallelRun(execution) }
+        defer { endParallelRun(execution, start: start) }
         try await execution.runParallel(schedule, in: self, configuration: configuration, isolation: isolation)
     }
 }

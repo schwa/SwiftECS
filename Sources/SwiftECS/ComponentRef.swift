@@ -28,8 +28,11 @@ public struct ComponentRef<Value: Component> {
     @inlinable
     public var value: Value {
         get {
+            world.mutations.checkAccessible()
+            let value = column.serialValue(at: index)
+            // After the read, so the column need not stay retained across this opaque call (#52).
             world.trackStorageAccess()
-            return column.serialValue(at: index)
+            return value
         }
         nonmutating set {
             var oldValue: Value?

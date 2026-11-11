@@ -79,6 +79,9 @@ final class Column<T: Component>: AnyColumn {
 
     // ABI-visible for generic specialization; storage access goes through withLock.
     @usableFromInline let lock = ScopedLock()
+    // The lock, or serial access after checkAccessible(), already makes access exclusive, so the dynamic check is
+    // only overhead on hot ComponentRef paths (#52).
+    @exclusivity(unchecked)
     @usableFromInline var storage: ContiguousArray<T> = []
 
     @inlinable

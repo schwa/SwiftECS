@@ -441,8 +441,10 @@ public final class World {
 
     internal func execute(_ pipeline: Pipeline, deltaTime: Double, advancesTime: Bool) throws {
         try synchronizeBeforeRun()
+        let start = ContinuousClock.now
         let schedule = try resolve(pipeline)
-        try executeSystems(schedule.compactMap(\.implementation), deltaTime: deltaTime, advancesTime: advancesTime, synchronization: pipeline.synchronization)
+        let resolveDuration = ContinuousClock.now - start
+        try executeSystems(schedule.compactMap(\.implementation), deltaTime: deltaTime, advancesTime: advancesTime, synchronization: pipeline.synchronization, start: start, resolveDuration: resolveDuration)
     }
 
     internal func synchronizeBeforeRun() throws {
@@ -454,8 +456,9 @@ public final class World {
         }
     }
 
-    internal func executeSystems(_ systems: [System], deltaTime: Double, advancesTime: Bool, synchronization: PipelineSynchronization) throws {
+    internal func executeSystems(_ systems: [System], deltaTime: Double, advancesTime: Bool, synchronization: PipelineSynchronization, start: ContinuousClock.Instant = .now, resolveDuration: Duration = .zero) throws {
         let execution = PipelineExecution()
+        execution.statistics.resolveDuration = resolveDuration
         try mutations.batch {
             pipelineExecutionDepth += 1
             executions.append(execution)
@@ -470,6 +473,7 @@ public final class World {
                         system.cleanup()
                     }
                 }
+                execution.statistics.totalDuration = ContinuousClock.now - start
                 lastRunStatistics = execution.statistics
             }
             // Time advances before systems run, so simulationTime is "now".
@@ -490,7 +494,7 @@ public final class World {
         }
     }
 
-    internal func endParallelRun(_ execution: PipelineExecution) {
+    internal func endParallelRun(_ execution: PipelineExecution, start: ContinuousClock.Instant) {
         mutations.isParallelSuspended = false
         execution.discard(in: self)
         executions.removeLast()
@@ -500,6 +504,7 @@ public final class World {
         for system in cleanup {
             system.cleanup()
         }
+        execution.statistics.totalDuration = ContinuousClock.now - start
         lastRunStatistics = execution.statistics
         mutations.endBatch()
         parallelRunActive = false

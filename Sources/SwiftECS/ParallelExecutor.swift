@@ -1,4 +1,12 @@
 internal enum ParallelExecutor {
+    private static func timed(_ job: ParallelJob) async -> ParallelJobResult {
+        let clock = ContinuousClock()
+        let start = clock.now
+        var result = await job.execute()
+        result.duration = clock.now - start
+        return result
+    }
+
     @concurrent
     static func run(_ jobs: [ParallelJob], limit: Int) async -> [ParallelJobResult] {
         await withTaskGroup(of: (Int, ParallelJobResult).self) { group in
@@ -7,7 +15,7 @@ internal enum ParallelExecutor {
             for _ in 0..<min(limit, jobs.count) {
                 let index = next
                 let job = jobs[index]
-                group.addTask { (index, await job.execute()) }
+                group.addTask { (index, await timed(job)) }
                 next += 1
             }
             for await (index, result) in group {
@@ -15,7 +23,7 @@ internal enum ParallelExecutor {
                 if next < jobs.count {
                     let index = next
                     let job = jobs[index]
-                    group.addTask { (index, await job.execute()) }
+                    group.addTask { (index, await timed(job)) }
                     next += 1
                 }
             }

@@ -105,6 +105,6 @@ Storage observation publishes once per frame for any number of observers. The wo
 
 Movement is memory-bandwidth bound. On Apple M5 Max (18 processors, macOS 27.0, Swift 6.4, Release), light movement scaled to about 1.26x at 18 jobs for 100,000 entities.
 One million entities peaked near 1.89x at four jobs and regressed beyond it. Raising per-entity work (`ECS_SCALING_ITERATIONS=200`) reached about 2.11x at 16 jobs.
-Parallel efficiency decreases as the job count increases. More jobs do not give a linear speedup. Phase-level timing (dispatch, join, writeback, merge) needs core instrumentation and is tracked in #40 and #41.
+Parallel efficiency decreases as the job count increases. More jobs do not give a linear speedup. For phase-level timing, read `World.lastRunStatistics.parallelPhases` and `mergeDuration` after a run.
 Override the sweep with `ECS_SCALING_ENTITIES`, `ECS_SCALING_LIMITS`, `ECS_SCALING_ROUNDS`, `ECS_SCALING_FRAMES`, and `ECS_SCALING_ITERATIONS`.
 

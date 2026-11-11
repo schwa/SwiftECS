@@ -1,5 +1,6 @@
 internal final class PipelineExecution {
     var statistics = PipelineRunStatistics()
+    private let clock = ContinuousClock()
     private var commands: [(World) throws -> Void] = []
     private var effects = CommandEffects()
     private var reservedIDs: Set<EntityID> = []
@@ -17,7 +18,7 @@ internal final class PipelineExecution {
                     try flush(in: world)
                 }
                 statistics.systemCount += 1
-                append(try system.execute(world, deltaTime))
+                append(try timedExecute(system, in: world, deltaTime: deltaTime))
                 if synchronization == .afterEachSystem || world.mutations.hasObservers || system.access.commandEffects.requiresBarrier {
                     try flush(in: world)
                 }
@@ -79,10 +80,14 @@ internal final class PipelineExecution {
         var wave = PreparedParallelWave(entries: entries)
         for entry in entries {
             let start = wave.jobs.count
+            let startTime = clock.now
             if let prepare = entry.descriptor.implementation?.prepareParallel {
                 wave.jobs.append(contentsOf: prepare(world, configuration.deltaTime, identities, configuration.parallelism))
             }
+            let duration = clock.now - startTime
             wave.ranges.append(start..<wave.jobs.count)
+            wave.prepareDurations.append(duration)
+            statistics.parallelPhases.prepare += duration
             statistics.systemCount += 1
         }
         return wave
@@ -90,7 +95,9 @@ internal final class PipelineExecution {
 
     private func execute(_ wave: PreparedParallelWave, in world: World, parallelism: Int, isolation _: isolated (any Actor)?) async throws {
         world.mutations.isParallelSuspended = true
+        let executeStart = clock.now
         let results = await ParallelExecutor.run(wave.jobs, limit: parallelism)
+        let writeBackStart = clock.now
         world.mutations.isParallelSuspended = false
         if !wave.jobs.isEmpty {
             statistics.parallelBatchCount += 1
@@ -104,8 +111,13 @@ internal final class PipelineExecution {
         if results.contains(where: \.didWrite) {
             world.mutations.didChange()
         }
-        for (entry, range) in zip(wave.entries, wave.ranges) {
+        statistics.parallelPhases.execute += writeBackStart - executeStart
+        statistics.parallelPhases.writeBack += clock.now - writeBackStart
+        for (index, (entry, range)) in zip(wave.entries, wave.ranges).enumerated() {
             let outputs = results[range]
+            let busy = outputs.reduce(Duration.zero) { $0 + $1.duration }
+            statistics.parallelPhases.workerBusy += busy
+            statistics.systemTimings.append(SystemTiming(id: entry.descriptor.id, duration: wave.prepareDurations[index] + busy, ranInParallel: true))
             if let error = outputs.compactMap(\.error).first {
                 throw error
             }
@@ -141,6 +153,14 @@ internal final class PipelineExecution {
         return wave
     }
 
+    private func timedExecute(_ system: System, in world: World, deltaTime: Double) throws -> SystemCommandBatch {
+        let start = clock.now
+        defer {
+            statistics.systemTimings.append(SystemTiming(id: system.id, duration: clock.now - start, ranInParallel: false))
+        }
+        return try system.execute(world, deltaTime)
+    }
+
     private func requiresMerge(before access: SystemAccess, hasObservers: Bool) -> Bool {
         nextCommand < commands.count && (hasObservers || effects.requiresMerge(before: access))
     }
@@ -162,12 +182,14 @@ internal final class PipelineExecution {
             return
         }
         let ownsFlush = !isFlushing
+        let start = clock.now
         if ownsFlush {
             statistics.mergeCount += 1
             isFlushing = true
         }
         defer {
             if ownsFlush {
+                statistics.mergeDuration += clock.now - start
                 isFlushing = false
                 discard(in: world)
             }

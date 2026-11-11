@@ -158,6 +158,7 @@ let statistics = world.lastRunStatistics
 ```
 
 `lastRunStatistics` reports attempted systems, nonempty merges, and attempted commands for the most recent completed run, including execution failures.
+It also reports timings: `totalDuration`, `resolveDuration`, `mergeDuration`, per-system `systemTimings`, and `parallelPhases` (prepare, execute, worker busy time, and write-back) for parallel runs.
 The statistics are not observable. Invalid schedules do not start a run or replace the previous statistics.
 
 Nested runs merge completed outer callbacks before schedule selection. The active callback's private commands remain pending until that callback succeeds.

@@ -1389,10 +1389,12 @@ Deferred: no current need. Struct-of-arrays is the only item that can change per
 ## 51: No way for callers to see where update time is spent
 
 +++
-status: new
+status: closed
 priority: medium
 kind: feature
 created: 2026-11-06T04:33:16Z
+updated: 2026-11-11T16:36:48Z
+closed: 2026-11-11T16:36:48Z
 +++
 
 Calling code cannot find out where time goes during `world.update`. The only data available is `World.lastRunStatistics`, which counts systems, merges, commands, parallel batches, and tasks. It reports no durations.
@@ -1413,11 +1415,13 @@ Existing related notes: phase-level timing for parallel runs is mentioned as mis
 ## 52: Reading a component through ComponentRef costs retain/release of the world and column on every access
 
 +++
-status: new
+status: closed
 priority: low
 kind: enhancement
-labels: area:performance,effort:m
+labels: area:performance, effort:m
 created: 2026-11-11T16:14:59Z
+updated: 2026-11-11T16:36:48Z
+closed: 2026-11-11T16:36:48Z
 +++
 
 SceneSprockets keeps a ComponentRef per node field and reads node properties (transform, visibility, pivot, ...) through it during scene traversal. After two optimization passes in SceneSprockets (SceneSprockets #270, #283), the remaining per-node cost is mostly retain/release traffic from ComponentRef, which holds strong references to the World and the Column and is copied on each read.

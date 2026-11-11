@@ -4,4 +4,5 @@ internal struct ParallelJobResult: Sendable {
     var didWrite: Bool
     var valueUpdates: [ParallelValueUpdate] = []
     let error: (any Error)?
+    var duration: Duration = .zero
 }
