@@ -8,8 +8,8 @@ private final class LifecycleChange: @unchecked Sendable {
 }
 
 @Test func `world lifecycle methods reject foreign handles without changing either world`() throws {
-    let owner = World()
-    let other = World()
+    let owner = ObservableWorld().world
+    let other = ObservableWorld().world
     let entity = owner.createEntity(Health(current: 10))
     let child = owner.createEntity()
     try child.setParent(entity)
@@ -37,7 +37,7 @@ private final class LifecycleChange: @unchecked Sendable {
 }
 
 @Test func `world lifecycle methods preserve handle identity and reject stale handles`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let original = world.createEntity(Health(current: 10))
     let clone = try #require(try world.clone(original))
     #expect(clone.id != original.id)

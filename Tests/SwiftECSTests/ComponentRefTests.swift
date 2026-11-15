@@ -24,7 +24,7 @@ private final class ComponentRefChange: @unchecked Sendable {
 }
 
 @Test func `component references mutate only the selected type`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(Position(x: 1, y: 2), Velocity(dx: 3, dy: 4))
     let row = try #require(world.query(Position.self, Velocity.self).first { _ in true })
     let (position, velocity) = row.components
@@ -51,7 +51,7 @@ private func selectiveMovementSystem() -> System {
 }
 
 @Test func `selective writes inside a system preserve batched invalidation`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     for _ in 0..<10 {
         world.createEntity(Position(x: 0, y: 0), Velocity(dx: 1, dy: 0))
     }
@@ -71,7 +71,7 @@ private func selectiveMovementSystem() -> System {
 }
 
 @Test func `single component references support full replacement`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(Health(current: 10))
     let row = try #require(world.query(Health.self).first { _ in true })
     let health = row.components

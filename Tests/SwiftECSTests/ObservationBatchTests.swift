@@ -32,7 +32,7 @@ private func tickSystem() -> System {
 }
 
 @Test func `sequential update substeps notify once per update without batching`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(Health(current: 0))
     try world.addSystem(tickSystem())
     let tracker = BatchTracker { _ = world.entityCount }
@@ -44,7 +44,7 @@ private func tickSystem() -> System {
 }
 
 @Test func `batchingObservation coalesces substep storage invalidation into one notification`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(Health(current: 0))
     try world.addSystem(tickSystem())
     let tracker = BatchTracker { _ = world.entityCount }
@@ -62,7 +62,7 @@ private func tickSystem() -> System {
 }
 
 @Test func `batchingObservation flushes the pending invalidation when a substep throws`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(Health(current: 0))
     try world.addSystem(tickSystem())
     let tracker = BatchTracker { _ = world.entityCount }
@@ -79,7 +79,7 @@ private func tickSystem() -> System {
 }
 
 @Test func `batchingObservation returns its body result and nests`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     world.createEntity(Health(current: 0))
     try world.addSystem(tickSystem())
     let tracker = BatchTracker { _ = world.entityCount }

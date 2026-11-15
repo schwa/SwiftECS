@@ -29,7 +29,7 @@ private func observationTestSystem(_ action: @escaping () throws -> Void) -> Sys
 }
 
 @Test func `every storage read observes component writes`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(Position(x: 1, y: 2))
     let query = Query(with: Position.self)
     world.register(query)
@@ -69,7 +69,7 @@ private func observationTestSystem(_ action: @escaping () throws -> Void) -> Sys
 }
 
 @Test func `empty and missing results observe structural mutations`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let query = Query(with: Health.self)
     world.register(query)
     let tracker = StorageTracker {
@@ -104,7 +104,7 @@ private func observationTestSystem(_ action: @escaping () throws -> Void) -> Sys
 
 @Test func `each empty query path tracks future matches`() throws {
     for registered in [false, true] {
-        let world = World()
+        let world = ObservableWorld().world
         let query = Query(with: Health.self)
         if registered {
             world.register(query)
@@ -128,7 +128,7 @@ private func observationTestSystem(_ action: @escaping () throws -> Void) -> Sys
 }
 
 @Test func `empty retained iterators register access even when exhausted`() {
-    let world = World()
+    let world = ObservableWorld().world
     var ordinary = world.entities(matching: .all).makeIterator()
     var fast = world.query(Health.self, matching: .all).makeIterator()
     let ordinaryTracker = StorageTracker { _ = ordinary.next() }
@@ -139,7 +139,7 @@ private func observationTestSystem(_ action: @escaping () throws -> Void) -> Sys
 }
 
 @Test func `component reference writes notify and preserve component events`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     world.createEntity(Position(x: 0, y: 0))
     let row = try #require(world.query(Position.self).first { _ in true })
     let reference = row.components
@@ -154,7 +154,7 @@ private func observationTestSystem(_ action: @escaping () throws -> Void) -> Sys
 }
 
 @Test func `failed mutations and other worlds do not invalidate storage`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity()
     try world.destroy(entity)
     let tracker = StorageTracker { _ = world.entityCount }
@@ -162,7 +162,7 @@ private func observationTestSystem(_ action: @escaping () throws -> Void) -> Sys
     entity.remove(Health.self)
     try world.destroy(entity)
     _ = try world.clone(entity)
-    let other = World()
+    let other = ObservableWorld().world
     let live = other.createEntity()
     live.set(Health(current: 1))
     #expect(tracker.count == 0)
@@ -173,7 +173,7 @@ private func observationTestSystem(_ action: @escaping () throws -> Void) -> Sys
 }
 
 @Test func `ten thousand writes emit one storage notification per update`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(Position(x: 0, y: 0))
     let tracker = StorageTracker { _ = entity[Position.self] }
     let reference = try #require(world.query(Position.self).first { _ in true }).components
@@ -203,7 +203,7 @@ private func observationTestSystem(_ action: @escaping () throws -> Void) -> Sys
 }
 
 @Test func `updates without storage writes only notify simulation time`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let storage = StorageTracker { _ = world.entityCount }
     let time = StorageTracker { _ = world.simulationTime }
     try world.update(deltaTime: 1)
@@ -212,7 +212,7 @@ private func observationTestSystem(_ action: @escaping () throws -> Void) -> Sys
 }
 
 @Test func `nested updates flush only when outer update completes`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let tracker = StorageTracker { _ = world.entityCount }
     var nested = false
     try world.addSystem(observationTestSystem {
@@ -236,7 +236,7 @@ private func observationTestSystem(_ action: @escaping () throws -> Void) -> Sys
 }
 
 @Test func `failed nested update preserves pending invalidation and future writes`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let tracker = StorageTracker { _ = world.entityCount }
     try world.addSystem(observationTestSystem {
         world.createEntity()

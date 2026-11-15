@@ -50,6 +50,7 @@ A ``World`` stores entities. Each ``Entity`` holds a set of ``Component`` values
 ### Observing Changes
 
 - <doc:Observation>
+- ``ObservableWorld``
 - ``ComponentEvent``
 - ``ComponentChange``
 - ``RelationshipEvent``

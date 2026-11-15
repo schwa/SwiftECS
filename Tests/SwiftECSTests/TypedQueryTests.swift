@@ -24,7 +24,7 @@ private final class TypedQueryChanges: @unchecked Sendable {
 }
 
 @Test func `typed queries read and write multiple archetypes without optional access`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let first = world.createEntity(Position(x: 1, y: 2), Velocity(dx: 3, dy: 4))
     let second = world.createEntity(Position(x: 5, y: 6), Velocity(dx: 7, dy: 8), Health(current: 100))
     let excluded = world.createEntity(Position(x: 9, y: 10))
@@ -43,7 +43,7 @@ private final class TypedQueryChanges: @unchecked Sendable {
 }
 
 @Test func `copied typed iterators and rows keep independent indices`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let first = world.createEntity(Position(x: 1, y: 0))
     let second = world.createEntity(Position(x: 2, y: 0))
     var iterator = world.query(Position.self).makeIterator()
@@ -68,7 +68,7 @@ private final class TypedQueryChanges: @unchecked Sendable {
 }
 
 @Test func `typed queries support zero one three and four component packs`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(Position(x: 1, y: 2), Velocity(dx: 3, dy: 4), Health(current: 5), Transform(x: 6, y: 7, z: 8))
     let single = try #require(world.query(Health.self).first { _ in true })
     single.set(Health(current: 20))
@@ -87,7 +87,7 @@ private final class TypedQueryChanges: @unchecked Sendable {
 }
 
 @Test func `typed queries combine predicates with required columns and registered caches`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let query = Query(.not(.contains(Health.self)))
     world.register(query)
     world.createEntity(Health(current: 1))
@@ -105,7 +105,7 @@ private final class TypedQueryChanges: @unchecked Sendable {
 }
 
 @Test func `typed query reads track empty results sequences iterators and rows`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let empty = TypedQueryChanges { _ = world.query(Position.self) }
     let entity = world.createEntity(Position(x: 1, y: 2))
     #expect(empty.count == 1)
@@ -134,7 +134,7 @@ private func typedMovementSystem() -> System {
 }
 
 @Test func `typed writes preserve component events and batch storage notifications`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     for _ in 0..<1_000 {
         world.createEntity(Position(x: 0, y: 0), Velocity(dx: 1, dy: 0))
     }

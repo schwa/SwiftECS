@@ -29,7 +29,7 @@ private final class MutationLog: @unchecked Sendable {
 
 @Test(arguments: MutationAccess.allCases)
 private func `write paths publish changed state before component events and invalidate afterward`(access: MutationAccess) throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(Position(x: 1, y: 2), Velocity(dx: 3, dy: 4))
     let row = try #require(world.query(Position.self, Velocity.self).first { _ in true })
     let log = MutationLog { _ = entity[Position.self] }
@@ -65,7 +65,7 @@ private func mutationSystem(_ action: @escaping () -> Void) -> System {
 
 @Test(arguments: [false, true])
 private func `reentrant component callbacks preserve synchronous ordering and update batching`(batched: Bool) throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(Position(x: 0, y: 0))
     let log = MutationLog { _ = world.entityCount }
     let positionToken = world.observe(Position.self) { _ in
@@ -98,7 +98,7 @@ private func `reentrant component callbacks preserve synchronous ordering and up
 }
 
 @Test func `removed events see the component absent before storage invalidation`() {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(Health(current: 7))
     let log = MutationLog { _ = entity.contains(Health.self) }
     let token = world.observe(Health.self) { event in
@@ -118,7 +118,7 @@ private func `reentrant component callbacks preserve synchronous ordering and up
 }
 
 @Test func `entity lifecycle changes notify storage without synthesizing component events`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = MutationLog { _ = world.entityCount }
     var componentEvents = 0
     let token = world.observe(Health.self) { _ in componentEvents += 1 }
@@ -132,7 +132,7 @@ private func `reentrant component callbacks preserve synchronous ordering and up
 }
 
 @Test func `whole row writes finish before a callback destroys the source entity`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let first = world.createEntity(Position(x: 1, y: 2), Velocity(dx: 3, dy: 4))
     let second = world.createEntity(Position(x: 70, y: 80), Velocity(dx: 90, dy: 100))
     let row = try #require(world.query(Position.self, Velocity.self).first { $0.entityID == first.id })

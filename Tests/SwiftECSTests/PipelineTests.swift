@@ -21,7 +21,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `phase DAG orders all selected systems across unequal paths`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     let root = try world.createPhase("root")
     let left = try world.createPhase("left", after: [root])
@@ -38,7 +38,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `ready systems use registration order rather than query storage order`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     let first = try world.addSystem(pipelineTestSystem(name: "first", log: log), id: "first", after: ["second"])
     try world.addSystem(pipelineTestSystem(name: "second", log: log), id: "second")
@@ -49,7 +49,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `pipelines select systems without implicitly executing phase predecessors`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     let early = try world.createPhase("early")
     let late = try world.createPhase("late", after: [early])
@@ -70,7 +70,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `excluded explicit dependencies fail before execution or time advances`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     try world.addSystem(pipelineTestSystem(name: "first", log: log), id: "first")
     try world.addSystem(pipelineTestSystem(name: "second", log: log), id: "second", dependencies: ["first"]).set(Gameplay())
@@ -83,7 +83,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `phase and system constraints are validated together`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     let early = try world.createPhase("early")
     let late = try world.createPhase("late", after: [early])
@@ -96,7 +96,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `reachable phase cycles fail including empty phases`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     let first = try world.createPhase("first")
     let second = try world.createPhase("second", after: [first])
@@ -110,7 +110,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `runtime relationship edits rebuild the next schedule`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     let first = try world.createPhase("first")
     let second = try world.createPhase("second")
@@ -124,7 +124,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `pipeline membership changes during a run affect the next snapshot`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     var target: Entity?
     let first = pipelineTestSystem(name: "A", log: log) {
@@ -140,7 +140,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `removal during execution retains the snapshot and defers cleanup`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     let first = pipelineTestSystem(name: "A", log: log) {
         world.removeAllSystems()
@@ -157,7 +157,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `new registrations start on the next run`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     var registered = false
     let first = pipelineTestSystem(name: "A", log: log) {
@@ -178,7 +178,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `missing and invalid phase metadata fails before execution`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     let phase = try world.createPhase("phase")
     let system = try world.addSystem(pipelineTestSystem(name: "A", log: log), id: "A", phase: phase)
@@ -191,8 +191,8 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `foreign scheduling handles fail without registration side effects`() throws {
-    let world = World()
-    let other = World()
+    let world = ObservableWorld().world
+    let other = ObservableWorld().world
     let log = PipelineLog()
     let phase = try other.createPhase("foreign")
     #expect(throws: RelationshipError.differentWorlds) {
@@ -207,7 +207,7 @@ private func pipelineTestSystem(name: String, log: PipelineLog, action: @escapin
 }
 
 @Test func `before sugar and unresolved references use ECS relationships`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     let first = try world.addSystem(pipelineTestSystem(name: "A", log: log), id: "A", before: ["B"])
     let reference = try #require(world.systemEntity(for: "B"))
@@ -241,7 +241,7 @@ private final class ScheduleChanges: @unchecked Sendable {
 }
 
 @Test func `scheduling changes notify storage and system counts`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let log = PipelineLog()
     let changes = ScheduleChanges { _ = world.systemCount }
     let system = try world.addSystem(pipelineTestSystem(name: "A", log: log), id: "A")

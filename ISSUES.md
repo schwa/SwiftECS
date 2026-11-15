@@ -1494,6 +1494,8 @@ As a result, all owner-side work runs on the main thread: scheduling, serial sys
 
 Observation should be optional. Users who do not drive SwiftUI directly from the world (or who own the world on a non-main actor) still pay for observation tracking and have no supported pattern for getting state to the UI from an off-main world.
 
+- `2026-11-15T17:53:07Z`: Observation is now opt-in: World is no longer @Observable, and ObservableWorld provides an observed world. Still open: no supported pattern for getting state to the UI from an off-main world.
+
 ---
 
 ## 56: EntityID has no public initializer from a raw value

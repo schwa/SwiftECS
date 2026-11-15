@@ -22,14 +22,17 @@ Whole-row writes finish before the first component event. Storage invalidation f
 
 ## Use SwiftUI observation
 
+A plain `World` does not take part in Swift Observation. Create an ``ObservableWorld`` and use its `world` to drive views.
+
 ```swift
 import SwiftUI
 
 @MainActor
 struct EntityCountView: View {
-    @State private var world = World()
+    @State private var observable = ObservableWorld()
 
     var body: some View {
+        let world = observable.world
         VStack {
             Text("Entities: \(world.entityCount)")
             Button("Add entity") {
@@ -42,5 +45,5 @@ struct EntityCountView: View {
 
 Component, query, and relationship reads establish world-wide observation dependencies. Writes inside one outermost `world.update()` produce one storage invalidation. Writes outside updates notify immediately.
 
-`World` is not thread-safe. Keep SwiftUI-owned worlds on the main actor. Internal mutations of reference-type components require an ECS write to notify observation.
+`World` is not thread-safe. Keep an observable world on the main actor. A plain world can live on any one actor or task. Internal mutations of reference-type components require an ECS write to notify observation.
 

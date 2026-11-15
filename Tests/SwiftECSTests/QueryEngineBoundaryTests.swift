@@ -54,7 +54,7 @@ private func verifyQueryPaths(_ cases: [QueryExpectation], in world: World) {
 
 @Test(arguments: [false, true])
 private func `query paths agree through graph edits archetype changes and registration cycles`(registered: Bool) throws {
-    let world = World()
+    let world = ObservableWorld().world
     let root = world.createEntity()
     let child = world.createEntity(Health(current: 1))
     let leaf = world.createEntity(Position(x: 0, y: 0))
@@ -81,7 +81,7 @@ private func `query paths agree through graph edits archetype changes and regist
 }
 
 @Test func `registered selections preserve captured archetypes and discover new ones on recreation`() {
-    let world = World()
+    let world = ObservableWorld().world
     let query = Query(with: Health.self)
     world.register(query)
     #expect(world.snapshot(matching: query).isEmpty)
@@ -106,8 +106,8 @@ private final class QueryInvalidation: @unchecked Sendable {
 }
 
 @Test func `query registrations are world local and do not invalidate storage observers`() {
-    let first = World()
-    let second = World()
+    let first = ObservableWorld().world
+    let second = ObservableWorld().world
     let query = Query(with: Health.self)
     let entity = first.createEntity(Health(current: 1))
     first.register(query)

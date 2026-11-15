@@ -3,7 +3,11 @@ import Observation
 @usableFromInline
 internal final class MutationCoordinator: Observable {
     private let registrar = ObservationRegistrar()
+    // False for a plain World. Reads then skip the registrar.
+    @usableFromInline let isObserved: Bool
     private var revision: UInt64 = 0
+    var timeRevision: UInt64 = 0
+    var pipelineRevision: UInt64 = 0
     private var batchDepth = 0
     private var isDirty = false
     // Observation trackers are one-shot and only registered through access(), so a publish with no access since the
@@ -27,11 +31,37 @@ internal final class MutationCoordinator: Observable {
         !handlers.isEmpty
     }
 
-    @usableFromInline
+    init(isObserved: Bool) {
+        self.isObserved = isObserved
+    }
+
+    @inlinable
     func access() {
         checkAccessible()
+        if isObserved {
+            trackStorage()
+        }
+    }
+
+    @usableFromInline
+    func trackStorage() {
         accessedSincePublish = true
         registrar.access(self, keyPath: \.revision)
+    }
+
+    // For world properties that are not storage, such as simulationTime.
+    func track(_ keyPath: KeyPath<MutationCoordinator, UInt64>) {
+        if isObserved {
+            registrar.access(self, keyPath: keyPath)
+        }
+    }
+
+    func mutate(_ keyPath: KeyPath<MutationCoordinator, UInt64>, _ body: () -> Void) {
+        if isObserved {
+            registrar.withMutation(of: self, keyPath: keyPath, body)
+        } else {
+            body()
+        }
     }
 
     @inlinable

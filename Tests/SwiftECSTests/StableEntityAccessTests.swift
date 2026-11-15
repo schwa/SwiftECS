@@ -15,7 +15,7 @@ private final class ChangeCount: @unchecked Sendable {
 
 @Test
 func createEntityWithChosenID() {
-    let world = World()
+    let world = ObservableWorld().world
     let id = EntityID()
     world.createEntity(id: id, StableValue(x: 1))
     #expect(world[id]?[StableValue.self]?.x == 1)
@@ -23,7 +23,7 @@ func createEntityWithChosenID() {
 
 @Test
 func createEntityFromRuntimeComponents() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let id = EntityID()
     let components: [any Component] = [StableValue(x: 4), StableTag()]
     world.createEntity(id: id, components: components)
@@ -35,7 +35,7 @@ func createEntityFromRuntimeComponents() throws {
 
 @Test
 func createEntityWithTypedInitializer() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let types = [ComponentType(StableValue.self), ComponentType(StableTag.self)]
     let first = EntityID()
     let second = EntityID()
@@ -66,7 +66,7 @@ func createEntityWithTypedInitializer() throws {
 
 @Test
 func componentRefReadsAndWritesTheEntity() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(StableValue(x: 1))
     let ref = try #require(world.componentRef(StableValue.self, for: entity.id))
     ref.value.x = 5
@@ -76,7 +76,7 @@ func componentRefReadsAndWritesTheEntity() throws {
 
 @Test
 func untrackedValueDoesNotObserveTheWorld() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(StableValue(x: 1))
     let ref = try #require(world.componentRef(StableValue.self, for: entity.id))
     let changes = ChangeCount()
@@ -92,7 +92,7 @@ func untrackedValueDoesNotObserveTheWorld() throws {
 
 @Test
 func storageLocationChangesOnlyWhenTheEntityMoves() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let first = world.createEntity(StableValue(x: 1))
     let second = world.createEntity(StableValue(x: 2))
     let location = try #require(world.storageLocation(of: second.id))
@@ -114,7 +114,7 @@ func storageLocationChangesOnlyWhenTheEntityMoves() throws {
 // Publishing skips the registrar when nothing accessed the World since the last publish; trackers must still fire.
 @Test
 func storageObservationStillFiresAfterSkippedPublishes() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let entity = world.createEntity(StableValue(x: 1))
     let ref = try #require(world.componentRef(StableValue.self, for: entity.id))
     // Writes with nobody tracking.
@@ -142,7 +142,7 @@ func storageObservationStillFiresAfterSkippedPublishes() throws {
 
 @Test
 func structuralRevisionChangesOnlyOnStructuralChanges() {
-    let world = World()
+    let world = ObservableWorld().world
     let first = world.createEntity(StableValue(x: 1))
     let revision = world.structuralRevision
     first.set(StableValue(x: 2))

@@ -105,7 +105,7 @@ struct ObservationOverheadBenchmarkTests {
     }
 
     @MainActor private func makeWorld(entityCount: Int) -> World {
-        let world = World()
+        let world = ObservableWorld().world
         for index in 0..<entityCount {
             world.createEntity(Transform(x: Double(index), y: 0, z: 0), Physics(velocityX: 1, velocityY: 2, velocityZ: 0))
         }

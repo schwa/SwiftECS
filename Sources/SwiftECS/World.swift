@@ -1,26 +1,16 @@
-import Observation
-
 /// Container for entities, components, and systems.
-@Observable
+///
+/// A plain world does not take part in Swift Observation. Use ``ObservableWorld`` to drive SwiftUI from a world.
 public final class World {
-    @ObservationIgnored
     internal var nextSystemRegistrationOrder: UInt64 = 0
-    @ObservationIgnored
     internal var pipelineExecutionDepth = 0
-    @ObservationIgnored
     internal var pendingSystemCleanup: [System] = []
-    @ObservationIgnored
     internal var executions: [PipelineExecution] = []
-    @ObservationIgnored
     internal var parallelRunActive = false
-    @ObservationIgnored
     internal var reservedCommandIDs: Set<EntityID> = []
     /// Counts from the most recent completed run. Not observable.
-    @ObservationIgnored
     public internal(set) var lastRunStatistics = PipelineRunStatistics()
-    @ObservationIgnored
     internal var archetypes: [ArchetypeSignature: Archetype] = [:]
-    @ObservationIgnored
     @usableFromInline internal let revisionCell = OwnerCell<UInt64>(0)
 
     /// A counter that changes when an entity is created, destroyed, or gains or loses a component type.
@@ -30,19 +20,15 @@ public final class World {
         get { revisionCell.value }
         set { revisionCell.value = newValue }
     }
-    @ObservationIgnored
     internal var entityLocations: [EntityID: EntityLocation] = [:]
-    @ObservationIgnored
     private let emptySignature = ArchetypeSignature()
-    @ObservationIgnored
-    @usableFromInline internal let mutations = MutationCoordinator()
+    @usableFromInline internal let mutations: MutationCoordinator
 
     @inlinable
     internal func trackStorageAccess() {
         mutations.access()
     }
 
-    @ObservationIgnored
     internal let relationshipGraph = RelationshipGraph()
 
     internal func removeEntities<S: Sequence>(_ ids: S) -> Int where S.Element == EntityID {
@@ -55,27 +41,48 @@ public final class World {
         }
     }
 
-    @ObservationIgnored
     @usableFromInline internal let queries = QueryEngine()
 
+    private var storedSimulationTime = 0.0
+    private var storedDefaultPipeline = Pipeline()
+
     /// The current simulation time (accumulated deltaTime from all updates).
-    /// This is observable and updates once per `update()` call.
-    public private(set) var simulationTime: Double = 0.0
+    /// It updates once per `update()` call.
+    public private(set) var simulationTime: Double {
+        get {
+            mutations.track(\.timeRevision)
+            return storedSimulationTime
+        }
+        set {
+            mutations.mutate(\.timeRevision) { storedSimulationTime = newValue }
+        }
+    }
 
     /// The pipeline that `update(deltaTime:)` runs.
-    public var defaultPipeline = Pipeline()
+    public var defaultPipeline: Pipeline {
+        get {
+            mutations.track(\.pipelineRevision)
+            return storedDefaultPipeline
+        }
+        set {
+            mutations.mutate(\.pipelineRevision) { storedDefaultPipeline = newValue }
+        }
+    }
 
     /// Create an empty world.
-    public init() {
+    public convenience init() {
+        self.init(isObserved: false)
+    }
+
+    internal init(isObserved: Bool) {
+        mutations = MutationCoordinator(isObserved: isObserved)
         archetypes[emptySignature] = Archetype(signature: emptySignature, serial: 0)
     }
 
-    @ObservationIgnored
     private var lastArchetypeSerial: UInt64 = 0
 
     // The archetype for the last createEntity(id:types:_:) call, so creating many entities with the same types does
     // not hash the whole signature each time.
-    @ObservationIgnored
     internal var lastTypedCreation: (types: [ComponentType], archetype: Archetype)?
 
     // MARK: - Entity Management

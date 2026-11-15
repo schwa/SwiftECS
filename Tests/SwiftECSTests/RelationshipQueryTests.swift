@@ -5,7 +5,7 @@ import Testing
 private enum Targets: Relationship {}
 
 @Test func `all query APIs filter relationships and cached queries see reparenting`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let firstParent = world.createEntity()
     let secondParent = world.createEntity()
     let first = world.createEntity(Health(current: 1))
@@ -35,7 +35,7 @@ private enum Targets: Relationship {}
 }
 
 @Test func `registered relationship queries discover new component archetypes`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let root = world.createEntity()
     let query = Query(.contains(Health.self) && .related(ChildOf.self))
     world.register(query)
@@ -50,7 +50,7 @@ private enum Targets: Relationship {}
 }
 
 @Test func `descendant predicates follow transitive links and exclude their root`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let root = world.createEntity(Health(current: 0))
     let child = world.createEntity(Health(current: 1))
     let leaf = world.createEntity(Health(current: 2))
@@ -102,7 +102,7 @@ private func reparentSystem(parent: Entity, child: Entity) -> System {
 }
 
 @Test func `empty relationship queries observe links and system mutations batch once`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let parent = world.createEntity()
     let child = world.createEntity(Health(current: 1))
     let query = Query(.related(ChildOf.self, to: parent.id))

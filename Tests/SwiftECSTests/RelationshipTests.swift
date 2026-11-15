@@ -33,7 +33,7 @@ private final class RelationshipChanges: @unchecked Sendable {
 }
 
 @Test func `general pairs support multiple targets and distinct relationship types`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let source = world.createEntity()
     let first = world.createEntity()
     let second = world.createEntity()
@@ -52,7 +52,7 @@ private final class RelationshipChanges: @unchecked Sendable {
 }
 
 @Test func `ChildOf is exclusive and cyclic reparenting leaves links unchanged`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let root = world.createEntity()
     let child = world.createEntity()
     let leaf = world.createEntity()
@@ -74,7 +74,7 @@ private final class RelationshipChanges: @unchecked Sendable {
 }
 
 @Test func `deleting a parent detaches children but recursive deletion removes its subtree`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let root = world.createEntity()
     let child = world.createEntity()
     let leaf = world.createEntity()
@@ -95,7 +95,7 @@ private final class RelationshipChanges: @unchecked Sendable {
 }
 
 @Test func `general traversal visits cycles and diamonds once in breadth first order`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let root = world.createEntity()
     let first = world.createEntity()
     let second = world.createEntity()
@@ -111,11 +111,11 @@ private final class RelationshipChanges: @unchecked Sendable {
 }
 
 @Test func `relationship writes reject dead and foreign entities`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let source = world.createEntity()
     let dead = world.createEntity()
     try world.destroy(dead)
-    let foreign = World().createEntity()
+    let foreign = ObservableWorld().world.createEntity()
     #expect(throws: RelationshipError.differentWorlds) { try source.setParent(foreign) }
     #expect(throws: RelationshipError.missingEntity(dead.id)) { try source.setParent(dead) }
     #expect(throws: RelationshipError.missingEntity(dead.id)) { try dead.setParent(source) }
@@ -125,7 +125,7 @@ private final class RelationshipChanges: @unchecked Sendable {
 }
 
 @Test func `relationship reads observe writes and deletion without duplicate notifications`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let source = world.createEntity()
     let target = world.createEntity()
     let reads: [() -> Void] = [
@@ -154,7 +154,7 @@ private final class RelationshipChanges: @unchecked Sendable {
 }
 
 @Test func `exclusivity and cycle restrictions are independent policies`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let first = world.createEntity()
     let second = world.createEntity()
     let third = world.createEntity()
@@ -173,7 +173,7 @@ private final class RelationshipChanges: @unchecked Sendable {
 }
 
 @Test func `failed and duplicate relationship writes do not invalidate observation`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let root = world.createEntity()
     let child = world.createEntity()
     try child.setParent(root)
@@ -183,7 +183,7 @@ private final class RelationshipChanges: @unchecked Sendable {
     try root.setParent(nil)
     #expect(!(try root.removeRelationship(Likes.self, to: child)))
     #expect(changes.count == 0)
-    let otherWorld = World()
+    let otherWorld = ObservableWorld().world
     let otherParent = otherWorld.createEntity()
     let otherChild = otherWorld.createEntity()
     try otherChild.setParent(otherParent)
@@ -191,7 +191,7 @@ private final class RelationshipChanges: @unchecked Sendable {
 }
 
 @Test func `deep hierarchy traversal and recursive deletion use iterative walks`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let root = world.createEntity()
     var parent = root
     for _ in 0..<200 {
@@ -206,7 +206,7 @@ private final class RelationshipChanges: @unchecked Sendable {
 }
 
 @Test func `cloning copies outgoing pairs without copying descendants`() throws {
-    let world = World()
+    let world = ObservableWorld().world
     let parent = world.createEntity()
     let source = world.createEntity(Health(current: 5))
     let child = world.createEntity()

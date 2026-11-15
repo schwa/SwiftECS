@@ -77,7 +77,7 @@ struct QueryPerformanceTests {
             for observed in [false, true] {
                 for offset in accesses.indices {
                     let access = accesses[(round + offset) % accesses.count]
-                    let world = World()
+                    let world = observed ? ObservableWorld().world : World()
                     for index in 0..<entityCount {
                         world.createEntity(Transform(x: Double(index), y: 0, z: 0), Physics(velocityX: 1, velocityY: 2, velocityZ: 3))
                     }

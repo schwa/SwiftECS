@@ -9,7 +9,8 @@ final class SurvivalSession {
         case magic, haste, vitality
     }
 
-    private(set) var world = World()
+    // Views read the live world, so it must be observed.
+    private(set) var world = ObservableWorld().world
     private(set) var started = false
     private(set) var paused = false
     private(set) var failure: String?
@@ -41,7 +42,7 @@ final class SurvivalSession {
     }
 
     func start() {
-        world = World()
+        world = ObservableWorld().world
         system = SurvivalSystem()
         do {
             try system.install(in: world)
