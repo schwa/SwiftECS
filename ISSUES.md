@@ -1441,3 +1441,71 @@ Expected: a repeated read of one component through a cached reference costs clos
 Reported from SceneSprockets #270.
 
 ---
+
+## 53: Scripting language support
+
++++
+status: new
+priority: medium
+kind: feature
+labels: scripting
+created: 2026-11-15T16:52:28Z
++++
+
+SwiftECS has no way to script parts of the ECS (systems, queries, component access) from a scripting language.
+
+## Proposed approach (per user)
+- Language: Luau.
+- Build a separate Luau package outside SwiftECS. It holds all the messy parts (vendored C++ VM and compiler, C API bridging) and is only a generic Luau wrapper with no ECS knowledge.
+- The wrapper may use Swift macros to make the Swift-facing interface pleasant.
+- SwiftECS integration lives in its own target or package that depends on both. The core SwiftECS target stays free of scripting dependencies.
+
+## Notes
+- Luau numbers are doubles, so entity IDs above 2^53 need care.
+- Luau native codegen is not available on iOS. Only the interpreter runs there.
+
+---
+
+## 54: No visual inspector for World state
+
++++
+status: new
+priority: medium
+kind: feature
+created: 2026-11-15T17:20:26Z
++++
+
+There is no UI to inspect a running World. The only debug tools are text-based (`World.stats`, `componentTypes(for:)`, `dump()` in World+Debug.swift). We cannot browse entities, archetypes, component values, systems, or resources in a live app (e.g. the demos).
+
+---
+
+## 55: World observation support pushes users to keep the world on the main actor
+
++++
+status: new
+priority: medium
+kind: enhancement
+created: 2026-11-15T17:28:28Z
++++
+
+`World` is always `@Observable`, and SwiftUI observation is built into every world. The docs (Observation.md) tell users to keep SwiftUI-owned worlds on the main actor, and both demos (BoidsSession, SurvivalSession) do this.
+
+As a result, all owner-side work runs on the main thread: scheduling, serial systems, writeback after parallel jobs, command merges, structural changes, and observer delivery. Only parallel worker callbacks leave it.
+
+Observation should be optional. Users who do not drive SwiftUI directly from the world (or who own the world on a non-main actor) still pay for observation tracking and have no supported pattern for getting state to the UI from an off-main world.
+
+---
+
+## 56: EntityID has no public initializer from a raw value
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: area:api
+created: 2026-11-15T17:50:20Z
++++
+
+EntityID exposes 'value: UInt64' but there is no public way to make an EntityID from a stored UInt64 except decoding it (Codable). Tools that serialise IDs elsewhere (e.g. SwiftECSLuau passes IDs to scripts as strings) have to round-trip through JSONDecoder.
+
+---
