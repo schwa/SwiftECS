@@ -1511,3 +1511,38 @@ created: 2026-11-15T17:50:20Z
 EntityID exposes 'value: UInt64' but there is no public way to make an EntityID from a stored UInt64 except decoding it (Codable). Tools that serialise IDs elsewhere (e.g. SwiftECSLuau passes IDs to scripts as strings) have to round-trip through JSONDecoder.
 
 ---
+
+## 57: Default phase is not reachable before the first system is added
+
++++
+status: new
+priority: low
+kind: enhancement
+labels: area:api
+created: 2026-11-15T17:54:09Z
++++
+
+World creates its default 'Update' phase lazily inside addSystem, and DefaultPhase is private. Code that wants to create a phase after the default one (createPhase(_:after:)) before any system exists has no way to get the default phase entity. SwiftECSLuau works around it by adding and destroying a no-op system.
+
+---
+
+## 58: Components passed to createEntity do not send added events
+
++++
+status: new
+priority: low
+kind: bug
+labels: area:api
+created: 2026-11-15T17:58:47Z
++++
+
+A component observer registered with world.observe(T.self) receives .added when a component is set on an existing entity, but not when the component is passed to createEntity(...).
+
+Repro:
+1. world.observe(Health.self) { print($0) }
+2. world.createEntity(Health(value: 1))  -> no event
+3. world.createEntity().set(Health(value: 1))  -> .added
+
+Expected: both send .added (or documented that createEntity does not). Found in SwiftECSLuau observer tests.
+
+---
